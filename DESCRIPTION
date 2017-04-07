@@ -10,15 +10,11 @@ Encoding: UTF-8
 LazyData: true
 Imports: 
   ggplot2,
-  iprior,
-  Rcpp (>= 0.12.10)
-LinkingTo:
-  Rcpp,
-  RcppEigen
+  iprior
 Suggests:
   knitr,
   rmarkdown,
   testthat
-LinkingTo: Rcpp
 URL: https://github.com/haziqjamil/iprobit
 BugReports: https://github.com/haziqjamil/iprobit/issues
+RoxygenNote: 6.0.1

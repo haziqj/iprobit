@@ -4,10 +4,13 @@ library(gridExtra)
 
 ikernL <- function(Xl, kernel = c("Canonical", "FBM,0.5"), interactions = NULL) {
   Hurst <- splitHurst(kernel)  # get the Hurst coefficient
+  Hurst <- ifelse(is.na(Hurst), 0.5, Hurst)
   kernel <- splitKernel(kernel)  # get the kernel
   kernel <- match.arg(kernel, c("Canonical", "FBM"))
-  if (kernel == "FBM") kernelFn <- iprior::fnH3
-  else kernelFn <- iprior::fnH2
+  if (kernel == "FBM")
+    kernelFn <- function(x, y = NULL) iprior::fnH3(x, y = NULL, gamma = Hurst)
+  else
+    kernelFn <- function(x, y = NULL) iprior::fnH2(x, y = NULL)
   p <- length(Xl)
   Hl <- NULL
 
@@ -17,8 +20,22 @@ ikernL <- function(Xl, kernel = c("Canonical", "FBM,0.5"), interactions = NULL) 
   Hl
 }
 
-iprobit <- function(y, ..., kernel = "Canonical", maxit = 100, stop.crit = 1e-3,
+iprobitSE <- function(eta, thing1, thing0) {
+  # Posterior variance of ystar ------------------------------------------------
+  var.ystar <- rep(NA, n)
+  # 1 - eta * phi(eta) / Phi(eta) - (phi(eta) / Phi(eta)) ^ 2
+  var.ystar[y == 1] <- 1 - eta[y == 1] * thing1 + (thing1 ^ 2)
+  # 1 - eta * (-1) * {phi(eta) / Phi(-eta)} - (phi(eta) / Phi(-eta)) ^ 2
+  var.ystar[y == 0] <- 1 - eta[y == 0] * thing0 + (thing0 ^ 2)
+  sqrt(var.ystar)
+}
+
+iprobit <- function(y, ..., kernel = "Canonical", maxit = 1000, stop.crit = 1e-3,
                     silent = FALSE, interactions = NULL) {
+  y.tmp <- checkLevels(y)
+  y <- y.tmp$y
+  y.levels <- y.tmp$levels
+
   # Prepare kernel matrices ----------------------------------------------------
   Xl <- list(...)
   iprobit.kernel <- ikernL(Xl, kernel, NULL)
@@ -43,6 +60,7 @@ iprobit <- function(y, ..., kernel = "Canonical", maxit = 100, stop.crit = 1e-3,
   niter <- 1
   lb.const <- (n + 2 - log(n)) / 2 + log(2 * pi)
 
+  start.time <- Sys.time()
   for (t in 1:(maxit - 1)) {
     # Update ystar -------------------------------------------------------------
     eta <- as.numeric(alpha[t] + lambda[t] * H %*% w[t, ])
@@ -91,6 +109,16 @@ iprobit <- function(y, ..., kernel = "Canonical", maxit = 100, stop.crit = 1e-3,
     niter <- niter + 1
     if (!silent) setTxtProgressBar(pb, t)
   }
+  end.time <- Sys.time()
+  time.taken <- end.time - start.time
+
+  # Calculate standard errors from posterior variance --------------------------
+  se.lambda <- sqrt(1 / ct)
+  se.alpha <- sqrt(1 / n)
+  se.ystar <- iprobitSE(eta, thing1, thing0)
+
+  # Close function -------------------------------------------------------------
+
   if (!silent) {
     close(pb)
     if (niter == maxit) cat("Convergence criterion not met.\n")
@@ -99,16 +127,93 @@ iprobit <- function(y, ..., kernel = "Canonical", maxit = 100, stop.crit = 1e-3,
 
   res <- list(ystar = ystar[niter, ], w = w[niter, ], lambda = lambda[niter],
               alpha = alpha[niter], lower.bound = lower.bound, kernel = kernel,
-              X = X, y = y, error.rate = error.rate)
+              X = X, y = y, error.rate = error.rate, se = c(se.alpha, se.lambda),
+              se.ystar = se.ystar, y.levels = y.levels,
+              start.time = start.time, end.time = end.time, time = time.taken,
+              call = match.call(), stop.crit = stop.crit, niter = niter,
+              maxit = maxit)
   class(res) <- "ipriorProbit"
   res
 }
 
+ipriorProbitPrintAndSummary <- function(x) {
+  y.hat <- fitted.ipriorProbit(x)$y
+  train.error.rate <- format(round(mean(y.hat != x$y) * 100, 2))
+
+  # Calculate 95% credibility interval for error rate --------------------------
+  y.hat.upper <- fitted(x, "upper")$y
+  train.error.rate.upper <- format(round(mean(y.hat.upper != x$y) * 100, 2))
+  y.hat.lower <- fitted(x, "lower")$y
+  train.error.rate.lower <- format(round(mean(y.hat.lower != x$y) * 100, 2))
+
+  list(
+    train.error.rate = train.error.rate,
+    error.band = c(train.error.rate.lower, train.error.rate.upper),
+    lb = as.numeric(logLik(x))
+  )
+}
+
+print.ipriorProbit <- function(x, newdata = NULL, testdata = NULL) {
+  tmp <- ipriorProbitPrintAndSummary(x)
+  train.error.rate <- tmp$train.error.rate
+  cat("Training error rate:", train.error.rate, "%")
+  if (!is.null(newdata) && !is.null(testdata)) {
+    y.hat <- predict(x, newdata)$y
+    test.error.rate <- format(round(mean(y.hat != testdata) * 100, 2))
+    cat("\nTest error rate:", test.error.rate, "%")
+  }
+}
+
+# iprobit summary
+summary.ipriorProbit <- function(x) {
+  tmp <- ipriorProbitPrintAndSummary(x)
+  train.error.rate <- tmp$train.error.rate
+
+  post.mean <- c(x$alpha, x$lambda)
+  se <- x$se  # only for lambda alpha and lambda
+  tab <- cbind(
+    Mean    = round(post.mean, digits = 4),
+    S.E.    = round(se, digits = 4),
+    "2.5%"  = round(post.mean - 1.96 * se, digits = 4),
+    "97.5%" = round(post.mean + 1.96 * se, digits = 4)
+  )
+  rownames(tab) <- c("alpha", "lambda")
+
+  res <- list(tab = tab, call = x$call, kernel = x$kernel, maxit = x$maxit,
+              stop.crit = x$stop.crit, niter = x$niter, lb = tmp$lb,
+              error = train.error.rate, error.band = x$error.band)
+  class(res) <- "iprobitSummary"
+  res
+}
+
+print.iprobitSummary <- function(x) {
+  cat("\nCall:\n")
+  print(x$call)
+  cat("\nRKHS used:", x$kernel, "\n\n")
+  print(x$tab)
+  if (x$niter == x$maxit) {
+    cat("\nConvergence criterion not met. ")
+  } else {
+    cat("\nConverged to within", x$stop.crit, "tolerance. ")
+  }
+  cat("No. of iterations:", x$niter)
+  # cat("\nModel classification error rate (%):", x$error, "within [",
+  #     x$error.band[1], ",", x$error.band[2], "]")
+  cat("\nModel classification error rate (%):", x$error)
+  cat("\nVariational lower bound:", x$lb)
+  cat("\n\n")
+}
+
 # I-prior probit fitted
-fitted.ipriorProbit <- function(x) {
+fitted.ipriorProbit <- function(x, upper.or.lower = NULL) {
   y.hat <- rep(0, length(x$ystar))
-  y.hat[x$ystar >= 0] <- 1
-  p.hat <- pnorm(x$ystar)
+  ystar <- x$ystar
+  if (!is.null(upper.or.lower)) {
+    if (upper.or.lower == "upper") ystar <- ystar + 1.96 * x$se.ystar
+    else if (upper.or.lower == "lower") ystar <- ystar - 1.96 * x$se.ystar
+  }
+  y.hat[ystar >= 0] <- 1
+  p.hat <- pnorm(ystar)
 
   list(y = y.hat, prob = p.hat)
 }
@@ -127,65 +232,4 @@ predict.ipriorProbit <- function(object, newdata, ...) {
   p.hat <- pnorm(ystar.hat)
 
   list(y = y.hat, prob = p.hat)
-}
-
-# I-prior probit plot
-plot.ipriorProbit <- function(x, niter.plot = NULL, levels = NULL, ...) {
-  if (is.null(niter.plot)) niter.plot <- length(x$lower.bound) - 1
-  tmp <- as.factor(x$y)
-  if (!is.null(levels)) levels(tmp) <- levels
-  lb <- x$lower.bound[2:(niter.plot + 1)]
-  error.rate <- x$error.rate[2:(niter.plot + 1)]
-  maximin <- max(lb) - min(lb)
-  maximin.inv <- 1 / maximin
-  error.rate.scaled <- error.rate * maximin + min(lb)
-  plot.df1 <- data.frame(Iteration = 1:niter.plot,
-                         lower = lb,
-                         error = error.rate.scaled)
-  plot.df2 <- data.frame(Observation = 1:length(x$ystar),
-                         p.hat = fitted(x)$prob,
-                         Class = tmp)
-
-  p1 <- ggplot(plot.df1) +
-    geom_point(aes(x = Iteration, y = error, col = "Error rate")) +
-    geom_line(aes(x = Iteration, y = error, col = "Error rate",
-                  linetype = "Error rate")) +
-    geom_point(aes(x = Iteration, y = lower, col = "Lower bound")) +
-    geom_line(aes(x = Iteration, y = lower, col = "Lower bound",
-                  linetype = "Lower bound")) +
-    scale_linetype_manual(name = NULL,
-                          values = c("Lower bound" = "longdash",
-                                     "Error rate" = "solid")) +
-    scale_colour_manual(name = NULL,
-                        values = c("Lower bound" = "black",
-                                   "Error rate" = "lightgoldenrod4")) +
-    scale_y_continuous(
-      "Lower bound",
-      sec.axis = sec_axis(~ (. - min(lb)) * maximin.inv, name = "Error rate")
-    ) +
-    theme(legend.position = "top")
-
-  p2 <- ggplot(plot.df2, aes(x = Observation, y = p.hat, col = Class)) +
-  geom_point() +
-  labs(y = "Fitted probabilities")
-  #
-  # grid.arrange(p1, p2, ncol = 1, nrow = 2, heights = c(6, 4))
-  p2
-}
-
-print.ipriorProbit <- function(x, newdata = NULL, testdata = NULL) {
-  y.hat <- fitted(x)$y
-  train.error.rate <- format(round(mean(y.hat != x$y) * 100, 2))
-  cat("Training error rate:", train.error.rate, "%")
-  if (!is.null(newdata) && !is.null(testdata)) {
-    y.hat <- predict(x, newdata)$y
-    test.error.rate <- format(round(mean(y.hat != testdata) * 100, 2))
-    cat("\nTest error rate:", test.error.rate, "%")
-  }
-}
-
-# Extract lower bound
-logLik.ipriorProbit <- function(x) {
-  lb <- x$lower.bound[!is.na(x$lower.bound)]
-  cat("Lower bound =", lb[length(lb)])
 }
