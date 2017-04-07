@@ -1,48 +1,50 @@
-## ---- prelim ----
 library(iprior)
 library(ggplot2)
-library(progress)
 library(gridExtra)
 
-## ---- pmf.pdf ----
-# f(x)
-fiprior <- function(theta, w) {
-  alpha <- theta[1]
-  lambda <- theta[2]
-  as.numeric(alpha + lambda * H %*% w)
-}
-# f(y | w)
-l <- function(theta, w) {
-  sum(
-    y * pnorm(fiprior(theta, w), log.p = TRUE) +
-      (1 - y) * pnorm(-fiprior(theta, w), log.p = TRUE)
-  )
+ikernL <- function(Xl, kernel = c("Canonical", "FBM,0.5"), interactions = NULL) {
+  Hurst <- splitHurst(kernel)  # get the Hurst coefficient
+  kernel <- splitKernel(kernel)  # get the kernel
+  kernel <- match.arg(kernel, c("Canonical", "FBM"))
+  if (kernel == "FBM") kernelFn <- iprior::fnH3
+  else kernelFn <- iprior::fnH2
+  p <- length(Xl)
+  Hl <- NULL
+
+  for (i in 1:p) {
+    Hl[[i]] <- kernelFn(as.matrix(Xl[[i]]))
+  }
+  Hl
 }
 
-## ---- variational.bayes ----
-iprobit <- function(y, X, kernel = "Canonical", maxit = 100,
-                    stop.crit = 1e-3, silent = FALSE) {
-  if (kernel == "FBM") H <- iprior::fnH3(X)
-  else H <- iprior::fnH2(X)
+iprobit <- function(y, ..., kernel = "Canonical", maxit = 100, stop.crit = 1e-3,
+                    silent = FALSE, interactions = NULL) {
+  # Prepare kernel matrices ----------------------------------------------------
+  Xl <- list(...)
+  iprobit.kernel <- ikernL(Xl, kernel, NULL)
+  H <- iprobit.kernel[[1]]  # CHANGE THIS FOR FUTURE UPDATES. NOW ONLY SUPPORT
+                            # SINGLE LAMBDA
+
   H2 <- H %*% H
   if (!silent) pb <- txtProgressBar(min = 0, max = maxit - 1, style = 3)
   n <- length(y)
 
-  # Set up parameter results
+  # Set up parameter results ---------------------------------------------------
   lower.bound <- lambda <- rep(NA, maxit)
   error.rate <- alpha <- rep(0, maxit)
   w <- matrix(NA, ncol = n, nrow = maxit)
   ystar <- matrix(NA, ncol = n, nrow = maxit)
 
-  # Initialise
-  lambda[1] <- 1
+  # Initialise -----------------------------------------------------------------
+  lambda[1] <- abs(rnorm(1))
   lambda2 <- 1
-  alpha[1] <- 0
-  w[1, ] <- rep(0, n)
+  alpha[1] <- rnorm(1) #0
+  w[1, ] <- rnorm(n) #rep(0, n)
   niter <- 1
+  lb.const <- (n + 2 - log(n)) / 2 + log(2 * pi)
 
   for (t in 1:(maxit - 1)) {
-    # Update ystar
+    # Update ystar -------------------------------------------------------------
     eta <- as.numeric(alpha[t] + lambda[t] * H %*% w[t, ])
     thing <- rep(NA, n)
     thing1 <- exp(  # phi(eta) / Phi(eta)
@@ -55,31 +57,31 @@ iprobit <- function(y, X, kernel = "Canonical", maxit = 100,
     thing[y == 0] <- thing0
     ystar[t + 1, ] <- eta + thing
 
-    # Update w
+    # Update w -----------------------------------------------------------------
     A <- lambda2 * H2 + diag(1, n)
     a <- as.numeric(lambda[t] * crossprod(H, ystar[t + 1, ] - alpha[t]))
     eigenA <- eigen(A)
     V <- eigenA$vec
-    u <- abs(eigenA$val)
-    w.var <- V %*% diag(1 / u) %*% t(V)
-    w[t + 1, ] <- as.numeric(V %*% (diag(1 / u) %*% (t(V) %*% a)))
-    W <- w.var + tcrossprod(w[t + 1, ])
+    u <- eigenA$val + 1e-8  # ensure positive eigenvalues
+    uinv.Vt <- t(V) / u
+    w[t + 1, ] <- as.numeric(crossprod(a, V) %*% uinv.Vt)
+    W <- V %*% uinv.Vt + tcrossprod(w[t + 1, ])
 
-    # Update lambda
+    # Update lambda ------------------------------------------------------------
     ct <- sum(H2 * W)
     d <- as.numeric(crossprod(ystar[t + 1, ] - alpha[t], H) %*% w[t + 1, ])
     lambda[t + 1] <- d / ct
     lambda2 <- 1 / ct + (d / ct) ^ 2
 
-    # Update alpha
+    # Update alpha -------------------------------------------------------------
     alpha[t + 1] <- mean(ystar[t + 1, ] - lambda[t + 1] * H %*% w[t + 1, ])
 
-    # Lower bound
-    lower.bound[t + 1] <- (n + 2 - log(n)) / 2 + log(2 * pi) +
+    # Lower bound --------------------------------------------------------------
+    lower.bound[t + 1] <- lb.const +
       sum(pnorm(eta[y == 1], log.p = TRUE)) + sum(pnorm(-eta[y == 0], log.p = TRUE)) -
       (sum(diag(W)) + determinant(A)$modulus + log(ct)) / 2
 
-    # Running fit
+    # Running fit --------------------------------------------------------------
     tmp <- rep(0, n)
     tmp[ystar[t + 1, ] >= 0] <- 1
     error.rate[t] <- sum(tmp != y) / n * 100
@@ -89,8 +91,11 @@ iprobit <- function(y, X, kernel = "Canonical", maxit = 100,
     niter <- niter + 1
     if (!silent) setTxtProgressBar(pb, t)
   }
-  if (!silent) close(pb)
-  if (!silent) cat("Converged after", niter, " iterations")
+  if (!silent) {
+    close(pb)
+    if (niter == maxit) cat("Convergence criterion not met.\n")
+    else cat("Converged after", niter, "iterations.\n")
+  }
 
   res <- list(ystar = ystar[niter, ], w = w[niter, ], lambda = lambda[niter],
               alpha = alpha[niter], lower.bound = lower.bound, kernel = kernel,
@@ -163,8 +168,9 @@ plot.ipriorProbit <- function(x, niter.plot = NULL, levels = NULL, ...) {
   p2 <- ggplot(plot.df2, aes(x = Observation, y = p.hat, col = Class)) +
   geom_point() +
   labs(y = "Fitted probabilities")
-
-  grid.arrange(p1, p2, ncol = 1, nrow = 2, heights = c(6, 4))
+  #
+  # grid.arrange(p1, p2, ncol = 1, nrow = 2, heights = c(6, 4))
+  p2
 }
 
 print.ipriorProbit <- function(x, newdata = NULL, testdata = NULL) {
@@ -178,68 +184,8 @@ print.ipriorProbit <- function(x, newdata = NULL, testdata = NULL) {
   }
 }
 
-## ---- iris.data ----
-data(iris)
-str(iris, strict.width = "cut", width = 70)
-y <- ifelse(iris$Species == "setosa", 1, 0)
-X <- iris[, -5]
-n <- length(y)
-H <- fnH2(X)  # canonical kernel
-setosa <- as.factor(y)
-levels(setosa) <- c("Setosa", "Others")
-
-## ---- iris.plot1 ----
-ggplot(data = cbind(X, Class = setosa),
-       aes(x = Sepal.Length, y = Sepal.Width, col = Class)) +
-  geom_point(size = 3)
-
-## ---- iris.res ----
-system.time(mod <- iprobit(y, X, silent = TRUE, maxit = 100))
-print(mod)
-
-## ---- iris.plot2 ----
-plot(mod, 30, levels = c("Setosa", "Others"))
-
-## ---- ionosphere.data ----
-# n = 350, p = 34
-ion <- read.table("ionosphere.data.txt", sep = ",", header = TRUE)
-summary(ion$g)
-X <- as.matrix(ion[, -35])
-y <- as.numeric(ion$g)
-y[y == 2] <- 0  # convert good = 0
-train.index <- sample(1:length(y), 200)
-test.index <- (1:length(y))[-train.index]
-X.train <- X[train.index, ]
-y.train <- y[train.index]
-X.test <- X[test.index, ]
-y.test <- y[test.index]
-
-## ---- ionosphere.res ----
-mod <- iprobit(y.train, X.train, kernel = "FBM", silent = TRUE)
-print(mod)
-print(mod, X.test, y.test)  # Test error rate
-
-## ---- ionosphere.plot ----
-plot(mod, 15, levels = c("good", "bad"))
-
-## ---- cardiac.data ----
-# n = 451, p = 194
-load("Arrh194.RData")
-tmp <- as.factor(ArrhDataNew$y)
-levels(tmp) <- c("Normal", "Arrhythmia")
-summary(tmp)
-train.index <- sample(1:length(ArrhDataNew$y), 300)
-test.index <- (1:length(ArrhDataNew$y))[-train.index]
-X.train <- ArrhDataNew$x[train.index, ]
-y.train <- ArrhDataNew$y[train.index] - 1
-X.test <- ArrhDataNew$x[test.index, ]
-y.test <- ArrhDataNew$y[test.index] - 1
-
-## ---- cardiac.res ----
-mod <- iprobit(y.train, X.train, kernel = "FBM", silent = F)
-print(mod)
-print(mod, X.test, y.test)  # Test error rate
-
-## ---- cardiac.plot ----
-plot(mod, 15, levels = c("Normal", "Arrhythmia"))
-
+# Extract lower bound
+logLik.ipriorProbit <- function(x) {
+  lb <- x$lower.bound[!is.na(x$lower.bound)]
+  cat("Lower bound =", lb[length(lb)])
+}
