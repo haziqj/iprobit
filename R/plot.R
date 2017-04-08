@@ -50,3 +50,47 @@ iplot_lb <- function(x, niter.plot = NULL) {
     labs(y = "Variational lower bound") +
     theme_bw()
 }
+
+iplot_prob <- function(x, covariate = 1, levels = NULL) {
+  if (!is.numeric(covariate)) {
+    covariate <- grep(covariate, colnames(mod$X))
+  }
+  classes <- as.factor(x$y)
+  if (!is.null(levels)) levels(classes) <- levels
+  else levels(classes) <- x$y.levels
+  mean.X <- apply(x$X, 2, mean)
+  X.new <- x$X
+  X.new[, -covariate] <- mean.X[-covariate]
+  p.hat <- predict(x, X.new)$prob
+  p.hat.lower <- predict(x, X.new, "lower")$prob
+  p.hat.upper <- predict(x, X.new, "upper")$prob
+  plot.df <- data.frame(x = x$X[, covariate], y = x$y, prob = p.hat,
+                        low = p.hat.lower, high = p.hat.upper,
+                        Class = classes)
+  x.axis.lab <- colnames(x$X)[covariate]
+
+  ggplot(plot.df, aes(x = x, y = y)) +
+    geom_line(aes(x = x, y = prob)) +
+    geom_point(aes(col = Class)) +
+    geom_ribbon(aes(x = x, ymin = low, ymax = high), fill = "grey70", alpha = 0.5) +
+    labs(x = x.axis.lab, y = "Probability") +
+    theme_bw()
+}
+
+iplot_decbound <- function(x, levels = NULL) {
+  classes <- as.factor(x$y)
+  if (!is.null(levels)) levels(classes) <- levels
+  else levels(classes) <- x$y.levels
+  plot.df <- data.frame(X = x$X, Class = classes)
+
+  ggplot(data = plot.df, aes(x = X[, 1], y = X[, 2], col = Class)) +
+    geom_point(size = 3) +
+    labs(x = colnames(x$X)[1], y = colnames(x$X)[2]) +
+    theme_bw()
+}
+
+
+
+
+
+

@@ -2,27 +2,37 @@ library(iprior)
 library(ggplot2)
 library(gridExtra)
 
-ikernL <- function(Xl, kernel = c("Canonical", "FBM,0.5"), interactions = NULL) {
+ikernL <- function(Xl, newdata = NULL, kernel = c("Canonical", "FBM,0.5"),
+                   interactions = NULL) {
   Hurst <- splitHurst(kernel)  # get the Hurst coefficient
   Hurst <- ifelse(is.na(Hurst), 0.5, Hurst)
   kernel <- splitKernel(kernel)  # get the kernel
   kernel <- match.arg(kernel, c("Canonical", "FBM"))
   if (kernel == "FBM")
-    kernelFn <- function(x, y = NULL) iprior::fnH3(x, y = NULL, gamma = Hurst)
+    kernelFn <- function(x, y = NULL) iprior::fnH3(x = x, y = y, gamma = Hurst)
   else
-    kernelFn <- function(x, y = NULL) iprior::fnH2(x, y = NULL)
+    kernelFn <- function(x, y = NULL) iprior::fnH2(x = x, y = y)
   p <- length(Xl)
   Hl <- NULL
 
   for (i in 1:p) {
-    Hl[[i]] <- kernelFn(as.matrix(Xl[[i]]))
+    Hl[[i]] <- kernelFn(Xl[[i]], y = newdata[[i]])
   }
   Hl
 }
 
-iprobitSE <- function(eta, thing1, thing0) {
+iprobitSE <- function(y, eta, thing1 = NULL, thing0 = NULL) {
+  if (is.null(thing1) | is.null(thing0)) {
+    thing1 <- exp(  # phi(eta) / Phi(eta)
+      dnorm(eta[y == 1], log = TRUE) - pnorm(eta[y == 1], log.p = TRUE)
+    )
+    thing0 <- -exp(  # -1 * {phi(eta) / Phi(-eta)}
+      dnorm(eta[y == 0], log = TRUE) - pnorm(-eta[y == 0], log.p = TRUE)
+    )
+  }
+
   # Posterior variance of ystar ------------------------------------------------
-  var.ystar <- rep(NA, n)
+  var.ystar <- rep(NA, length(y))
   # 1 - eta * phi(eta) / Phi(eta) - (phi(eta) / Phi(eta)) ^ 2
   var.ystar[y == 1] <- 1 - eta[y == 1] * thing1 + (thing1 ^ 2)
   # 1 - eta * (-1) * {phi(eta) / Phi(-eta)} - (phi(eta) / Phi(-eta)) ^ 2
@@ -30,7 +40,7 @@ iprobitSE <- function(eta, thing1, thing0) {
   sqrt(var.ystar)
 }
 
-iprobit <- function(y, ..., kernel = "Canonical", maxit = 1000, stop.crit = 1e-3,
+iprobit <- function(y, ..., kernel = "Canonical", maxit = 1000, stop.crit = 1e-7,
                     silent = FALSE, interactions = NULL) {
   y.tmp <- checkLevels(y)
   y <- y.tmp$y
@@ -38,7 +48,7 @@ iprobit <- function(y, ..., kernel = "Canonical", maxit = 1000, stop.crit = 1e-3
 
   # Prepare kernel matrices ----------------------------------------------------
   Xl <- list(...)
-  iprobit.kernel <- ikernL(Xl, kernel, NULL)
+  iprobit.kernel <- ikernL(Xl, NULL, kernel, NULL)
   H <- iprobit.kernel[[1]]  # CHANGE THIS FOR FUTURE UPDATES. NOW ONLY SUPPORT
                             # SINGLE LAMBDA
 
@@ -53,10 +63,10 @@ iprobit <- function(y, ..., kernel = "Canonical", maxit = 1000, stop.crit = 1e-3
   ystar <- matrix(NA, ncol = n, nrow = maxit)
 
   # Initialise -----------------------------------------------------------------
-  lambda[1] <- abs(rnorm(1))
+  lambda[1] <- rnorm(1)
   lambda2 <- 1
   alpha[1] <- rnorm(1) #0
-  w[1, ] <- rnorm(n) #rep(0, n)
+  w[1, ] <- rnorm(n) ##rep(0, n)
   niter <- 1
   lb.const <- (n + 2 - log(n)) / 2 + log(2 * pi)
 
@@ -83,7 +93,8 @@ iprobit <- function(y, ..., kernel = "Canonical", maxit = 1000, stop.crit = 1e-3
     u <- eigenA$val + 1e-8  # ensure positive eigenvalues
     uinv.Vt <- t(V) / u
     w[t + 1, ] <- as.numeric(crossprod(a, V) %*% uinv.Vt)
-    W <- V %*% uinv.Vt + tcrossprod(w[t + 1, ])
+    Varw <- V %*% uinv.Vt
+    W <- Varw + tcrossprod(w[t + 1, ])
 
     # Update lambda ------------------------------------------------------------
     ct <- sum(H2 * W)
@@ -115,7 +126,7 @@ iprobit <- function(y, ..., kernel = "Canonical", maxit = 1000, stop.crit = 1e-3
   # Calculate standard errors from posterior variance --------------------------
   se.lambda <- sqrt(1 / ct)
   se.alpha <- sqrt(1 / n)
-  se.ystar <- iprobitSE(eta, thing1, thing0)
+  se.ystar <- iprobitSE(y = y, eta = eta, thing1 = thing1, thing0 = thing0)
 
   # Close function -------------------------------------------------------------
 
@@ -127,8 +138,9 @@ iprobit <- function(y, ..., kernel = "Canonical", maxit = 1000, stop.crit = 1e-3
 
   res <- list(ystar = ystar[niter, ], w = w[niter, ], lambda = lambda[niter],
               alpha = alpha[niter], lower.bound = lower.bound, kernel = kernel,
-              X = X, y = y, error.rate = error.rate, se = c(se.alpha, se.lambda),
-              se.ystar = se.ystar, y.levels = y.levels,
+              X = Xl[[1]], y = y, error.rate = error.rate,
+              se = c(se.alpha, se.lambda),
+              se.ystar = se.ystar, y.levels = y.levels, Varw = Varw,
               start.time = start.time, end.time = end.time, time = time.taken,
               call = match.call(), stop.crit = stop.crit, niter = niter,
               maxit = maxit)
@@ -206,30 +218,56 @@ print.iprobitSummary <- function(x) {
 
 # I-prior probit fitted
 fitted.ipriorProbit <- function(x, upper.or.lower = NULL) {
-  y.hat <- rep(0, length(x$ystar))
   ystar <- x$ystar
+  y.hat <- rep(0, length(x$ystar)); y.hat[ystar >= 0] <- 1
+  se.ystar <- iprobitSE(y = y.hat, eta = ystar)
+
   if (!is.null(upper.or.lower)) {
-    if (upper.or.lower == "upper") ystar <- ystar + 1.96 * x$se.ystar
-    else if (upper.or.lower == "lower") ystar <- ystar - 1.96 * x$se.ystar
+    if (upper.or.lower == "upper") {
+      ystar[ystar >= 0] <- ystar[ystar >= 0] + 2.241403 * se.ystar[ystar >= 0]
+      ystar[ystar < 0] <- ystar[ystar < 0] + 0.03133798 * se.ystar[ystar < 0]
+    } else if (upper.or.lower == "lower") {
+      ystar[ystar >= 0] <- ystar[ystar >= 0] - 0.03133798 * se.ystar[ystar >= 0]
+      ystar[ystar < 0] <- ystar[ystar < 0] - 2.241403 * se.ystar[ystar < 0]
+    }
+    y.hat[ystar >= 0] <- 1
   }
-  y.hat[ystar >= 0] <- 1
   p.hat <- pnorm(ystar)
 
   list(y = y.hat, prob = p.hat)
 }
 
 # I-prior probit predict
-predict.ipriorProbit <- function(object, newdata, ...) {
+predict.ipriorProbit <- function(object, newdata, upper.or.lower = NULL) {
   w <- object$w
   lambda <- object$lambda
   alpha <- object$alpha
 
-  if (object$kernel == "Canonical") H.tilde <- fnH2(object$X, newdata)
-  if (object$kernel == "FBM") H.tilde <- fnH3(object$X, newdata)
+  H.tilde <- ikernL(Xl = list(object$X), newdata = list(newdata),
+                    kernel = object$kernel)[[1]]
+  class(H.tilde) <- NULL
+  ystar <- as.numeric(alpha + lambda * H.tilde %*% w)
+  y.hat <- rep(0, nrow(newdata)); y.hat[ystar >= 0] <- 1
+  se.ystar <- iprobitSE(y = y.hat, eta = ystar)
 
-  ystar.hat <- as.numeric(alpha + lambda * H.tilde %*% w)
-  y.hat <- rep(0, nrow(newdata)); y.hat[ystar.hat >= 0] <- 1
-  p.hat <- pnorm(ystar.hat)
+  if (!is.null(upper.or.lower)) {
+    if (upper.or.lower == "upper") {
+      ystar[ystar >= 0] <- ystar[ystar >= 0] + 1.96 * se.ystar[ystar >= 0]
+      ystar[ystar < 0] <- ystar[ystar < 0] + 1.96 * se.ystar[ystar < 0]
+    } else if (upper.or.lower == "lower") {
+      ystar[ystar >= 0] <- ystar[ystar >= 0] - 1.96 * se.ystar[ystar >= 0]
+      ystar[ystar < 0] <- ystar[ystar < 0] - 1.96 * se.ystar[ystar < 0]
+    }
+    y.hat <- rep(0, nrow(newdata)); y.hat[ystar >= 0] <- 1
+  }
+  p.hat <- pnorm(ystar)
 
   list(y = y.hat, prob = p.hat)
 }
+
+# Note: Quantiles for truncated normal distribution are
+# qtruncnorm(0.025, a = 0)  # upper tail truncated at zero
+# qtruncnorm(0.975, a = 0)
+# ## 0.03133798
+# ## 2.241403
+# lower tail truncated at zero are symmetric opposites of the above.
