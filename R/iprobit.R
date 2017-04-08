@@ -40,7 +40,7 @@ iprobitSE <- function(y, eta, thing1 = NULL, thing0 = NULL) {
   sqrt(var.ystar)
 }
 
-iprobit <- function(y, ..., kernel = "Canonical", maxit = 1000, stop.crit = 1e-7,
+iprobit <- function(y, ..., kernel = "Canonical", maxit = 1000, stop.crit = 1e-5,
                     silent = FALSE, interactions = NULL) {
   y.tmp <- checkLevels(y)
   y <- y.tmp$y
