@@ -237,7 +237,7 @@ fitted.ipriorProbit <- function(x, upper.or.lower = NULL) {
     y.hat[ystar >= 0] <- 1
   }
   p.hat <- pnorm(ystar)
-  y.hat <- as.factor(y.hat); levels(y.hat) <- object$y.levels
+  y.hat <- as.factor(y.hat); levels(y.hat) <- x$y.levels
 
   list(y = y.hat, prob = p.hat)
 }
