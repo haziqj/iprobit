@@ -1,7 +1,4 @@
-library(iprior)
-library(ggplot2)
-library(gridExtra)
-
+#' @export
 ikernL <- function(Xl, newdata = NULL, kernel = c("Canonical", "FBM,0.5"),
                    interactions = NULL) {
   Hurst <- splitHurst(kernel)  # get the Hurst coefficient
@@ -21,6 +18,7 @@ ikernL <- function(Xl, newdata = NULL, kernel = c("Canonical", "FBM,0.5"),
   Hl
 }
 
+#' @export
 iprobitSE <- function(y, eta, thing1 = NULL, thing0 = NULL) {
   if (is.null(thing1) | is.null(thing0)) {
     thing1 <- exp(  # phi(eta) / Phi(eta)
@@ -40,6 +38,7 @@ iprobitSE <- function(y, eta, thing1 = NULL, thing0 = NULL) {
   sqrt(var.ystar)
 }
 
+#' @export
 iprobit <- function(y, ..., kernel = "Canonical", maxit = 1000, stop.crit = 1e-5,
                     silent = FALSE, interactions = NULL) {
   y.tmp <- checkLevels(y)
@@ -148,6 +147,7 @@ iprobit <- function(y, ..., kernel = "Canonical", maxit = 1000, stop.crit = 1e-5
   res
 }
 
+#' @export
 ipriorProbitPrintAndSummary <- function(x) {
   y.hat <- fitted.ipriorProbit(x)$y
   train.error.rate <- format(round(mean(y.hat != x$y) * 100, 2))
@@ -165,6 +165,7 @@ ipriorProbitPrintAndSummary <- function(x) {
   )
 }
 
+#' @export
 print.ipriorProbit <- function(x, newdata = NULL, testdata = NULL) {
   tmp <- ipriorProbitPrintAndSummary(x)
   train.error.rate <- tmp$train.error.rate
@@ -176,7 +177,8 @@ print.ipriorProbit <- function(x, newdata = NULL, testdata = NULL) {
   }
 }
 
-# iprobit summary
+
+#' @export
 summary.ipriorProbit <- function(x) {
   tmp <- ipriorProbitPrintAndSummary(x)
   train.error.rate <- tmp$train.error.rate
@@ -198,6 +200,7 @@ summary.ipriorProbit <- function(x) {
   res
 }
 
+#' @export
 print.iprobitSummary <- function(x) {
   cat("\nCall:\n")
   print(x$call)
@@ -216,7 +219,7 @@ print.iprobitSummary <- function(x) {
   cat("\n\n")
 }
 
-# I-prior probit fitted
+#' @export
 fitted.ipriorProbit <- function(x, upper.or.lower = NULL) {
   ystar <- x$ystar
   y.hat <- rep(0, length(x$ystar)); y.hat[ystar >= 0] <- 1
@@ -237,7 +240,7 @@ fitted.ipriorProbit <- function(x, upper.or.lower = NULL) {
   list(y = y.hat, prob = p.hat)
 }
 
-# I-prior probit predict
+#' @export
 predict.ipriorProbit <- function(object, newdata, upper.or.lower = NULL) {
   w <- object$w
   lambda <- object$lambda

@@ -24,6 +24,7 @@ iplot_fitted <- function(x, levels = NULL) {
     theme_bw()
 }
 
+#' @export
 iplot_lb <- function(x, niter.plot = NULL) {
   lb.original <- x$lower.bound[!is.na(x$lower.bound)]
   if (is.null(niter.plot)) niter.plot <- c(1, length(lb.original))
@@ -51,6 +52,7 @@ iplot_lb <- function(x, niter.plot = NULL) {
     theme_bw()
 }
 
+#' @export
 iplot_prob <- function(x, covariate = 1, levels = NULL) {
   if (!is.numeric(covariate)) {
     covariate <- grep(covariate, colnames(mod$X))
@@ -77,6 +79,7 @@ iplot_prob <- function(x, covariate = 1, levels = NULL) {
     theme_bw()
 }
 
+#' @export
 iplot_decbound <- function(x, levels = NULL) {
   classes <- as.factor(x$y)
   if (!is.null(levels)) levels(classes) <- levels
@@ -99,6 +102,7 @@ iplot_decbound <- function(x, levels = NULL) {
     theme_bw()
 }
 
+#' @export
 boundarySolver <- function(alpha, lambda, w, kernel, X, xmin, xmax,
                            ymin, ymax) {
   xlength <- 500
