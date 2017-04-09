@@ -1,11 +1,3 @@
-#' Plot for \code{ipriorProbit} objects.
-#'
-#' @param x
-#' @param niter.plot
-#' @param levels
-#' @param ...
-#'
-#' @return
 #' @export
 plot.ipriorProbit <- function(x, niter.plot = NULL, levels = NULL, ...) {
   fitted.plot <- iplot_fitted(x, levels = levels)
