@@ -7,7 +7,6 @@ Authors@R: person("Haziq", "Jamil", email = "haziq.jamil@gmail.com",
 Description: Fit I-prior probit models to binary data.
 License: GPL (>= 3.0)
 Encoding: UTF-8
-LazyData: true
 Imports: 
   ggplot2,
   iprior
