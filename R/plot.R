@@ -18,7 +18,11 @@ iplot_fitted <- function(x, levels = NULL) {
 }
 
 #' @export
-iplot_lb <- function(x, niter.plot = NULL) {
+iplot_lb <- function(x, niter.plot = NULL, lab.pos = c("up", "down")) {
+  lab.pos <- match.arg(c("up", "down"))
+  if (lab.pos == "up") lab.pos <- -0.5
+  else lab.pos <- 1.5
+
   lb.original <- x$lower.bound[!is.na(x$lower.bound)]
   if (is.null(niter.plot)) niter.plot <- c(1, length(lb.original))
   else if (length(niter.plot) == 1) niter.plot <- c(1, niter.plot)
@@ -40,7 +44,7 @@ iplot_lb <- function(x, niter.plot = NULL) {
     geom_text(aes(label = ifelse(lb == max(lb), round(max(lb), 2), "")),
               vjust = 1.5, size = 3.7) +
     annotate("text", col = "red", x = niter.plot[1], y = max(lb.original),
-             vjust = -0.5, label = round(max(lb.original), 2), size = 3.7) +
+             vjust = lab.pos, label = round(max(lb.original), 2), size = 3.7) +
     labs(y = "Variational lower bound") +
     theme_bw()
 }
