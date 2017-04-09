@@ -151,7 +151,8 @@ iprobit <- function(y, ..., kernel = "Canonical", maxit = 1000, stop.crit = 1e-5
 #' @export
 ipriorProbitPrintAndSummary <- function(x) {
   y.hat <- fitted.ipriorProbit(x)$y
-  train.error.rate <- format(round(mean(y.hat != x$y) * 100, 2))
+  y <- as.factor(x$y); levels(y) <- x$y.levels 
+  train.error.rate <- format(round(mean(y.hat != y) * 100, 2))
 
   # Calculate 95% credibility interval for error rate --------------------------
   y.hat.upper <- fitted(x, "upper")$y
