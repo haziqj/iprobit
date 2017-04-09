@@ -1,3 +1,4 @@
+#' @import ggplot2
 #' @export
 plot.ipriorProbit <- function(x, niter.plot = NULL, levels = NULL, ...) {
   fitted.plot <- iplot_fitted(x, levels = levels)

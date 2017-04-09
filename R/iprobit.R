@@ -40,7 +40,8 @@ iprobitSE <- function(y, eta, thing1 = NULL, thing0 = NULL) {
 
 #' @export
 iprobit <- function(y, ..., kernel = "Canonical", maxit = 1000, stop.crit = 1e-5,
-                    silent = FALSE, interactions = NULL) {
+                    silent = FALSE, interactions = NULL, alpha0 = rnorm(1),
+                    lambda0 = abs(rnorm(1)), w0 = rep(0, n)) {
   y.tmp <- checkLevels(y)
   y <- y.tmp$y
   y.levels <- y.tmp$levels
@@ -62,10 +63,10 @@ iprobit <- function(y, ..., kernel = "Canonical", maxit = 1000, stop.crit = 1e-5
   ystar <- matrix(NA, ncol = n, nrow = maxit)
 
   # Initialise -----------------------------------------------------------------
-  lambda[1] <- rnorm(1)
-  lambda2 <- 1
-  alpha[1] <- rnorm(1) #0
-  w[1, ] <- rnorm(n) ##rep(0, n)
+  lambda[1] <- lambda0
+  lambda2 <- lambda0 ^ 2
+  alpha[1] <- alpha0
+  w[1, ] <- w0
   niter <- 1
   lb.const <- (n + 2 - log(n)) / 2 + log(2 * pi)
 
