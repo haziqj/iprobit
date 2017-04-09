@@ -19,7 +19,7 @@ iplot_fitted <- function(x, levels = NULL) {
 
 #' @export
 iplot_lb <- function(x, niter.plot = NULL, lab.pos = c("up", "down")) {
-  lab.pos <- match.arg(c("up", "down"))
+  lab.pos <- match.arg(lab.pos, c("up", "down"))
   if (lab.pos == "up") lab.pos <- -0.5
   else lab.pos <- 1.5
 
