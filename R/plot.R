@@ -93,7 +93,7 @@ iplot_decbound <- function(x, levels = NULL) {
   ggplot(data = plot.df, aes(x = X[, 1], y = X[, 2])) +
     geom_point(aes(col = Class), size = 3) +
     # geom_text(aes(label = Observation)) +
-    geom_line(data = dec.df, aes(x = x.dec, y = y.dec), col = "grey30", linetype = 2) +
+    geom_line(data = dec.df, aes(x = x.dec, y = y.dec), col = "grey35", linetype = "longdash") +
     coord_cartesian(xlim = xx, ylim = yy) +
     labs(x = colnames(x$X)[1], y = colnames(x$X)[2]) +
     theme_bw()
