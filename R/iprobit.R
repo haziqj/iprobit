@@ -1,24 +1,4 @@
 #' @export
-ikernL <- function(Xl, newdata = NULL, kernel = c("Canonical", "FBM,0.5"),
-                   interactions = NULL) {
-  Hurst <- splitHurst(kernel)  # get the Hurst coefficient
-  Hurst <- ifelse(is.na(Hurst), 0.5, Hurst)
-  kernel <- splitKernel(kernel)  # get the kernel
-  kernel <- match.arg(kernel, c("Canonical", "FBM"))
-  if (kernel == "FBM")
-    kernelFn <- function(x, y = NULL) iprior::fnH3(x = x, y = y, gamma = Hurst)
-  else
-    kernelFn <- function(x, y = NULL) iprior::fnH2(x = x, y = y)
-  p <- length(Xl)
-  Hl <- NULL
-
-  for (i in 1:p) {
-    Hl[[i]] <- kernelFn(Xl[[i]], y = newdata[[i]])
-  }
-  Hl
-}
-
-#' @export
 iprobitSE <- function(y, eta, thing1 = NULL, thing0 = NULL) {
   if (is.null(thing1) | is.null(thing0)) {
     thing1 <- exp(  # phi(eta) / Phi(eta)
@@ -151,7 +131,7 @@ iprobit <- function(y, ..., kernel = "Canonical", maxit = 1000, stop.crit = 1e-5
 #' @export
 ipriorProbitPrintAndSummary <- function(x) {
   y.hat <- fitted.ipriorProbit(x)$y
-  y <- as.factor(x$y); levels(y) <- x$y.levels 
+  y <- as.factor(x$y); levels(y) <- x$y.levels
   train.error.rate <- format(round(mean(y.hat != y) * 100, 2))
 
   # Calculate 95% credibility interval for error rate --------------------------
@@ -220,61 +200,3 @@ print.iprobitSummary <- function(x) {
   cat("\nVariational lower bound:", x$lb)
   cat("\n\n")
 }
-
-#' @export
-fitted.ipriorProbit <- function(x, upper.or.lower = NULL) {
-  ystar <- x$ystar
-  y.hat <- rep(0, length(x$ystar)); y.hat[ystar >= 0] <- 1
-  se.ystar <- iprobitSE(y = y.hat, eta = ystar)
-
-  if (!is.null(upper.or.lower)) {
-    if (upper.or.lower == "upper") {
-      ystar[ystar >= 0] <- ystar[ystar >= 0] + 2.241403 * se.ystar[ystar >= 0]
-      ystar[ystar < 0] <- ystar[ystar < 0] + 0.03133798 * se.ystar[ystar < 0]
-    } else if (upper.or.lower == "lower") {
-      ystar[ystar >= 0] <- ystar[ystar >= 0] - 0.03133798 * se.ystar[ystar >= 0]
-      ystar[ystar < 0] <- ystar[ystar < 0] - 2.241403 * se.ystar[ystar < 0]
-    }
-    y.hat[ystar >= 0] <- 1
-  }
-  p.hat <- pnorm(ystar)
-  y.hat <- as.factor(y.hat); levels(y.hat) <- x$y.levels
-
-  list(y = y.hat, prob = p.hat)
-}
-
-#' @export
-predict.ipriorProbit <- function(object, newdata, upper.or.lower = NULL) {
-  w <- object$w
-  lambda <- object$lambda
-  alpha <- object$alpha
-
-  H.tilde <- ikernL(Xl = list(object$X), newdata = list(newdata),
-                    kernel = object$kernel)[[1]]
-  class(H.tilde) <- NULL
-  ystar <- as.numeric(alpha + lambda * H.tilde %*% w)
-  y.hat <- rep(0, nrow(newdata)); y.hat[ystar >= 0] <- 1
-  se.ystar <- iprobitSE(y = y.hat, eta = ystar)
-
-  if (!is.null(upper.or.lower)) {
-    if (upper.or.lower == "upper") {
-      ystar[ystar >= 0] <- ystar[ystar >= 0] + 1.96 * se.ystar[ystar >= 0]
-      ystar[ystar < 0] <- ystar[ystar < 0] + 1.96 * se.ystar[ystar < 0]
-    } else if (upper.or.lower == "lower") {
-      ystar[ystar >= 0] <- ystar[ystar >= 0] - 1.96 * se.ystar[ystar >= 0]
-      ystar[ystar < 0] <- ystar[ystar < 0] - 1.96 * se.ystar[ystar < 0]
-    }
-    y.hat <- rep(0, nrow(newdata)); y.hat[ystar >= 0] <- 1
-  }
-  p.hat <- pnorm(ystar)
-  y.hat <- as.factor(y.hat); levels(y.hat) <- object$y.levels
-
-  list(y = y.hat, prob = p.hat)
-}
-
-# Note: Quantiles for truncated normal distribution are
-# qtruncnorm(0.025, a = 0)  # upper tail truncated at zero
-# qtruncnorm(0.975, a = 0)
-# ## 0.03133798
-# ## 2.241403
-# lower tail truncated at zero are symmetric opposites of the above.
