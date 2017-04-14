@@ -173,7 +173,7 @@ summary.ipriorProbit <- function(x) {
     "2.5%"  = round(post.mean - 1.96 * se, digits = 4),
     "97.5%" = round(post.mean + 1.96 * se, digits = 4)
   )
-  rownames(tab) <- c("alpha", "lambda")
+  rownames(tab) <- c("alpha", paste0("lambda", 1:length(x$lambda)))
 
   res <- list(tab = tab, call = x$call, kernel = x$kernel, maxit = x$maxit,
               stop.crit = x$stop.crit, niter = x$niter, lb = tmp$lb,
