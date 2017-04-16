@@ -7,10 +7,32 @@ fitted.ipriorProbit <- function(x, upper.or.lower = NULL) {
   if (!is.null(upper.or.lower)) {
     if (upper.or.lower == "upper") {
       ystar[ystar >= 0] <- ystar[ystar >= 0] + 2.241403 * se.ystar[ystar >= 0]
-      ystar[ystar < 0] <- ystar[ystar < 0] + 0.03133798 * se.ystar[ystar < 0]
+      ystar[ystar < 0] <- ystar[ystar < 0] - 0.03133798 * se.ystar[ystar < 0]
     } else if (upper.or.lower == "lower") {
-      ystar[ystar >= 0] <- ystar[ystar >= 0] - 0.03133798 * se.ystar[ystar >= 0]
+      ystar[ystar >= 0] <- ystar[ystar >= 0] + 0.03133798 * se.ystar[ystar >= 0]
       ystar[ystar < 0] <- ystar[ystar < 0] - 2.241403 * se.ystar[ystar < 0]
+    }
+    y.hat[ystar >= 0] <- 1
+  }
+  p.hat <- pnorm(ystar)
+  y.hat <- as.factor(y.hat); levels(y.hat) <- x$y.levels
+
+  list(y = y.hat, prob = p.hat)
+}
+
+#' @export
+fitted2 <- function(x, upper.or.lower = NULL) {
+  ystar <- x$ystar
+  y.hat <- rep(0, length(x$ystar)); y.hat[ystar >= 0] <- 1
+  se.ystar <- iprobitSE(y = y.hat, eta = ystar)
+
+  if (!is.null(upper.or.lower)) {
+    if (upper.or.lower == "upper") {
+      ystar[ystar >= 0] <- ystar[ystar >= 0] + 1.96 * se.ystar[ystar >= 0]
+      ystar[ystar < 0] <- ystar[ystar < 0] + 1.96 * se.ystar[ystar < 0]
+    } else if (upper.or.lower == "lower") {
+      ystar[ystar >= 0] <- ystar[ystar >= 0] - 1.96 * se.ystar[ystar >= 0]
+      ystar[ystar < 0] <- ystar[ystar < 0] - 1.96 * se.ystar[ystar < 0]
     }
     y.hat[ystar >= 0] <- 1
   }
@@ -35,11 +57,11 @@ predict.ipriorProbit <- function(object, newdata, upper.or.lower = NULL) {
 
   if (!is.null(upper.or.lower)) {
     if (upper.or.lower == "upper") {
-      ystar[ystar >= 0] <- ystar[ystar >= 0] + 1.96 * se.ystar[ystar >= 0]
-      ystar[ystar < 0] <- ystar[ystar < 0] + 1.96 * se.ystar[ystar < 0]
+      ystar[ystar >= 0] <- ystar[ystar >= 0] + 2.241403 * se.ystar[ystar >= 0]
+      ystar[ystar < 0] <- ystar[ystar < 0] - 0.03133798 * se.ystar[ystar < 0]
     } else if (upper.or.lower == "lower") {
-      ystar[ystar >= 0] <- ystar[ystar >= 0] - 1.96 * se.ystar[ystar >= 0]
-      ystar[ystar < 0] <- ystar[ystar < 0] - 1.96 * se.ystar[ystar < 0]
+      ystar[ystar >= 0] <- ystar[ystar >= 0] + 0.03133798 * se.ystar[ystar >= 0]
+      ystar[ystar < 0] <- ystar[ystar < 0] - 2.241403 * se.ystar[ystar < 0]
     }
     y.hat <- rep(0, nrow(newdata)); y.hat[ystar >= 0] <- 1
   }
@@ -64,11 +86,11 @@ predict2 <- function(object, newdata, upper.or.lower = NULL) {
 
   if (!is.null(upper.or.lower)) {
     if (upper.or.lower == "upper") {
-      ystar[ystar >= 0] <- ystar[ystar >= 0] + 2.241403 * se.ystar[ystar >= 0]
-      ystar[ystar < 0] <- ystar[ystar < 0] + 0.03133798 * se.ystar[ystar < 0]
+      ystar[ystar >= 0] <- ystar[ystar >= 0] + 1.96 * se.ystar[ystar >= 0]
+      ystar[ystar < 0] <- ystar[ystar < 0] + 1.96 * se.ystar[ystar < 0]
     } else if (upper.or.lower == "lower") {
-      ystar[ystar >= 0] <- ystar[ystar >= 0] - 0.03133798 * se.ystar[ystar >= 0]
-      ystar[ystar < 0] <- ystar[ystar < 0] - 2.241403 * se.ystar[ystar < 0]
+      ystar[ystar >= 0] <- ystar[ystar >= 0] - 1.96 * se.ystar[ystar >= 0]
+      ystar[ystar < 0] <- ystar[ystar < 0] - 1.96 * se.ystar[ystar < 0]
     }
     y.hat <- rep(0, nrow(newdata)); y.hat[ystar >= 0] <- 1
   }
