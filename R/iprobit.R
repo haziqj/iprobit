@@ -169,7 +169,7 @@ summary.ipriorProbit <- function(x) {
   se <- x$se  # only for lambda alpha and lambda
   tab <- cbind(
     Mean    = round(post.mean, digits = 4),
-    S.E.    = round(se, digits = 4),
+    S.D.    = round(se, digits = 4),
     "2.5%"  = round(post.mean - 1.96 * se, digits = 4),
     "97.5%" = round(post.mean + 1.96 * se, digits = 4)
   )
