@@ -4,6 +4,7 @@ plot.ipriorProbit <- function(x, niter.plot = NULL, levels = NULL, ...) {
   fitted.plot <- iplot_fitted(x, levels = levels)
 }
 
+#' @export
 iplot_fitted <- function(x, levels = NULL) {
   classes <- as.factor(x$y)
   if (!is.null(levels)) levels(classes) <- levels
@@ -14,6 +15,31 @@ iplot_fitted <- function(x, levels = NULL) {
   ggplot(plot.df, aes(x = Observation, y = p.hat, col = Class)) +
     geom_point() +
     labs(y = "Fitted probabilities") +
+    theme_bw()
+}
+
+#' @export
+plot.iprobitMult <- function(x, levels = NULL, ...) {
+  fitted.plot <- iplot_fitted_mult(x, levels = levels)
+  fitted.plot
+}
+
+#' @export
+iplot_fitted_mult <- function(x, levels = NULL) {
+  list2env(x, envir = environment())
+  n <- length(y)
+  y.lev <- levels(y)
+  m <- length(y.lev)
+  nm <- n * m
+  p <- ncol(X)
+
+  probs <- fitted(x)$probs
+  df.plot <- data.frame(probs, i = 1:n)
+  df.plot <- reshape2::melt(df.plot, id.vars = "i")
+  ggplot(df.plot, aes(x = i, y = value)) +
+    geom_area(aes(col = variable, fill = variable), position = "stack") +
+    coord_cartesian(ylim = c(0, 1)) +
+    labs(col = "Class", fill = "Class", x = "Index", y = "Fitted probabilities") +
     theme_bw()
 }
 
