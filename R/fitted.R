@@ -184,6 +184,7 @@ predict.iprobitMult <- function(object, X.test, y.test = NULL,
             class = "iprobitMultPredict")
 }
 
+#' @export
 print.iprobitMultPredict <- function(x) {
   cat("Test error rate:", x$test.error.rate, "%")
 }
