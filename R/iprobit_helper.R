@@ -18,33 +18,21 @@
 #
 ################################################################################
 
-splitKernel <- function(kernel) {
-  # Helper function to split the FBMs from the Hurst coefficients, if any
-  paste(lapply(strsplit(kernel, ","), function(x) x[1]))
-}
+iprobitSE <- function(y, eta, thing1 = NULL, thing0 = NULL) {
+  if (is.null(thing1) | is.null(thing0)) {
+    thing1 <- exp(  # phi(eta) / Phi(eta)
+      dnorm(eta[y == 1], log = TRUE) - pnorm(eta[y == 1], log.p = TRUE)
+    )
+    thing0 <- -exp(  # -1 * {phi(eta) / Phi(-eta)}
+      dnorm(eta[y == 0], log = TRUE) - pnorm(-eta[y == 0], log.p = TRUE)
+    )
+  }
 
-splitHurst <- function(kernel) {
-  # Helper function to split the FBMs from the Hurst coefficients, if any
-  suppressWarnings(
-    tmp <- as.numeric(paste(lapply(strsplit(kernel, ","), function(x) x[2])))
-  )
-  tmp
-}
-
-checkLevels <- function(y) {
-  y <- as.factor(y)
-  y.levels <- levels(y)
-  y.numeric <- as.numeric(y) - 1
-
-  if (length(y.levels) > 2) stop("Only able to fit binary data.")
-
-  list(y = y.numeric, levels = y.levels)
-}
-
-is.iprobitMod_bin <- function(x) {
-  any(class(x) == "iprobitMod_bin")
-}
-
-is.iprobitMod_mult <- function(x) {
-  any(class(x) == "iprobitMod_mult")
+  # Posterior variance of ystar ------------------------------------------------
+  var.ystar <- rep(NA, length(y))
+  # 1 - eta * phi(eta) / Phi(eta) - (phi(eta) / Phi(eta)) ^ 2
+  var.ystar[y == 1] <- 1 - eta[y == 1] * thing1 + (thing1 ^ 2)
+  # 1 - eta * (-1) * {phi(eta) / Phi(-eta)} - (phi(eta) / Phi(-eta)) ^ 2
+  var.ystar[y == 0] <- 1 - eta[y == 0] * thing0 + (thing0 ^ 2)
+  sqrt(var.ystar)
 }

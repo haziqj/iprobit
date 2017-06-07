@@ -2,7 +2,7 @@
 iprobit_mult <- function(y, X, kernel = c("Canonical", "FBM"), maxit = 100,
                          stop.crit = 1e-5,  silent = FALSE, alpha0 = NULL,
                          lambda0 = NULL, w0 = NULL, common.intercept = FALSE,
-                         common.RKHS.scale = TRUE) {
+                         common.RKHS.scale = FALSE) {
   n <- length(y)
   y.lev <- levels(y)
   m <- length(y.lev)
@@ -130,29 +130,6 @@ iprobit_mult <- function(y, X, kernel = c("Canonical", "FBM"), maxit = 100,
   res <- list(ystar = ystar.tmp, w = w, lambda = lambda, alpha = alpha,
               lower.bound = lb, time = time.taken, niter = niter, y = y, X = X,
               kernel = kernel, maxit = maxit)
-  class(res) <- "iprobitMult"
+  class(res) <- c("iprobitMod", "iprobitMod_mult")
   res
 }
-
-#' @export
-print.iprobitMult <- function(x) {
-  Intercept <- lambda <- 0
-  m <- ncol(x$w)
-  Intercept[1:m] <- x$alpha
-  lambda[1:m] <- x$lambda
-  theta <- rbind(Intercept, lambda)
-  colnames(theta) <- paste0("Class = ", seq_len(m))
-  # y.hat <- fitted(x)$y
-
-  cat("Lower bound value = ", x$lower.bound[x$niter], "\n")
-  # cat("Training error rate = ", mean(y.hat != x$y), "%\n")
-  cat("Iterations = ", x$niter, "\n\n")
-  print(round(theta, 5))
-}
-
-
-
-
-
-
-
