@@ -66,7 +66,10 @@ predict.ipriorProbit <- function(object, newdata, upper.or.lower = NULL) {
     y.hat <- rep(0, nrow(newdata)); y.hat[ystar >= 0] <- 1
   }
   p.hat <- pnorm(ystar)
+  p.hat <- data.frame(1 - p.hat, p.hat)
+  colnames(p.hat) <- object$y.levels
   y.hat <- as.factor(y.hat); levels(y.hat) <- object$y.levels
+
 
   list(y = y.hat, prob = p.hat)
 }

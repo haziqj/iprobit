@@ -19,7 +19,7 @@ iprobitSE <- function(y, eta, thing1 = NULL, thing0 = NULL) {
 }
 
 #' @export
-iprobit <- function(y, ..., kernel = "Canonical", maxit = 1000, stop.crit = 1e-5,
+iprobit <- function(y, ..., kernel = "Canonical", maxit = 100, stop.crit = 1e-5,
                     silent = FALSE, interactions = NULL, alpha0 = rnorm(1),
                     lambda0 = abs(rnorm(1)), w0 = rep(0, n)) {
   y.tmp <- checkLevels(y)
@@ -30,30 +30,25 @@ iprobit <- function(y, ..., kernel = "Canonical", maxit = 1000, stop.crit = 1e-5
   Xl <- list(...)
   iprobit.kernel <- ikernL(Xl, NULL, kernel, NULL)
   H <- iprobit.kernel[[1]]  # CHANGE THIS FOR FUTURE UPDATES. NOW ONLY SUPPORT
-                            # SINGLE LAMBDA
+                            # SINGLE LAMBDA.
+  H.sq <- H %*% H
 
-  H2 <- H %*% H
   if (!silent) pb <- txtProgressBar(min = 0, max = maxit - 1, style = 3)
   n <- length(y)
 
-  # Set up parameter results ---------------------------------------------------
-  lower.bound <- lambda <- rep(NA, maxit)
-  error.rate <- alpha <- rep(0, maxit)
-  w <- matrix(NA, ncol = n, nrow = maxit)
-  ystar <- matrix(NA, ncol = n, nrow = maxit)
-
   # Initialise -----------------------------------------------------------------
-  lambda[1] <- lambda0
-  lambda2 <- lambda0 ^ 2
-  alpha[1] <- alpha0
-  w[1, ] <- w0
+  lambda <- lambda0
+  lambda.sq <- lambda ^ 2
+  alpha <- alpha0
+  w <- w0
   niter <- 1
+  lower.bound <- rep(NA, maxit)
   lb.const <- (n + 2 - log(n)) / 2 + log(2 * pi)
 
   start.time <- Sys.time()
   for (t in 1:(maxit - 1)) {
     # Update ystar -------------------------------------------------------------
-    eta <- as.numeric(alpha[t] + lambda[t] * H %*% w[t, ])
+    eta <- as.numeric(alpha + lambda * H %*% w)
     thing <- rep(NA, n)
     thing1 <- exp(  # phi(eta) / Phi(eta)
       dnorm(eta[y == 1], log = TRUE) - pnorm(eta[y == 1], log.p = TRUE)
@@ -63,37 +58,33 @@ iprobit <- function(y, ..., kernel = "Canonical", maxit = 1000, stop.crit = 1e-5
     )
     thing[y == 1] <- thing1
     thing[y == 0] <- thing0
-    ystar[t + 1, ] <- eta + thing
+    ystar <- eta + thing
 
     # Update w -----------------------------------------------------------------
-    A <- lambda2 * H2 + diag(1, n)
-    a <- as.numeric(lambda[t] * crossprod(H, ystar[t + 1, ] - alpha[t]))
+    A <- lambda.sq * H.sq + diag(1, n)
+    a <- as.numeric(lambda[t] * crossprod(H, ystar - alpha))
     eigenA <- eigen(A)
     V <- eigenA$vec
     u <- eigenA$val + 1e-8  # ensure positive eigenvalues
     uinv.Vt <- t(V) / u
-    w[t + 1, ] <- as.numeric(crossprod(a, V) %*% uinv.Vt)
+    w <- as.numeric(crossprod(a, V) %*% uinv.Vt)
     Varw <- V %*% uinv.Vt
-    W <- Varw + tcrossprod(w[t + 1, ])
+    W <- Varw + tcrossprod(w)
 
     # Update lambda ------------------------------------------------------------
-    ct <- sum(H2 * W)
-    d <- as.numeric(crossprod(ystar[t + 1, ] - alpha[t], H) %*% w[t + 1, ])
-    lambda[t + 1] <- d / ct
-    lambda2 <- 1 / ct + (d / ct) ^ 2
+    ct <- sum(H.sq * W)
+    d <- as.numeric(crossprod(ystar - alpha, H) %*% w)
+    lambda <- d / ct
+    lambda.sq <- 1 / ct + (d / ct) ^ 2
 
     # Update alpha -------------------------------------------------------------
-    alpha[t + 1] <- mean(ystar[t + 1, ] - lambda[t + 1] * H %*% w[t + 1, ])
+    alpha <- mean(ystar - lambda * H %*% w)
 
     # Lower bound --------------------------------------------------------------
     lower.bound[t + 1] <- lb.const +
-      sum(pnorm(eta[y == 1], log.p = TRUE)) + sum(pnorm(-eta[y == 0], log.p = TRUE)) -
+      sum(pnorm(eta[y == 1], log.p = TRUE)) +
+      sum(pnorm(-eta[y == 0], log.p = TRUE)) -
       (sum(diag(W)) + determinant(A)$modulus + log(ct)) / 2
-
-    # Running fit --------------------------------------------------------------
-    tmp <- rep(0, n)
-    tmp[ystar[t + 1, ] >= 0] <- 1
-    error.rate[t] <- sum(tmp != y) / n * 100
 
     lb.diff <- abs(lower.bound[t + 1] - lower.bound[t])
     if (!is.na(lb.diff) && (lb.diff < stop.crit)) break
@@ -109,7 +100,6 @@ iprobit <- function(y, ..., kernel = "Canonical", maxit = 1000, stop.crit = 1e-5
   se.ystar <- iprobitSE(y = y, eta = eta, thing1 = thing1, thing0 = thing0)
 
   # Close function -------------------------------------------------------------
-
   if (!silent) {
     close(pb)
     if (niter == maxit) cat("Convergence criterion not met.\n")
