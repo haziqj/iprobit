@@ -1,3 +1,16 @@
+# myfun <- function() {
+#   this.env <- environment()
+#   environment(.lambdaExpand) <- this.env
+#   list2env(mod, this.env)
+#   list2env(BlockBstuff, this.env)
+#   environment(BlockB)  <- this.env
+#   list2env(model, this.env)
+#   lambda <- 1:4
+#   .lambdaExpand(env = this.env)
+#   BlockB(1)
+#   print(Sl)
+# }
+
 # gg_colour_hue <- function(n) {
 #   hues = seq(15, 375, length = n + 1)
 #   hcl(h = hues, l = 65, c = 100)[1:n]

@@ -1,5 +1,6 @@
 #' @export
-gen_mixture <- function(n = 500, m = 2, mu = m / 2 + 1, sd = 1, proportion = rep(0.5, m)) {
+gen_mixture <- function(n = 500, m = 2, mu = m / 2 + 1, sd = 1,
+                        proportion = rep(0.5, m)) {
   # Angles
   angles <- seq(from = 0, by = 360 / m, length = m) * pi / 180
 
@@ -82,4 +83,9 @@ plot.iprobitData <- function(x) {
     geom_point(alpha = 0.8) +
     labs(x = "X1", y = "X2", col = "Class") +
     theme_bw()
+}
+
+#' @export
+as.data.frame.iprobitData <- function(x) {
+  data.frame(x$X, y = x$y)
 }

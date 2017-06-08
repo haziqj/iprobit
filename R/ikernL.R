@@ -20,3 +20,32 @@ ikernL <- function(Xl, newdata = NULL, kernel = c("Canonical", "FBM,0.5", "Pears
   }
   Hl
 }
+
+# # Test iprior kernel loader on categorical data
+#
+# dat <- gen_mixture(n = 2)
+# df <- data.frame(dat$X, y = dat$y)
+# mod <- kernL(y ~ . ^ 2, df)
+#
+# myfun <- function() {
+#   this.env <- environment()
+#   environment(.lambdaExpand) <- this.env
+#   list2env(mod, this.env)
+#   list2env(BlockBstuff, this.env)
+#   environment(BlockB)  <- this.env
+#   list2env(model, this.env)
+#   lambda <- seq_len(p)
+#   .lambdaExpand(env = this.env)
+#   BlockB(1)
+#   BlockB(2)
+#   print(lambda)
+#   print(Hl)
+#   print(Pl)
+#   print(Psql)
+#   print(Sl)
+# }
+# myfun()
+
+
+
+

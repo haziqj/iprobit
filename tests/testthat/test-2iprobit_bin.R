@@ -32,3 +32,19 @@ test_that("Fitted and predict", {
   expect_that(print(mod.predict), prints_text("Test error rate"))
 
 })
+
+test_that("Convergence", {
+
+  set.seed(123)
+  dat <- gen_mixture(n = 10)
+
+  # Single lambda
+  # mod <- iprobit_bin(dat$y, dat$X, silent = TRUE, maxit = 200)
+  # > mod
+  # Lower bound value =  -4.89696
+  # Iterations =  106
+  #
+  # alpha   lambda
+  # -0.00901  0.11646
+
+})
