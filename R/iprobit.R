@@ -41,20 +41,21 @@ iprobit.default <- function(y, ..., kernel = "Canonical", silent = FALSE,
 
 #' @export
 iprobit.formula <- function(formula, data = parent.frame(), kernel = "Canonical",
-                            silent = FALSE, control = list()) {
+                            silent = FALSE, one.lam = FALSE, control = list()) {
   # Pass to iprobit default ----------------------------------------------------
-  ipriorKernel <- iprior::kernL(formula, data, model = list(kernel = kernel))
-  est <- iprobit.default(y = ipriorKernel, control = control)
+  ipriorKernel <- iprior::kernL(formula, data, model = list(kernel = kernel,
+                                                            one.lam = one.lam))
+  est <- iprobit.default(y = ipriorKernel, control = control, silent = silent)
 
   # Changing the call to simply iprobit ----------------------------------------
-  # cl <- match.call()
-  # est$fullcall <- cl
-  # cl[[1L]] <- as.name("iprior")
-  # m <- match(c("formula", "data"), names(cl), 0L)
-  # cl <- cl[c(1L, m)]
-  # est$call <- cl
-  # names(est$call)[2] <- "formula"
-  # est$formula <- formula
+  cl <- match.call()
+  est$fullcall <- cl
+  cl[[1L]] <- as.name("iprobit")
+  m <- match(c("formula", "data"), names(cl), 0L)
+  cl <- cl[c(1L, m)]
+  est$call <- cl
+  names(est$call)[2] <- "formula"
+  est$formula <- formula
   # est$terms <- class(est) <- "ipriorMod"
 
   est

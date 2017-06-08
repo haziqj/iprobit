@@ -38,3 +38,7 @@ is.iprobitMod_bin <- function(x) {
 is.iprobitMod_mult <- function(x) {
   any(class(x) == "iprobitMod_mult")
 }
+
+is.iprobitData <- function(x) {
+  any(class(x) == "iprobitData")
+}
