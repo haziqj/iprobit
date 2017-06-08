@@ -1,50 +1,48 @@
 #' @export
-iprobit_bin <- function(y, ..., kernel = "Canonical", maxit = 100,
-                        stop.crit = 1e-5, silent = FALSE, interactions = NULL,
-                        alpha0 = rnorm(1), lambda0 = abs(rnorm(1)),
-                        w0 = rep(0, n)) {
-  y.tmp <- checkLevels(y)
-  y <- y.tmp$y
-  y.levels <- y.tmp$levels
-
-  # Prepare kernel matrices ----------------------------------------------------
-  Xl <- list(...)
-  iprobit.kernel <- ikernL(Xl, NULL, kernel, NULL)
-  Hurst <- 0.5  # CHANGE THIS
-  H <- iprobit.kernel[[1]]  # CHANGE THIS FOR FUTURE UPDATES. NOW ONLY SUPPORT
-                            # SINGLE LAMBDA.
-  H.sq <- H %*% H
-
-  if (!silent) pb <- txtProgressBar(min = 0, max = maxit - 1, style = 3)
-  n <- length(y)
+iprobit_bin <- function(ipriorKernel, maxit = 200, stop.crit = 1e-5,
+                        silent = FALSE, alpha0 = NULL, lambda0 = NULL,
+                        w0 = NULL) {
+  # Declare all variables and functions to be used into environment ------------
+  iprobit.env <- environment()
+  list2env(ipriorKernel, iprobit.env)
+  list2env(BlockBstuff, iprobit.env)
+  list2env(model, iprobit.env)
+  environment(BlockB) <- environment(.lambdaExpand) <- iprobit.env
+  y <- Y
 
   # Initialise -----------------------------------------------------------------
+  if (is.null(lambda0)) lambda0 <- abs(rnorm(p))
+  if (is.null(alpha0)) alpha0 <- rnorm(1)
+  if (is.null(w0)) w0 <- rep(0, n)
   lambda <- lambda0
   lambda.sq <- lambda ^ 2
+  Hlam.mat <- Reduce("+", mapply("*", Hl, lambda, SIMPLIFY = FALSE))
+  Hlam.matsq <- Reduce("+", mapply("*", Psql, lambda.sq, SIMPLIFY = FALSE))
   alpha <- alpha0
   w <- w0
   niter <- 1
   lower.bound <- rep(NA, maxit)
   lb.const <- (n + 2 - log(n)) / 2 + log(2 * pi)
 
+  if (!silent) pb <- txtProgressBar(min = 0, max = maxit - 1, style = 3)
   start.time <- Sys.time()
   for (t in 1:(maxit - 1)) {
     # Update ystar -------------------------------------------------------------
-    eta <- as.numeric(alpha + lambda * H %*% w)
+    eta <- as.numeric(alpha + Hlam.mat %*% w)
     thing <- rep(NA, n)
     thing1 <- exp(  # phi(eta) / Phi(eta)
-      dnorm(eta[y == 1], log = TRUE) - pnorm(eta[y == 1], log.p = TRUE)
+      dnorm(eta[y == 2], log = TRUE) - pnorm(eta[y == 2], log.p = TRUE)
     )
     thing0 <- -exp(  # -1 * {phi(eta) / Phi(-eta)}
-      dnorm(eta[y == 0], log = TRUE) - pnorm(-eta[y == 0], log.p = TRUE)
+      dnorm(eta[y == 1], log = TRUE) - pnorm(-eta[y == 1], log.p = TRUE)
     )
-    thing[y == 1] <- thing1
-    thing[y == 0] <- thing0
+    thing[y == 2] <- thing1
+    thing[y == 1] <- thing0
     ystar <- eta + thing
 
     # Update w -----------------------------------------------------------------
-    A <- lambda.sq * H.sq + diag(1, n)
-    a <- as.numeric(lambda * crossprod(H, ystar - alpha))
+    A <- Hlam.matsq + diag(1, n)
+    a <- as.numeric(crossprod(Hlam.mat, ystar - alpha))
     eigenA <- eigen(A)
     V <- eigenA$vec
     u <- eigenA$val + 1e-8  # ensure positive eigenvalues
@@ -54,18 +52,20 @@ iprobit_bin <- function(y, ..., kernel = "Canonical", maxit = 100,
     W <- Varw + tcrossprod(w)
 
     # Update lambda ------------------------------------------------------------
-    ct <- sum(H.sq * W)
-    d <- as.numeric(crossprod(ystar - alpha, H) %*% w)
+    ct <- sum(Psql[[1]] * W)
+    d <- as.numeric(crossprod(ystar - alpha, Pl[[1]]) %*% w - sum(Sl[[1]] * W))
     lambda <- d / ct
     lambda.sq <- 1 / ct + (d / ct) ^ 2
+    Hlam.mat <- Reduce("+", mapply("*", Hl, lambda, SIMPLIFY = FALSE))
+    Hlam.matsq <- Reduce("+", mapply("*", Psql, lambda.sq, SIMPLIFY = FALSE))
 
     # Update alpha -------------------------------------------------------------
-    alpha <- mean(ystar - lambda * H %*% w)
+    alpha <- mean(ystar - Hlam.mat %*% w)
 
     # Lower bound --------------------------------------------------------------
     lower.bound[t + 1] <- lb.const +
-      sum(pnorm(eta[y == 1], log.p = TRUE)) +
-      sum(pnorm(-eta[y == 0], log.p = TRUE)) -
+      sum(pnorm(eta[y == 2], log.p = TRUE)) +
+      sum(pnorm(-eta[y == 1], log.p = TRUE)) -
       (sum(diag(W)) + determinant(A)$modulus + log(ct)) / 2
 
     lb.diff <- abs(lower.bound[t + 1] - lower.bound[t])
@@ -89,7 +89,7 @@ iprobit_bin <- function(y, ..., kernel = "Canonical", maxit = 100,
   }
 
   res <- list(ystar = ystar, w = w, lambda = lambda, alpha = alpha,
-              lower.bound = lower.bound, kernel = kernel, X = Xl, y = y,
+              lower.bound = lower.bound, kernel = kernel, ipriorKernel = ipriorKernel,
               se = c(se.alpha, se.lambda), se.ystar = se.ystar,
               y.levels = y.levels, Varw = Varw, start.time = start.time,
               end.time = end.time, time = time.taken, call = match.call(),

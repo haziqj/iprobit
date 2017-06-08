@@ -31,14 +31,6 @@ splitHurst <- function(kernel) {
   tmp
 }
 
-checkLevels <- function(y) {
-  y <- as.factor(y)
-  y.levels <- levels(y)
-  y.numeric <- as.numeric(y) - 1
-
-  list(y = y.numeric, levels = y.levels)
-}
-
 is.iprobitMod_bin <- function(x) {
   any(class(x) == "iprobitMod_bin")
 }

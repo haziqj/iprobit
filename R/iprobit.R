@@ -8,7 +8,7 @@ iprobit.default <- function(y, ..., kernel = "Canonical", silent = FALSE,
                             interactions = NULL, control = list()) {
   # Set up controls ------------------------------------------------------------
   con <- list(
-    maxit             = 100,
+    maxit             = 200,
     stop.crit         = 1e-5,
     silent            = FALSE,
     alpha0            = NULL,  # if NULL, parameters are initialised in VB
@@ -33,9 +33,10 @@ iprobit.default <- function(y, ..., kernel = "Canonical", silent = FALSE,
   } else {
     ipriorKernel <- iprior::kernL(y, ..., model = list(kernel = kernel))
   }
-  if (!isTRUE(ipriorKernel$probit)) stop("y values must be factors.")
+  if (!isTRUE(ipriorKernel$model$probit)) stop("y values must be factors.")
 
-  ipriorKernel
+  res <- iprobit_bin(ipriorKernel, maxit, stop.crit, silent, alpha0, lambda0, w0)
+  res
 }
 
 #' @export
