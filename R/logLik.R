@@ -4,7 +4,7 @@
 #'
 #' @return The variational lower bound.
 #' @export
-logLik.ipriorProbit <- function(x) {
+logLik.iprobitMod <- function(x) {
   lb <- x$lower.bound[!is.na(x$lower.bound)]
   lb <- lb[length(lb)]
   class(lb) <- "iprobitLowerBound"

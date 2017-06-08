@@ -2,7 +2,7 @@
 
 S3method(fitted,ipriorProbit)
 S3method(fitted,iprobitMult)
-S3method(logLik,ipriorProbit)
+S3method(logLik,iprobitMod)
 S3method(plot,ipriorProbit)
 S3method(plot,iprobitData)
 S3method(plot,iprobitMult)

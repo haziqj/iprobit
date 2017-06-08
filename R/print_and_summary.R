@@ -1,12 +1,12 @@
 interceptAndLambdaNames <- function(x) {
   Intercept <- x$alpha
   if (length(Intercept) > 1)
-    names(Intercept) <- paste0("Intercept[", seq_along(Intercept), "] ")
+    names(Intercept) <- paste0("alpha[", seq_along(Intercept), "]")
   else
-    names(Intercept) <- "Intercept"
+    names(Intercept) <- "alpha"
   lambda <- x$lambda
   if (length(lambda) > 1)
-    names(lambda) <- paste0("lambda[", seq_along(lambda), "] ")
+    names(lambda) <- paste0("lambda[", seq_along(lambda), "]")
   else
     names(lambda) <- "lambda"
   c(Intercept, lambda)
