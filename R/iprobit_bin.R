@@ -10,6 +10,7 @@ iprobit_bin <- function(y, ..., kernel = "Canonical", maxit = 100,
   # Prepare kernel matrices ----------------------------------------------------
   Xl <- list(...)
   iprobit.kernel <- ikernL(Xl, NULL, kernel, NULL)
+  Hurst <- 0.5  # CHANGE THIS
   H <- iprobit.kernel[[1]]  # CHANGE THIS FOR FUTURE UPDATES. NOW ONLY SUPPORT
                             # SINGLE LAMBDA.
   H.sq <- H %*% H
@@ -92,7 +93,7 @@ iprobit_bin <- function(y, ..., kernel = "Canonical", maxit = 100,
               se = c(se.alpha, se.lambda), se.ystar = se.ystar,
               y.levels = y.levels, Varw = Varw, start.time = start.time,
               end.time = end.time, time = time.taken, call = match.call(),
-              stop.crit = stop.crit, niter = niter, maxit = maxit)
+              stop.crit = stop.crit, niter = niter, maxit = maxit, Hurst = Hurst)
   class(res) <- c("iprobitMod", "iprobitMod_bin")
   res
 }

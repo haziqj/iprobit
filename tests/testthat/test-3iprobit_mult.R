@@ -4,7 +4,7 @@ test_that("Fitting multinomial models (IIA)", {
 
   m <- 4
 	dat <- gen_mixture(n = 10, m = m)
-	mod1 <- iprobit_mult(dat$y, dat$X, silent = TRUE, maxit = 5)
+	mod1 <- iprobit_mult(dat$y, dat$X, silent = TRUE, maxit = 5, kernel = "FBM")
 	expect_s3_class(mod1, "iprobitMod")
 	expect_s3_class(mod1, "iprobitMod_mult")
 
@@ -26,10 +26,13 @@ test_that("Fitting multinomial models (IIA)", {
 
 })
 
-# test_that("Print and summary (IIA)", {
-#
-#   dat <- gen_mixture(n = 10)
-#   mod <- iprobit_bin(dat$y, dat$X, silent = TRUE, maxit = 5)
-#   expect_that(print(mod), prints_text("Lower bound value ="))
-#
-# })
+test_that("Print and summary (IIA)", {
+
+  m <- 4
+  dat <- gen_mixture(n = 10, m = m)
+  mod <- iprobit_mult(dat$y, dat$X, silent = TRUE, maxit = 5)
+  expect_that(print(mod), prints_text("Lower bound value ="))
+  mod.summary <- summary(mod)
+  expect_s3_class(mod.summary, "iprobitSummary")
+
+})

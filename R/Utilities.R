@@ -36,8 +36,6 @@ checkLevels <- function(y) {
   y.levels <- levels(y)
   y.numeric <- as.numeric(y) - 1
 
-  if (length(y.levels) > 2) stop("Only able to fit binary data.")
-
   list(y = y.numeric, levels = y.levels)
 }
 

@@ -128,8 +128,10 @@ iprobit_mult <- function(y, X, kernel = c("Canonical", "FBM"), maxit = 100,
   }
 
   res <- list(ystar = ystar.tmp, w = w, lambda = lambda, alpha = alpha,
-              lower.bound = lb, time = time.taken, niter = niter, y = y, X = X,
-              kernel = kernel, maxit = maxit)
+              lower.bound = lb, kernel = kernel, se = NA, y.levels = y.lev,
+              time = time.taken, call = match.call(), stop.crit = stop.crit,
+              niter = niter, y = y, X = X, maxit = maxit, Hurst = 0.5)
   class(res) <- c("iprobitMod", "iprobitMod_mult")
   res
 }
+
