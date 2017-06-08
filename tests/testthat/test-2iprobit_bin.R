@@ -18,3 +18,17 @@ test_that("Print and summary", {
   expect_s3_class(mod.summary, "iprobitSummary")
 
 })
+
+test_that("Fitted and predict", {
+
+  dat <- gen_mixture(n = 10)
+  dat.test <- gen_mixture(n = 10)
+  mod <- iprobit_bin(dat$y, dat$X, silent = TRUE, maxit = 5)
+  expect_that(fitted(mod), is_a("list"))
+  mod.predict <- predict(mod, newdata = dat.test$X)
+  expect_s3_class(mod.predict, "iprobitPredict")
+  expect_that(print(mod.predict), prints_text("Test data not provided."))
+  mod.predict <- predict(mod, newdata = dat.test$X, y = dat.test$y)
+  expect_that(print(mod.predict), prints_text("Test error rate"))
+
+})

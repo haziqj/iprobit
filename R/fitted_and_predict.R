@@ -1,5 +1,5 @@
 #' @export
-fitted.ipriorProbit <- function(x, upper.or.lower = NULL) {
+fitted.iprobitMod_bin <- function(x, upper.or.lower = NULL, round.digits = 4) {
   ystar <- x$ystar
   y.hat <- rep(0, length(x$ystar)); y.hat[ystar >= 0] <- 1
   se.ystar <- iprobitSE(y = y.hat, eta = ystar)
@@ -15,40 +15,47 @@ fitted.ipriorProbit <- function(x, upper.or.lower = NULL) {
     y.hat[ystar >= 0] <- 1
   }
   p.hat <- pnorm(ystar)
+  p.hat <- cbind(1 - p.hat, p.hat)
+  p.hat <- round(p.hat, round.digits)
+  colnames(p.hat) <- x$y.lev
   y.hat <- as.factor(y.hat); levels(y.hat) <- x$y.levels
 
-  list(y = y.hat, prob = p.hat)
+  list(y = y.hat, prob = as.data.frame(p.hat))
 }
 
 #' @export
-fitted2 <- function(x, upper.or.lower = NULL) {
-  ystar <- x$ystar
-  y.hat <- rep(0, length(x$ystar)); y.hat[ystar >= 0] <- 1
-  se.ystar <- iprobitSE(y = y.hat, eta = ystar)
+fitted.iprobitMod_mult <- function(x, round.digits = 4) {
+  list2env(x, envir = environment())
+  n <- length(y)
+  y.lev <- levels(y)
+  m <- length(y.lev)
 
-  if (!is.null(upper.or.lower)) {
-    if (upper.or.lower == "upper") {
-      ystar[ystar >= 0] <- ystar[ystar >= 0] + 1.96 * se.ystar[ystar >= 0]
-      ystar[ystar < 0] <- ystar[ystar < 0] + 1.96 * se.ystar[ystar < 0]
-    } else if (upper.or.lower == "lower") {
-      ystar[ystar >= 0] <- ystar[ystar >= 0] - 1.96 * se.ystar[ystar >= 0]
-      ystar[ystar < 0] <- ystar[ystar < 0] - 1.96 * se.ystar[ystar < 0]
+  y.hat <- factor(apply(ystar, 1, function(x) which(x == max(x))))
+  levels(y.hat) <- y.lev
+
+  probs <- ystar
+  for (i in 1:n) {
+    for (j in 1:m) {
+      probs[i, j] <- EprodPhiZ(ystar[i, j] - ystar[i, (1:m)[-j]])
     }
-    y.hat[ystar >= 0] <- 1
+    # probs[i, m] <- 1 - sum(probs[i, 1:(m - 1)])
   }
-  p.hat <- pnorm(ystar)
-  y.hat <- as.factor(y.hat); levels(y.hat) <- x$y.levels
+  probs <- round(probs, round.digits)
+  probs <- probs / matrix(rep(apply(probs, 1, sum), m), ncol = m)  # normalise
+  probs <- round(probs, round.digits)
+  colnames(probs) <- y.lev
 
-  list(y = y.hat, prob = p.hat)
+  list(y = y.hat, prob = as.data.frame(probs))
 }
 
 #' @export
-predict.ipriorProbit <- function(object, newdata, upper.or.lower = NULL) {
+predict.iprobitMod_bin <- function(object, newdata, y.test = NULL,
+                                   upper.or.lower = NULL) {
   w <- object$w
   lambda <- object$lambda
   alpha <- object$alpha
 
-  H.tilde <- ikernL(Xl = list(object$X), newdata = list(newdata),
+  H.tilde <- ikernL(Xl = object$X, newdata = list(newdata),
                     kernel = object$kernel)[[1]]
   class(H.tilde) <- NULL
   ystar <- as.numeric(alpha + lambda * H.tilde %*% w)
@@ -70,38 +77,70 @@ predict.ipriorProbit <- function(object, newdata, upper.or.lower = NULL) {
   colnames(p.hat) <- object$y.levels
   y.hat <- as.factor(y.hat); levels(y.hat) <- object$y.levels
 
-
-  list(y = y.hat, prob = p.hat)
-}
-
-#' @export
-predict2 <- function(object, newdata, upper.or.lower = NULL) {
-  w <- object$w
-  lambda <- object$lambda
-  alpha <- object$alpha
-
-  H.tilde <- ikernL(Xl = list(object$X), newdata = list(newdata),
-                    kernel = object$kernel)[[1]]
-  class(H.tilde) <- NULL
-  ystar <- as.numeric(alpha + lambda * H.tilde %*% w)
-  y.hat <- rep(0, nrow(newdata)); y.hat[ystar >= 0] <- 1
-  se.ystar <- iprobitSE(y = y.hat, eta = ystar)
-
-  if (!is.null(upper.or.lower)) {
-    if (upper.or.lower == "upper") {
-      ystar[ystar >= 0] <- ystar[ystar >= 0] + 1.96 * se.ystar[ystar >= 0]
-      ystar[ystar < 0] <- ystar[ystar < 0] + 1.96 * se.ystar[ystar < 0]
-    } else if (upper.or.lower == "lower") {
-      ystar[ystar >= 0] <- ystar[ystar >= 0] - 1.96 * se.ystar[ystar >= 0]
-      ystar[ystar < 0] <- ystar[ystar < 0] - 1.96 * se.ystar[ystar < 0]
-    }
-    y.hat <- rep(0, nrow(newdata)); y.hat[ystar >= 0] <- 1
+  y.hat
+  test.error.rate <- NULL
+  if (!is.null(y.test)) {
+    test.error.rate <- round(mean(y.hat != y.test) * 100, 2)
   }
-  p.hat <- pnorm(ystar)
-  y.hat <- as.factor(y.hat); levels(y.hat) <- object$y.levels
 
-  list(y = y.hat, prob = p.hat)
+  structure(list(y = y.hat, prob = as.data.frame(p.hat),
+                 test.error.rate = test.error.rate),
+            class = "iprobitPredict")
 }
+
+
+#' #' @export
+#' fitted2 <- function(x, upper.or.lower = NULL) {
+#'   ystar <- x$ystar
+#'   y.hat <- rep(0, length(x$ystar)); y.hat[ystar >= 0] <- 1
+#'   se.ystar <- iprobitSE(y = y.hat, eta = ystar)
+#'
+#'   if (!is.null(upper.or.lower)) {
+#'     if (upper.or.lower == "upper") {
+#'       ystar[ystar >= 0] <- ystar[ystar >= 0] + 1.96 * se.ystar[ystar >= 0]
+#'       ystar[ystar < 0] <- ystar[ystar < 0] + 1.96 * se.ystar[ystar < 0]
+#'     } else if (upper.or.lower == "lower") {
+#'       ystar[ystar >= 0] <- ystar[ystar >= 0] - 1.96 * se.ystar[ystar >= 0]
+#'       ystar[ystar < 0] <- ystar[ystar < 0] - 1.96 * se.ystar[ystar < 0]
+#'     }
+#'     y.hat[ystar >= 0] <- 1
+#'   }
+#'   p.hat <- pnorm(ystar)
+#'   y.hat <- as.factor(y.hat); levels(y.hat) <- x$y.levels
+#'
+#'   list(y = y.hat, prob = p.hat)
+#' }
+
+
+
+#' #' @export
+#' predict2 <- function(object, newdata, upper.or.lower = NULL) {
+#'   w <- object$w
+#'   lambda <- object$lambda
+#'   alpha <- object$alpha
+#'
+#'   H.tilde <- ikernL(Xl = list(object$X), newdata = list(newdata),
+#'                     kernel = object$kernel)[[1]]
+#'   class(H.tilde) <- NULL
+#'   ystar <- as.numeric(alpha + lambda * H.tilde %*% w)
+#'   y.hat <- rep(0, nrow(newdata)); y.hat[ystar >= 0] <- 1
+#'   se.ystar <- iprobitSE(y = y.hat, eta = ystar)
+#'
+#'   if (!is.null(upper.or.lower)) {
+#'     if (upper.or.lower == "upper") {
+#'       ystar[ystar >= 0] <- ystar[ystar >= 0] + 1.96 * se.ystar[ystar >= 0]
+#'       ystar[ystar < 0] <- ystar[ystar < 0] + 1.96 * se.ystar[ystar < 0]
+#'     } else if (upper.or.lower == "lower") {
+#'       ystar[ystar >= 0] <- ystar[ystar >= 0] - 1.96 * se.ystar[ystar >= 0]
+#'       ystar[ystar < 0] <- ystar[ystar < 0] - 1.96 * se.ystar[ystar < 0]
+#'     }
+#'     y.hat <- rep(0, nrow(newdata)); y.hat[ystar >= 0] <- 1
+#'   }
+#'   p.hat <- pnorm(ystar)
+#'   y.hat <- as.factor(y.hat); levels(y.hat) <- object$y.levels
+#'
+#'   list(y = y.hat, prob = p.hat)
+#' }
 
 # Note: Quantiles for truncated normal distribution are
 # qtruncnorm(0.025, a = 0)  # upper tail truncated at zero
@@ -110,31 +149,7 @@ predict2 <- function(object, newdata, upper.or.lower = NULL) {
 # ## 2.241403
 # lower tail truncated at zero are symmetric opposites of the above.
 
-#' @export
-fitted.iprobitMult <- function(x, round.digits = 3) {
-  list2env(x, envir = environment())
-  n <- length(y)
-  y.lev <- levels(y)
-  m <- length(y.lev)
-  nm <- n * m
-  p <- ncol(X)
 
-  y.hat <- factor(apply(ystar, 1, function(x) which(x == max(x))))
-  levels(y.hat) <- y.lev
-
-  probs <- ystar
-  for (i in 1:n) {
-    for (j in 1:m) {
-      probs[i, j] <- EprodPhiZ(ystar[i, j] - ystar[i, (1:m)[-j]])
-    }
-    # probs[i, m] <- 1 - sum(probs[i, 1:(m - 1)])
-  }
-  probs <- round(probs, round.digits)
-  probs <- probs / matrix(rep(apply(probs, 1, sum), m), ncol = m)  # normalise
-  colnames(probs) <- y.lev
-
-  list(y.hat = y.hat, probs = as.data.frame(probs))
-}
 
 #' @export
 predict.iprobitMult <- function(object, X.test, y.test = NULL,
@@ -188,6 +203,9 @@ predict.iprobitMult <- function(object, X.test, y.test = NULL,
 }
 
 #' @export
-print.iprobitMultPredict <- function(x) {
-  cat("Test error rate:", x$test.error.rate, "%")
+print.iprobitPredict <- function(x) {
+  if (!is.null(x$test.error.rate))
+    cat("Test error rate:", x$test.error.rate, "%")
+  else
+    cat("Test data not provided.")
 }
