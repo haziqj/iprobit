@@ -5,8 +5,8 @@ iprobit2 <- function(y, ..., kernel = "Canonical", maxit = 10000, stop.crit = 1e
   # A temporary function to do iprobit models with two covariates and
   # interactions.
 
-  y.tmp <- checkLevels(y)
-  y <- y.tmp$y
+  y.tmp <- iprior::.checkLevels(y)
+  y <- y.tmp$y - 1
   y.levels <- y.tmp$levels
 
   # Prepare kernel matrices ----------------------------------------------------
@@ -80,7 +80,7 @@ iprobit2 <- function(y, ..., kernel = "Canonical", maxit = 10000, stop.crit = 1e
     # Update lambda[1] ---------------------------------------------------------
     P1 <- H1
     P1.H2 <- H1.H2
-    S1 <- 0
+    S1 <- lambda[t, 2] * (P1.H2 + t(P1.H2))
     ct1 <- sum(H1sq * W)
     if (isTRUE(interactions)) {
       P1 <- P1 + lambda[t, 2] * H12
@@ -96,7 +96,7 @@ iprobit2 <- function(y, ..., kernel = "Canonical", maxit = 10000, stop.crit = 1e
     # Update lambda[2] ---------------------------------------------------------
     P2 <- H2
     P2.H1 <- t(H1.H2)
-    S2 <- 0
+    S2 <- lambda[t + 1, 1] * (P2.H1 + t(P2.H1))
     ct2 <- sum(H2sq * W)
     if (isTRUE(interactions)) {
       P2 <- P2 + lambda[t + 1, 1] * H12
@@ -154,6 +154,6 @@ iprobit2 <- function(y, ..., kernel = "Canonical", maxit = 10000, stop.crit = 1e
               start.time = start.time, end.time = end.time, time = time.taken,
               call = match.call(), stop.crit = stop.crit, niter = niter,
               maxit = maxit)
-  class(res) <- "ipriorProbit"
+  class(res) <- "iprobitMod"
   res
 }

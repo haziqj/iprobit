@@ -11,15 +11,15 @@ iprobit_bin <- function(ipriorKernel, maxit = 200, stop.crit = 1e-5,
   environment(.lambdaExpand) <- iprobit.env
   environment(HlamFn) <- iprobit.env
   environment(HlamsqFn) <- iprobit.env
-
   y <- Y
 
   # Initialise -----------------------------------------------------------------
-  if (is.null(lambda0)) lambda0 <- abs(rnorm(p))
+  if (is.null(lambda0)) lambda0 <- abs(rnorm(l))
   if (is.null(alpha0)) alpha0 <- rnorm(1)
   if (is.null(w0)) w0 <- rep(0, n)
-  lambda <- lambda0
-  lambda.sq <- lambda ^ 2
+  lambda <- ct <- lambda0
+  lambda.sq <- lambda0 ^ 2
+  .lambdaExpand(env = iprobit.env)
   HlamFn(iprobit.env)
   HlamsqFn(iprobit.env)
   alpha <- alpha0
@@ -56,10 +56,17 @@ iprobit_bin <- function(ipriorKernel, maxit = 200, stop.crit = 1e-5,
     W <- Varw + tcrossprod(w)
 
     # Update lambda ------------------------------------------------------------
-    ct <- sum(Psql[[1]] * W)
-    d <- as.numeric(crossprod(ystar - alpha, Pl[[1]]) %*% w - sum(Sl[[1]] * W))
-    lambda <- d / ct
-    lambda.sq <- 1 / ct + (d / ct) ^ 2
+    for (k in 1:l) {
+      .lambdaExpand(env = iprobit.env)
+      BlockB(k)
+      ct[k] <- sum(Psql[[k]] * W)
+      d <- as.numeric(
+        crossprod(ystar - alpha, Pl[[k]]) %*% w - sum(Sl[[k]] * W) / 2
+      )
+      lambda[k] <- d / ct[k]
+      lambda.sq[k] <- 1 / ct[k] + (d / ct[k]) ^ 2
+    }
+    .lambdaExpand(env = iprobit.env)
     HlamFn(iprobit.env)
     HlamsqFn(iprobit.env)
 
@@ -70,7 +77,7 @@ iprobit_bin <- function(ipriorKernel, maxit = 200, stop.crit = 1e-5,
     lower.bound[t + 1] <- lb.const +
       sum(pnorm(eta[y == 2], log.p = TRUE)) +
       sum(pnorm(-eta[y == 1], log.p = TRUE)) -
-      (sum(diag(W)) + determinant(A)$modulus + log(ct)) / 2
+      (sum(diag(W)) + determinant(A)$modulus + sum(log(ct))) / 2
 
     lb.diff <- abs(lower.bound[t + 1] - lower.bound[t])
     if (!is.na(lb.diff) && (lb.diff < stop.crit)) break
@@ -92,7 +99,7 @@ iprobit_bin <- function(ipriorKernel, maxit = 200, stop.crit = 1e-5,
     else cat("Converged after", niter, "iterations.\n")
   }
 
-  res <- list(ystar = ystar, w = w, lambda = lambda, alpha = alpha,
+  res <- list(ystar = ystar, w = w, lambda = lambda[1:l], alpha = alpha,
               lower.bound = lower.bound, kernel = kernel, ipriorKernel = ipriorKernel,
               se = c(se.alpha, se.lambda), se.ystar = se.ystar,
               y.levels = y.levels, Varw = Varw, start.time = start.time,

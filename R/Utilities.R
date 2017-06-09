@@ -31,20 +31,19 @@ HlamsqFn <- function(env) {
   # and ind2 are indices of all possible two-way multiplications obtained from
   # iprior::kernL$BlockBstuff
   if (is.null(Hsql))
-    square.terms <- Reduce("+", mapply("*", Psql, lambda.sq, SIMPLIFY = FALSE))
+    square.terms <- Reduce("+", mapply("*", Psql[1:l], lambda.sq, SIMPLIFY = FALSE))
   else
-    square.terms <- Reduce("+", mapply("*", Hsql, lambda.sq, SIMPLIFY = FALSE))
+    square.terms <- Reduce("+", mapply("*", Hsql[1:l], lambda.sq, SIMPLIFY = FALSE))
 
   if (is.null(ind1) && is.null(ind2))
     two.way.terms <- 0
   else {
     lambda.two.way <- lambda[ind1] * lambda[ind2]
     two.way.terms <-
-      Reduce("+", mapply("*", H2l, lambda.two.way, SIMPLIFY = FALSE)) +
-      Reduce("+", mapply("*", lapply(H2l, t), lambda.two.way, SIMPLIFY = FALSE))
-  }
+      Reduce("+", mapply("*", H2l, lambda.two.way, SIMPLIFY = FALSE))
+    }
 
-  res.Hlam.matsq <<- square.terms + two.way.terms
+  res.Hlam.matsq <- square.terms + two.way.terms
   assign("Hlam.matsq", res.Hlam.matsq, envir = env)
 }
 
@@ -58,4 +57,17 @@ is.iprobitMod_mult <- function(x) {
 
 is.iprobitData <- function(x) {
   any(class(x) == "iprobitData")
+}
+
+splitKernel <- function(kernel) {
+   # Helper function to split the FBMs from the Hurst coefficients, if any
+     paste(lapply(strsplit(kernel, ","), function(x) x[1]))
+}
+
+splitHurst <- function(kernel) {
+  # Helper function to split the FBMs from the Hurst coefficients, if any
+    suppressWarnings(
+        tmp <- as.numeric(paste(lapply(strsplit(kernel, ","), function(x) x[2])))
+     )
+  tmp
 }
