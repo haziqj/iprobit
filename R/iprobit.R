@@ -8,7 +8,7 @@ iprobit.default <- function(y, ..., kernel = "Canonical", silent = FALSE,
                             interactions = NULL, control = list()) {
   # Set up controls ------------------------------------------------------------
   con <- list(
-    maxit             = 200,
+    maxit             = 100,
     stop.crit         = 1e-5,
     silent            = FALSE,
     alpha0            = NULL,  # if NULL, parameters are initialised in VB

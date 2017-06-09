@@ -1,20 +1,20 @@
 #' @import ggplot2
 #' @export
-plot.ipriorProbit <- function(x, niter.plot = NULL, levels = NULL, ...) {
-  fitted.plot <- iplot_fitted(x, levels = levels)
+plot.iprobitMod <- function(object, niter.plot = NULL, levels = NULL, ...) {
+  iplot_fitted(object)
 }
 
 #' @export
-iplot_fitted <- function(x, levels = NULL) {
-  classes <- as.factor(x$y)
-  if (!is.null(levels)) levels(classes) <- levels
-  else levels(classes) <- x$y.levels
-  plot.df <- data.frame(Observation = 1:length(x$ystar), p.hat = fitted(x)$prob,
-                        Class = classes)
+iplot_fitted <- function(object) {
+  list2env(object$ipriorKernel, envir = environment())
+  probs <- fitted(object)$prob
+  df.plot <- data.frame(probs, i = 1:n)
+  df.plot <- reshape2::melt(df.plot, id.vars = "i")
 
-  ggplot(plot.df, aes(x = Observation, y = p.hat, col = Class)) +
-    geom_point() +
-    labs(y = "Fitted probabilities") +
+  ggplot(df.plot, aes(x = i, y = value)) +
+    geom_area(aes(col = variable, fill = variable), position = "stack") +
+    labs(col = "Class", fill = "Class", x = "Index", y = "Fitted probabilities") +
+    coord_cartesian(expand = FALSE) +
     theme_bw()
 }
 
@@ -103,7 +103,7 @@ iplot_prob <- function(x, covariate = 1, levels = NULL) {
 }
 
 #' @export
-iplot_2x2 <- function(object, levels = NULL) {
+iplot_predict <- function(object, test.data = NULL) {
   tmp <- object$ipriorKernel$x
   class(tmp) <- NULL
   tmp <- as.data.frame(tmp)
@@ -113,71 +113,80 @@ iplot_2x2 <- function(object, levels = NULL) {
   xx <- seq(from = x[1] - 1, to = x[2] + 1, length.out = 100)
   yy <- seq(from = y[1] - 1, to = y[2] + 1, length.out = 100)
   plot.df <- expand.grid(xx, yy)
+  xname <- object$ipriorKernel$model$xname
+
+  points.df <- data.frame(tmp, factor(object$ipriorKernel$Y,
+                                      levels = object$ipriorKernel$y.levels))
 
   if (!is.null(object$formula)) {
     # Fitted using formula
     colnames(plot.df) <- attr(object$ipriorKernel$terms, "term.labels")
     prob <- predict(object, newdata = plot.df)$prob
+    if (!is.null(test.data)) {
+      if (is.iprobitData(test.data)) test.data <- as.data.frame(test.data)
+      points.df <- test.data
+    }
   } else {
     prob <- predict(object, newdata = list(plot.df))$prob
+    if (!is.null(test.data)) {
+      if (is.iprobitData(test.data)) test.data <- as.data.frame(test.data)
+      points.df <- test.data
+    }
   }
   plot.df <- cbind(plot.df, prob)
-  colnames(plot.df) <- c("X1", "X2", paste0("class", seq_along(mod$y.levels)))
+  colnames(plot.df) <- c(xname, paste0("class", seq_along(mod$y.levels)))
+  colnames(points.df) <- c(xname, "Class")
 
-  points.df <- data.frame(tmp,
-                          factor(object$ipriorKernel$Y,
-                                 levels = object$ipriorKernel$y.levels))
-  colnames(points.df) <- c("X1", "X2", "Class")
   ggplot() +
     geom_raster(data = plot.df, aes(X1, X2, fill = class2 ), alpha = 0.5) +
     scale_fill_gradient(low = "#F8766D", high = "#00BFC4", limits = c(0, 1)) +
     geom_point(data = points.df, aes(X1, X2, col = Class)) +
     coord_cartesian(xlim = x, ylim = y) +
+    guides(fill = FALSE) +
     theme_bw()
 }
 
-#' @export
-iplot_decbound <- function(x, levels = NULL) {
-  classes <- as.factor(x$y)
-  if (!is.null(levels)) levels(classes) <- levels
-  else levels(classes) <- x$y.levels
-  xx <- c(min(x$X[, 1]), max(x$X[, 1]))
-  yy <- c(min(x$X[, 2]), max(x$X[, 2]))
-  decision.line <- boundarySolver(x$alpha, x$lambda, x$w, x$kernel, x$X,
-                                  xmin = xx[1] - 10, xmax = xx[2] + 10,
-                                  ymin = yy[1] - 100, ymax = yy[2] + 100)
-  plot.df <- data.frame(X = x$X, Observation = 1:nrow(x$X), Class = classes)
-  dec.df <- data.frame(x.dec = decision.line$x1,
-                       y.dec = decision.line$x2)
 
-  ggplot(data = plot.df, aes(x = X[, 1], y = X[, 2])) +
-    geom_point(aes(col = Class), size = 3) +
-    # geom_text(aes(label = Observation)) +
-    geom_line(data = dec.df, aes(x = x.dec, y = y.dec), col = "grey35", linetype = "longdash") +
-    coord_cartesian(xlim = xx, ylim = yy) +
-    labs(x = colnames(x$X)[1], y = colnames(x$X)[2]) +
-    theme_bw()
-}
-
-#' @export
-boundarySolver <- function(alpha, lambda, w, kernel, X, xmin, xmax,
-                           ymin, ymax) {
-  xlength <- 500
-  x1plot <- seq(xmin, xmax, length = xlength)
-  x2plot <- rep(NA, xlength)
-
-  objFn <- function(x2, x1) {
-    H.tilde <- ikernL(list(X), list(matrix(c(x1, x2), nrow = 1)),
-                      kernel = kernel)[[1]]
-    alpha + lambda * as.numeric(H.tilde %*% w)
-  }
-  i <- 1
-  while (i <= xlength) {
-    tmp <- uniroot(objFn, c(ymin, ymax), x1 = x1plot[i])
-    x2plot[i] <- tmp$root
-    if (x2plot[i] > ymax) break
-    i <- i + 1
-  }
-
-  list(x1 = x1plot, x2 = x2plot)
-}
+# iplot_decbound <- function(x, levels = NULL) {
+#   classes <- as.factor(x$y)
+#   if (!is.null(levels)) levels(classes) <- levels
+#   else levels(classes) <- x$y.levels
+#   xx <- c(min(x$X[, 1]), max(x$X[, 1]))
+#   yy <- c(min(x$X[, 2]), max(x$X[, 2]))
+#   decision.line <- boundarySolver(x$alpha, x$lambda, x$w, x$kernel, x$X,
+#                                   xmin = xx[1] - 10, xmax = xx[2] + 10,
+#                                   ymin = yy[1] - 100, ymax = yy[2] + 100)
+#   plot.df <- data.frame(X = x$X, Observation = 1:nrow(x$X), Class = classes)
+#   dec.df <- data.frame(x.dec = decision.line$x1,
+#                        y.dec = decision.line$x2)
+#
+#   ggplot(data = plot.df, aes(x = X[, 1], y = X[, 2])) +
+#     geom_point(aes(col = Class), size = 3) +
+#     # geom_text(aes(label = Observation)) +
+#     geom_line(data = dec.df, aes(x = x.dec, y = y.dec), col = "grey35", linetype = "longdash") +
+#     coord_cartesian(xlim = xx, ylim = yy) +
+#     labs(x = colnames(x$X)[1], y = colnames(x$X)[2]) +
+#     theme_bw()
+# }
+#
+# boundarySolver <- function(alpha, lambda, w, kernel, X, xmin, xmax,
+#                            ymin, ymax) {
+#   xlength <- 500
+#   x1plot <- seq(xmin, xmax, length = xlength)
+#   x2plot <- rep(NA, xlength)
+#
+#   objFn <- function(x2, x1) {
+#     H.tilde <- ikernL(list(X), list(matrix(c(x1, x2), nrow = 1)),
+#                       kernel = kernel)[[1]]
+#     alpha + lambda * as.numeric(H.tilde %*% w)
+#   }
+#   i <- 1
+#   while (i <= xlength) {
+#     tmp <- uniroot(objFn, c(ymin, ymax), x1 = x1plot[i])
+#     x2plot[i] <- tmp$root
+#     if (x2plot[i] > ymax) break
+#     i <- i + 1
+#   }
+#
+#   list(x1 = x1plot, x2 = x2plot)
+# }

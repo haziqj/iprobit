@@ -33,7 +33,8 @@ summary.iprobitMod <- function(x) {
     "97.5%" = round(theta + 1.96 * se, digits = 4)
   )
 
-  res <- list(call = x$call, kernel = x$kernel, Hurst = x$Hurst, tab = tab,
+  res <- list(call = x$call, kernel = x$ipriorKernel$model$kernel,
+              Hurst = x$ipriorKernel$model$Hurst, tab = tab,
               maxit = x$maxit, niter = x$niter, stop.crit = x$stop.crit,
               lb = x$lower.bound)
   class(res) <- "iprobitSummary"
@@ -45,11 +46,9 @@ print.iprobitSummary <- function(x) {
   cat("\nCall:\n")
   print(x$call)
 
-  cat("\nRKHS used:", x$kernel)
-  if (x$kernel == "FBM")
-    cat(" with Hurst coefficient", x$Hurst, "\n\n")
-  else
-    cat("\n\n")
+  cat("\nRKHS used: ")
+  kernel.used <- paste0(x$kernel, ",", x$Hurst)
+  cat(kernel.used[1], "\n\n")
 
   cat("Parameter estimates:\n")
   print(x$tab)
