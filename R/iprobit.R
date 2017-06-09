@@ -33,9 +33,20 @@ iprobit.default <- function(y, ..., kernel = "Canonical", silent = FALSE,
   } else {
     ipriorKernel <- iprior::kernL(y, ..., model = list(kernel = kernel))
   }
-  if (!isTRUE(ipriorKernel$model$probit)) stop("y values must be factors.")
 
-  res <- iprobit_bin(ipriorKernel, maxit, stop.crit, silent, alpha0, lambda0, w0)
+  # Checks ---------------------------------------------------------------------
+  if (!isTRUE(ipriorKernel$model$probit)) stop("y values must be factors.")
+  if (ipriorKernel$r > 0) stop("Can't fit higher order terms yet.")
+  if (!is.null(ipriorKernel$model$intr.3plus))
+    stop("Can't fit more than three-way interactions yet.")
+
+  # Pass to the correct VB routine ---------------------------------------------
+  if (length(ipriorKernel$y.levels) == 2) {
+    res <- iprobit_bin(ipriorKernel, maxit, stop.crit, silent, alpha0, lambda0, w0)
+  } else {
+    res <- list("Multinomial probit")
+  }
+
   res
 }
 
