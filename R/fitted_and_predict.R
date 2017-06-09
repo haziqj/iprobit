@@ -61,8 +61,8 @@ predict.iprobitMod <- function(object, newdata = list(), y.test = NULL,
     if (!is.null(object$formula)) {
       # Model has been fitted using formula interface
       if (is.iprobitData(newdata)) newdata <- as.data.frame(newdata)
-      mf <- model.frame(formula = object$formula, data = newdata)
-      tt <- terms(mf)
+      # mf <- model.frame(formula = object$formula, data = newdata)
+      tt <- object$ipriorKernel$terms
       Terms <- delete.response(tt)
       xstar <- model.frame(Terms, newdata)
       y.test <- newdata[, attr(tt, "response")]

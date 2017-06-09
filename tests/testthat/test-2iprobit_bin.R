@@ -55,7 +55,7 @@ test_that("Predict (without test error rate)", {
                   control = list(maxit = 5))
 
   mod.predict <- predict(mod, newdata = list(dat.test$X))
-  modf.predict <- predict(modf, newdata = dat.test)
+  modf.predict <- predict(modf, newdata = as.data.frame(dat.test)[, -3])
 
   expect_s3_class(mod.predict, "iprobitPredict")
   expect_s3_class(modf.predict, "iprobitPredict")

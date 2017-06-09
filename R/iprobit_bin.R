@@ -26,7 +26,7 @@ iprobit_bin <- function(ipriorKernel, maxit = 200, stop.crit = 1e-5,
   w <- w0
   niter <- 1
   lower.bound <- rep(NA, maxit)
-  lb.const <- (n + 2 - log(n)) / 2 + log(2 * pi)
+  lb.const <- (n + 1 + l - log(n) + (l + 1) * log(2 * pi)) / 2
 
   if (!silent) pb <- txtProgressBar(min = 0, max = maxit - 1, style = 3)
   start.time <- Sys.time()
@@ -47,12 +47,12 @@ iprobit_bin <- function(ipriorKernel, maxit = 200, stop.crit = 1e-5,
     # Update w -----------------------------------------------------------------
     A <- Hlam.matsq + diag(1, n)
     a <- as.numeric(crossprod(Hlam.mat, ystar - alpha))
-    eigenA <- eigen(A)
+    eigenA <- iprior::eigenCpp(A)
     V <- eigenA$vec
     u <- eigenA$val + 1e-8  # ensure positive eigenvalues
     uinv.Vt <- t(V) / u
     w <- as.numeric(crossprod(a, V) %*% uinv.Vt)
-    Varw <- V %*% uinv.Vt
+    Varw <- iprior::fastVDiag(V, 1 / u)  # V %*% uinv.Vt
     W <- Varw + tcrossprod(w)
 
     # Update lambda ------------------------------------------------------------
@@ -104,7 +104,7 @@ iprobit_bin <- function(ipriorKernel, maxit = 200, stop.crit = 1e-5,
               se = c(se.alpha, se.lambda), se.ystar = se.ystar,
               y.levels = y.levels, Varw = Varw, start.time = start.time,
               end.time = end.time, time = time.taken, call = match.call(),
-              stop.crit = stop.crit, niter = niter, maxit = maxit, Hurst = Hurst)
+              stop.crit = stop.crit, niter = niter, maxit = maxit)
   class(res) <- c("iprobitMod", "iprobitMod_bin")
   res
 }

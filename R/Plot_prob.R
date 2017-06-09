@@ -33,8 +33,8 @@
 # prob <- predict(mod, newdata = plot.df)$prob
 # plot.df <- cbind(plot.df, prob)
 # colnames(plot.df) <- c("X1", "X2", "class1", "class2")
-#
-#
+# #
+# #
 # ggplot() +
 #   geom_raster(data = plot.df, aes(X1, X2, fill = class2 ), alpha = 0.5) +
 #   scale_fill_gradient(low = "#F8766D", high = "#00BFC4", limits = c(0, 1)) +
