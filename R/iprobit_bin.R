@@ -7,7 +7,11 @@ iprobit_bin <- function(ipriorKernel, maxit = 200, stop.crit = 1e-5,
   list2env(ipriorKernel, iprobit.env)
   list2env(BlockBstuff, iprobit.env)
   list2env(model, iprobit.env)
-  environment(BlockB) <- environment(.lambdaExpand) <- iprobit.env
+  environment(BlockB) <- iprobit.env
+  environment(.lambdaExpand) <- iprobit.env
+  environment(HlamFn) <- iprobit.env
+  environment(HlamsqFn) <- iprobit.env
+
   y <- Y
 
   # Initialise -----------------------------------------------------------------
@@ -16,8 +20,8 @@ iprobit_bin <- function(ipriorKernel, maxit = 200, stop.crit = 1e-5,
   if (is.null(w0)) w0 <- rep(0, n)
   lambda <- lambda0
   lambda.sq <- lambda ^ 2
-  Hlam.mat <- Reduce("+", mapply("*", Hl, lambda, SIMPLIFY = FALSE))
-  Hlam.matsq <- Reduce("+", mapply("*", Psql, lambda.sq, SIMPLIFY = FALSE))
+  HlamFn(iprobit.env)
+  HlamsqFn(iprobit.env)
   alpha <- alpha0
   w <- w0
   niter <- 1
@@ -56,8 +60,8 @@ iprobit_bin <- function(ipriorKernel, maxit = 200, stop.crit = 1e-5,
     d <- as.numeric(crossprod(ystar - alpha, Pl[[1]]) %*% w - sum(Sl[[1]] * W))
     lambda <- d / ct
     lambda.sq <- 1 / ct + (d / ct) ^ 2
-    Hlam.mat <- Reduce("+", mapply("*", Hl, lambda, SIMPLIFY = FALSE))
-    Hlam.matsq <- Reduce("+", mapply("*", Psql, lambda.sq, SIMPLIFY = FALSE))
+    HlamFn(iprobit.env)
+    HlamsqFn(iprobit.env)
 
     # Update alpha -------------------------------------------------------------
     alpha <- mean(ystar - Hlam.mat %*% w)

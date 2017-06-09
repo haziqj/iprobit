@@ -4,7 +4,7 @@ test_that("Fitting binary models", {
 
 	dat <- gen_mixture(n = 10)
 	mod <- iprobit(dat$y, dat$X, silent = TRUE, control = list(maxit = 5))
-	modf <- iprobit(y ~ ., dat, silent = TRUE, control = list(maxit = 5))
+	modf <- iprobit(y ~ ., dat, silent = TRUE, one.lam = TRUE, control = list(maxit = 5))
 	expect_s3_class(mod, "iprobitMod")
 	expect_s3_class(mod, "iprobitMod_bin")
 	expect_s3_class(modf, "iprobitMod")
@@ -16,7 +16,7 @@ test_that("Print", {
 
   dat <- gen_mixture(n = 10)
   mod <- iprobit(dat$y, dat$X, silent = TRUE, control = list(maxit = 5))
-  modf <- iprobit(y ~ ., dat, silent = TRUE, control = list(maxit = 5))
+  modf <- iprobit(y ~ ., dat, silent = TRUE, one.lam = TRUE, control = list(maxit = 5))
   expect_that(print(mod), prints_text("Lower bound value ="))
   expect_that(print(modf), prints_text("Lower bound value ="))
   mod.summary <- summary(mod)
@@ -28,7 +28,7 @@ test_that("Summary", {
 
   dat <- gen_mixture(n = 10)
   mod <- iprobit(dat$y, dat$X, silent = TRUE, control = list(maxit = 5))
-  modf <- iprobit(y ~ ., dat, silent = TRUE, control = list(maxit = 5))
+  modf <- iprobit(y ~ ., dat, silent = TRUE, one.lam = TRUE, control = list(maxit = 5))
   mod.summary <- summary(mod)
   modf.summary <- summary(modf)
   expect_s3_class(mod.summary, "iprobitSummary")
@@ -40,7 +40,7 @@ test_that("Fitted", {
 
   dat <- gen_mixture(n = 10)
   mod <- iprobit(dat$y, dat$X, silent = TRUE, control = list(maxit = 5))
-  modf <- iprobit(y ~ ., dat, silent = TRUE, control = list(maxit = 5))
+  modf <- iprobit(y ~ ., dat, silent = TRUE, one.lam = TRUE, control = list(maxit = 5))
   expect_that(fitted(mod), is_a("list"))
   expect_that(fitted(modf), is_a("list"))
 
