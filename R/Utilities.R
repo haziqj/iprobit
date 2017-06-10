@@ -18,6 +18,22 @@
 #
 ################################################################################
 
+lambdaExpand_bin <- function(x = lambda, y = lambda.sq, env = iprobit.env) {
+  environment(.lambdaExpand) <- environment()
+  original.lambda <- x
+  .lambdaExpand(x = original.lambda, env = environment())
+  lambda.tmp <- lambda
+  assign("lambda", lambda.tmp, envir = env)
+
+  if (!is.null(y)) {
+    original.lambda.sq <- y
+    lambda.sq.tmp <- NULL
+    .lambdaExpand(x = original.lambda.sq, env = environment())
+    lambda.sq.tmp <- lambda
+    assign("lambda.sq", lambda.sq.tmp, envir = env)
+  }
+}
+
 HlamFn <- function(env = environment()) {
   # Hl (list) and lambda (vector), both must be of same length, should be
   # defined in  environment.
@@ -30,6 +46,7 @@ HlamsqFn <- function(env = environment()) {
   # must be the same length, should be defined in  environment. Further, ind1
   # and ind2 are indices of all possible two-way multiplications obtained from
   # iprior::kernL$BlockBstuff
+  environment(Hlam_two_way_index) <- env
   if (is.null(Hsql))
     square.terms <- Reduce("+", mapply("*", Psql[1:q], lambda.sq[1:q],
                                        SIMPLIFY = FALSE))
@@ -40,7 +57,7 @@ HlamsqFn <- function(env = environment()) {
   if (is.null(ind1) && is.null(ind2))
     two.way.terms <- 0
   else {
-    lambda.two.way <- lambda[ind1] * lambda[ind2]
+    lambda.two.way <- Hlam_two_way_index(lambda, lambda.sq)
     two.way.terms <-
       Reduce("+", mapply("*", H2l, lambda.two.way, SIMPLIFY = FALSE))
     }
@@ -169,15 +186,25 @@ all.same <- function(v) {
   all(sapply(as.list(v[-1]), FUN = function(z) identical(z, v[1])))
 }
 
-lambdaExpand_mult <- function(x = lambda, env = iprobit.env) {
-  environment(.lambdaExpand) <- env
+lambdaExpand_mult <- function(x = lambda, y = lambda.sq, env = iprobit.env) {
+  environment(.lambdaExpand) <- environment()
   original.lambda <- x
   lambda.tmp <- NULL
   for (j in 1:m) {
-    .lambdaExpand(original.lambda[, j], env)
+    .lambdaExpand(x = original.lambda[, j], env = environment())
     lambda.tmp[[j]] <- lambda
   }
-  assign("lambda", matrix(unlist(lambda.tmp), ncol = m, nrow = l), envir = env)
+  assign("lambda", matrix(unlist(lambda.tmp), ncol = m), envir = env)
+
+  if (!is.null(y)) {
+    original.lambda.sq <- y
+    lambda.sq.tmp <- NULL
+    for (j in 1:m) {
+      .lambdaExpand(x = original.lambda.sq[, j], env = environment())
+      lambda.sq.tmp[[j]] <- lambda
+    }
+    assign("lambda.sq", matrix(unlist(lambda.sq.tmp), ncol = m), envir = env)
+  }
 }
 
 HlamFn_mult <- function(env = environment()) {
@@ -189,19 +216,20 @@ HlamFn_mult <- function(env = environment()) {
 }
 
 HlamsqFn_mult <- function(env = environment()) {
+  environment(Hlam_two_way_index) <- env
   res.Hlam.matsq <- NULL
   for (j in 1:m) {
     if (is.null(Hsql))
       square.terms <- Reduce("+", mapply("*", Psql, lambda.sq[, j],
                                          SIMPLIFY = FALSE))
     else
-      square.terms <- Reduce("+", mapply("*", Hsql[1:q], lambda.sq[, j],
+      square.terms <- Reduce("+", mapply("*", Hsql, lambda.sq[, j],
                                          SIMPLIFY = FALSE))
 
     if (is.null(ind1) && is.null(ind2))
       two.way.terms <- 0
     else {
-      lambda.two.way <- lambda[ind1, j] * lambda[ind2, j]
+      lambda.two.way <- Hlam_two_way_index(lambda[, j], lambda.sq[, j])
       two.way.terms <-
         Reduce("+", mapply("*", H2l, lambda.two.way, SIMPLIFY = FALSE))
     }
@@ -212,11 +240,45 @@ HlamsqFn_mult <- function(env = environment()) {
   assign("Hlam.matsq", res.Hlam.matsq, envir = env)
 }
 
+Hlam_two_way_index <- function(lam = c(1,2,3), lamsq = c(4,5,6)) {
+  # ind1 <- c(1, 1, 2)
+  # ind2 <- c(2, 3, 3)
+  # intr <- matrix(c(1,2), ncol = 1)
+  # l <- 2
+
+  comb.ind12 <- cbind(ind1, ind2)
+  comb.ind12 <- split(comb.ind12, row(comb.ind12))
+
+  replace_ind <- function(x) {
+    if (any(x > l)) {
+      here <- which(x > l)
+      what <- x[here] - l
+      res <- c(x[-here], intr[, what])
+      sort(res)
+    } else {
+      x
+    }
+  }
+
+  lam_ind <- function(x) {
+    if (length(x) > 2) {
+      here <- which(duplicated(x))
+      what <- x[here]
+      what.not <- x[x != what]
+      lamsq[what] * lam[what.not]
+    } else {
+      lam[x[1]] * lam[x[2]]
+    }
+  }
+
+  lapply(lapply(comb.ind12, replace_ind), lam_ind)
+}
+
 # myfun <- function() {
 #   # Function to test lambdaExpand_mult() and the Hlam*_mult functions
 #   set.seed(123)
 #   dat <- gen_mixture(n = 4, m = 3)
-#   mod <- iprior::kernL(y ~ ., dat)
+#   mod <- iprior::kernL(y ~ . ^ 2, dat)
 #   iprobit.env <- environment()
 #   list2env(mod, iprobit.env)
 #   list2env(BlockBstuff, iprobit.env)
@@ -224,14 +286,28 @@ HlamsqFn_mult <- function(env = environment()) {
 #   environment(lambdaExpand_mult) <- iprobit.env
 #   environment(HlamFn_mult) <- iprobit.env
 #   environment(HlamsqFn_mult) <- iprobit.env
+#   environment(Hlam_two_way_index) <- iprobit.env
 #   m <- length(y.levels)
 #   lambda <- matrix(2:3, ncol = m, nrow = l)
 #   lambda.sq <- lambda ^ 2
-#   lambdaExpand_mult()
-#   HlamFn_mult()
-#   HlamsqFn_mult()
-#   list(H = Hl, lambda = lambda, Hlam.mat = Hlam.mat[[1]],
-#        Hlam.matsq = Hlam.matsq[[1]])
+#   lambdaExpand_mult(x = lambda, y = lambda.sq, env = iprobit.env)
+#   HlamFn_mult(env = iprobit.env)
+#   HlamsqFn_mult(env = iprobit.env)
+#   list(H = Hl, Hsq = Hsql, lambda = lambda, lambda.sq = lambda.sq,
+#        Hlam.mat = Hlam.mat[[1]], Hlam.matsq = Hlam.matsq[[1]])
+#
+#   # CHECK
+#   # 2 3 6 (lambda)
+#   # 4 9 36 (lambda.sq)
+#   #
+#   # H1 <- H[[1]]
+#   # H2 <- H[[2]]
+#   # H12 <- H[[1]] * H[[2]]
+#   # H1sq <- H1 %*% H1
+#   # H2sq <- H2 %*% H2
+#   # H12sq <- H12 %*% H12
+#   #
+#   # 4 * H1sq + 9 * H2sq + 36 * H12sq + 2 * 3 * (H1 %*% H2 + H2 %*% H1) + 4 * 3 * (H1 %*% H12 + H12 %*% H1) + 9 * 2 * (H2 %*% H12 + H12 %*% H2)
 # }
 
 as.time <- function(x) {
@@ -244,4 +320,6 @@ as.time <- function(x) {
 print.iprobitTime <- function(x) {
   cat(x$time, x$unit)
 }
+
+
 

@@ -85,11 +85,10 @@ predict.iprobitMod <- function(object, newdata = list(), y.test = NULL,
 
     # Pass to appropriate prediction function ----------------------------------
     if (is.iprobitMod_bin(object)) {
-      environment(.lambdaExpand) <- environment()
+      environment(lambdaExpand_bin) <- environment()
       environment(HlamFn) <- environment()
-      .lambdaExpand(lambda, env = environment())
+      lambdaExpand_bin(env = environment(), y = NULL)
       HlamFn(env = environment())
-      # Hlam.mat <- Reduce("+", mapply("*", Hl, lambda, SIMPLIFY = FALSE))
       ystar.new <- as.vector(alpha + (Hlam.mat %*% w))
       names(ystar.new) <- xrownames
       yp <- predict_iprobit_bin(ystar.new, y.levels)
@@ -97,7 +96,7 @@ predict.iprobitMod <- function(object, newdata = list(), y.test = NULL,
     if (is.iprobitMod_mult(object)) {
       environment(lambdaExpand_mult) <- environment()
       environment(HlamFn_mult) <- environment()
-      lambdaExpand_mult(env = environment())
+      lambdaExpand_mult(env = environment(), y = NULL)
       HlamFn_mult(env = environment())
       ystar.new <- rep(alpha, each = nrow(Hlam.mat[[1]])) +
         mapply("%*%", Hlam.mat, split(w, col(w)))

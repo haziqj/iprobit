@@ -8,7 +8,7 @@ iprobit_bin <- function(ipriorKernel, maxit = 200, stop.crit = 1e-5,
   list2env(BlockBstuff, iprobit.env)
   list2env(model, iprobit.env)
   environment(BlockB) <- iprobit.env
-  environment(.lambdaExpand) <- iprobit.env
+  environment(lambdaExpand_bin) <- iprobit.env
   environment(HlamFn) <- iprobit.env
   environment(HlamsqFn) <- iprobit.env
   y <- Y
@@ -19,9 +19,9 @@ iprobit_bin <- function(ipriorKernel, maxit = 200, stop.crit = 1e-5,
   if (is.null(w0)) w0 <- rep(0, n)
   lambda <- ct <- lambda0
   lambda.sq <- lambda0 ^ 2
-  .lambdaExpand(env = iprobit.env)
-  HlamFn(iprobit.env)
-  HlamsqFn(iprobit.env)
+  lambdaExpand_bin(env = iprobit.env)
+  HlamFn(env = iprobit.env)
+  HlamsqFn(env = iprobit.env)
   alpha <- alpha0
   w <- w0
   niter <- 1
@@ -57,7 +57,7 @@ iprobit_bin <- function(ipriorKernel, maxit = 200, stop.crit = 1e-5,
 
     # Update lambda ------------------------------------------------------------
     for (k in 1:l) {
-      .lambdaExpand(env = iprobit.env)
+      lambdaExpand_bin(env = iprobit.env)
       BlockB(k)
       ct[k] <- sum(Psql[[k]] * W)
       dt <- as.numeric(
@@ -66,9 +66,9 @@ iprobit_bin <- function(ipriorKernel, maxit = 200, stop.crit = 1e-5,
       lambda[k] <- dt / ct[k]
       lambda.sq[k] <- 1 / ct[k] + (dt / ct[k]) ^ 2
     }
-    .lambdaExpand(env = iprobit.env)
-    HlamFn(iprobit.env)
-    HlamsqFn(iprobit.env)
+    lambdaExpand_bin(env = iprobit.env)
+    HlamFn(env = iprobit.env)
+    HlamsqFn(env = iprobit.env)
 
     # Update alpha -------------------------------------------------------------
     alpha <- mean(ystar - Hlam.mat %*% w)

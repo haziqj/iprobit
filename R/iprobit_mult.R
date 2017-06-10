@@ -26,7 +26,7 @@ iprobit_mult <- function(ipriorKernel, maxit = 100, stop.crit = 1e-5,
     else lambda0 <- abs(rnorm(l * m))
   }
   if (is.null(w0)) w0 <- matrix(0, ncol = m, nrow = n)
-  alpha <- alpha0
+  alpha <- rep(1,m); alpha[1:m] <- alpha0
   lambda <- ct <- dt <- matrix(lambda0, ncol = m, nrow = l)
   lambda.sq <- lambda ^ 2
   lambdaExpand_mult(env = iprobit.env)
