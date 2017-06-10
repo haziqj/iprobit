@@ -112,8 +112,9 @@ iplot_predict <- function(object, test.data = NULL) {
   plot.df <- expand.grid(xx, yy)
   xname <- object$ipriorKernel$model$xname[1:2]
 
-  points.df <- data.frame(tmp, factor(object$ipriorKernel$Y,
-                                      levels = object$ipriorKernel$y.levels))
+  classes <- factor(object$ipriorKernel$Y)
+  levels(classes) <- object$ipriorKernel$y.levels
+  points.df <- data.frame(tmp, classes)
 
   if (!is.null(object$formula)) {
     # Fitted using formula
@@ -131,11 +132,14 @@ iplot_predict <- function(object, test.data = NULL) {
     }
   }
   plot.df <- cbind(plot.df, prob)
-  colnames(plot.df) <- c(xname, paste0("class", seq_along(object$y.levels)))
-  colnames(points.df) <- c(xname, "Class")
+  colnames(plot.df) <- c("X1", "X2", paste0("class", seq_along(object$y.levels)))
+  colnames(points.df) <- c("X1", "X2", "Class")
 
   if (is.iprobitMod_bin(object)) p <- iplot_predict_bin(plot.df, points.df, x, y)
   if (is.iprobitMod_mult(object)) p <- iplot_predict_mult(plot.df, points.df, x, y)
+
+  p <- p +
+    labs(x = xname[1], y = xname[2], col = object$ipriorKernel$model$yname)
   p
 }
 
