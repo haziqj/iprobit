@@ -1,46 +1,49 @@
 #' @export
-iprobit_mult <- function(y, X, kernel = c("Canonical", "FBM"), maxit = 100,
-                         stop.crit = 1e-5,  silent = FALSE, alpha0 = NULL,
-                         lambda0 = NULL, w0 = NULL, common.intercept = FALSE,
+iprobit_mult <- function(ipriorKernel, maxit = 100, stop.crit = 1e-5,
+                         silent = FALSE, alpha0 = NULL, lambda0 = NULL,
+                         w0 = NULL, common.intercept = FALSE,
                          common.RKHS.scale = FALSE) {
-  n <- length(y)
-  y.lev <- levels(y)
-  m <- length(y.lev)
+  # Declare all variables and functions to be used into environment ------------
+  iprobit.env <- environment()
+  list2env(ipriorKernel, iprobit.env)
+  list2env(BlockBstuff, iprobit.env)
+  list2env(model, iprobit.env)
+  environment(BlockB) <- iprobit.env
+  environment(lambdaExpand_mult) <- iprobit.env
+  environment(HlamFn_mult) <- iprobit.env
+  environment(HlamsqFn_mult) <- iprobit.env
+  y <- Y
+  m <- length(y.levels)
   nm <- n * m
-  p <- ncol(X)
-  kernel <- match.arg(kernel, c("Canonical", "FBM"))
-  if (kernel == "FBM") H <- iprior::fnH3(X)
-  else H <- iprior::fnH2(X)
-  H.sq <- H %*% H
 
-  # Initialise
-  alpha <- rnorm(m)
-  lambda <- abs(rnorm(m))
-  if (isTRUE(common.intercept)) alpha <- rep(rnorm(1), m)
-  if (isTRUE(common.RKHS.scale)) lambda <- rep(rnorm(1), m)
-  lambda.sq <- lambda ^ 2
-  H.lam <- H.lam.sq <- list(NULL)
-  for (j in 1:m) {
-    H.lam[[j]] <- lambda[j] * H
-    H.lam.sq[[j]] <- lambda.sq[j] * H.sq
+  # Initialise -----------------------------------------------------------------
+  if (is.null(alpha0)) {
+    if (isTRUE(common.intercept)) alpha0 <- rep(rnorm(1), m)
+    else alpha0 <- rnorm(m)
   }
-  w <- f.tmp <- ystar.tmp <- matrix(0, ncol = m, nrow = n)
-  dt <- ct <- logdetA <- rep(NA, m)
+  if (is.null(lambda0)) {
+    if (isTRUE(common.RKHS.scale)) lambda0 <- rep(abs(rnorm(l)), m)
+    else lambda0 <- abs(rnorm(l * m))
+  }
+  if (is.null(w0)) w0 <- matrix(0, ncol = m, nrow = n)
+  alpha <- alpha0
+  lambda <- ct <- dt <- matrix(lambda0, ncol = m, nrow = l)
+  lambda.sq <- lambda ^ 2
+  lambdaExpand_mult()
+  HlamFn_mult()
+  HlamsqFn_mult()
+  w <- f.tmp <- ystar <- w0
+  logdetA <- rep(NA, m)
   lb <- rep(NA, maxit)
   W <- list(NULL)
   logClb <- rep(NA, n)
   niter <- 1
 
-  # Supplied starting values
-  if (!is.null(alpha0)) alpha <- alpha0
-  if (!is.null(lambda0)) lambda <- lambda0
-  if (!is.null(w0)) w <- w0
-
   if (!silent) pb <- txtProgressBar(min = 0, max = maxit - 1, style = 3)
   start.time <- Sys.time()
   for (t in 1:(maxit - 1)) {
     # Update f
-    f.tmp <- rep(alpha, each = n) + rep(lambda, each = n) * (H %*% w)
+    f.tmp <- rep(alpha, each = n) + mapply("%*%", Hlam.mat, split(w, col(w)))
 
     # Update ystar
     for (i in 1:n) {
@@ -59,42 +62,47 @@ iprobit_mult <- function(y, X, kernel = c("Canonical", "FBM"), maxit = 100,
             exp(logphi.k + logPhi.l) * dnorm(z)
           }, lower = -Inf, upper = Inf
         )$value)
-        ystar.tmp[i, k] <- fi[k] - exp(logD - logC)
+        ystar[i, k] <- fi[k] - exp(logD - logC)
       }
-      ystar.tmp[i, j] <- fi[j] - sum(ystar.tmp[i, -j] - fi[-j])
+      ystar[i, j] <- fi[j] - sum(ystar[i, -j] - fi[-j])
     }
-    ystar <- c(t(ystar.tmp))
 
     # Update w
     for (j in 1:m) {
-      A <- H.lam.sq[[j]] + diag(1, n)
-      a <- H.lam[[j]] %*% (ystar.tmp[, j] - alpha[j])
+      A <- Hlam.matsq[[j]] + diag(1, n)
+      a <- Hlam.mat[[j]] %*% (ystar[, j] - alpha[j])
       w[, j] <- solve(A, a)
       W[[j]] <- solve(A) + tcrossprod(w[, j])
       logdetA[j] <- determinant(A)$mod
     }
 
     # Update lambda
-    for (j in 1:m) {
-      ct[j] <- sum(H.sq * W[[j]])
-      dt[j] <- t(ystar.tmp[, j] - alpha[j]) %*% (H %*% w[, j])
-    }
-    if (isTRUE(common.RKHS.scale)) {
-      lambda <- rep(sum(dt) / sum(ct), m)
-      lambda.sq <- rep(1 / sum(ct) + lambda ^ 2, m)
-    } else {
-      lambda <- dt / ct
-      lambda.sq <- 1 / ct + lambda ^ 2
+    for (k in 1:l) {
+      for (j in 1:m) {
+        lambdaExpand_mult()
+        BlockB(k, lambda[, j])
+        ct[k, j] <- sum(Psql[[k]] * W[[j]])
+        dt[k, j] <- as.numeric(
+          crossprod(ystar[, j] - alpha[j], Pl[[k]]) %*% w[, j] -
+            sum(Sl[[k]] * W[[j]]) / 2
+        )
+      }
+      if (isTRUE(common.RKHS.scale)) {
+        lambda[k, ] <- rep(sum(dt[k, ]) / sum(ct[k, ]), m)
+        lambda.sq[k, ] <- rep(1 / sum(ct[k, ]) + lambda[k, ] ^ 2, m)
+      } else {
+        lambda[k, ] <- dt[k, ] / ct[k, ]
+        lambda.sq[k, ] <- 1 / ct[k, ] + lambda[k, ] ^ 2
+      }
     }
 
     # Update H.lam and H.lam.sq
-    for (j in 1:m) {
-      H.lam[[j]] <- lambda[j] * H
-      H.lam.sq[[j]] <- lambda.sq[j] * H.sq
-    }
+    lambdaExpand_mult()
+    HlamFn_mult()
+    HlamsqFn_mult()
 
     # Update alpha
-    alpha <- apply(ystar.tmp - rep(lambda, each = n) * (H %*% w), 2, mean)
+    alpha <- apply(ystar - mapply("%*%", Hlam.mat, split(w, col(w))), 2, mean)
 
     # Calculate lower bound
     lb.ystar <- sum(logClb)
@@ -119,18 +127,22 @@ iprobit_mult <- function(y, X, kernel = c("Canonical", "FBM"), maxit = 100,
   time.taken <- end.time - start.time
 
   # Clean up and close
-  if (isTRUE(common.RKHS.scale)) lambda <- lambda[1]
-  if (isTRUE(common.intercept)) alpha <- alpha[1]
+  lambda <- matrix(lambda[1:l, ], ncol = m, nrow = l)
+  # if (isTRUE(common.RKHS.scale)) lambda <- lambda[1:l, 1]
+  # else lambda <- lambda[1:l, ]
+  # if (isTRUE(common.intercept)) alpha <- alpha[1]
   if (!silent) {
     close(pb)
     if (niter == maxit) cat("Convergence criterion not met.\n")
     else cat("Converged after", niter, "iterations.\n")
   }
 
-  res <- list(ystar = ystar.tmp, w = w, lambda = lambda, alpha = alpha,
-              lower.bound = lb, kernel = kernel, se = NA, y.levels = y.lev,
-              time = time.taken, call = match.call(), stop.crit = stop.crit,
-              niter = niter, y = y, X = X, maxit = maxit, Hurst = 0.5)
+  res <- list(ystar = ystar, w = w, lambda = lambda, alpha = alpha,
+              lower.bound = lb, ipriorKernel = ipriorKernel,
+              se = NA, se.ystar = NA,
+              y.levels = y.levels, start.time = start.time,
+              end.time = end.time, time = time.taken, call = match.call(),
+              stop.crit = stop.crit, niter = niter, maxit = maxit)
   class(res) <- c("iprobitMod", "iprobitMod_mult")
   res
 }

@@ -5,11 +5,11 @@ iprobit <- function(...) {
 
 #' @export
 iprobit.default <- function(y, ..., kernel = "Canonical", silent = FALSE,
-                            interactions = NULL, control = list()) {
+                            interactions = NULL, parsm = TRUE, control = list()) {
   # Set up controls ------------------------------------------------------------
   con <- list(
     maxit             = 100,
-    stop.crit         = 1e-5,
+    stop.crit         = 1e-3,
     silent            = FALSE,
     alpha0            = NULL,  # if NULL, parameters are initialised in VB
     lambda0           = NULL,  # routine
@@ -31,31 +31,42 @@ iprobit.default <- function(y, ..., kernel = "Canonical", silent = FALSE,
   if (iprior::is.ipriorKernel(y)) {
     ipriorKernel <- y
   } else {
-    ipriorKernel <- iprior::kernL(y, ..., model = list(kernel = kernel))
+    ipriorKernel <- iprior::kernL(y, ...,
+                                  model = list(kernel = kernel, parsm = parsm,
+                                               interactions = interactions))
   }
 
   # Checks ---------------------------------------------------------------------
   if (!isTRUE(ipriorKernel$model$probit)) stop("y values must be factors.")
   if (ipriorKernel$r > 0) stop("Can't fit higher order terms yet.")
-  if (!is.null(ipriorKernel$model$intr.3plus))
+  if (ipriorKernel$no.int.3plus > 0)
     stop("Can't fit more than three-way interactions yet.")
 
   # Pass to the correct VB routine ---------------------------------------------
   if (length(ipriorKernel$y.levels) == 2) {
     res <- iprobit_bin(ipriorKernel, maxit, stop.crit, silent, alpha0, lambda0, w0)
+    param <- c(get_alpha(res), get_lambda(res))
   } else {
-    res <- list("Multinomial probit")
+    res <- iprobit_mult(ipriorKernel, maxit, stop.crit, silent, alpha0, lambda0,
+                        w0, common.intercept, common.RKHS.scale)
+    param <- rbind(get_alpha(res), get_lambda(res))
   }
+
+  # Include these in the ipriorMod object --------------------------------------
+  res$control      <- con
+  res$coefficients <- param
 
   res
 }
 
 #' @export
 iprobit.formula <- function(formula, data = parent.frame(), kernel = "Canonical",
-                            silent = FALSE, one.lam = FALSE, control = list()) {
+                            silent = FALSE, one.lam = FALSE, parsm = TRUE,
+                            control = list()) {
   # Pass to iprobit default ----------------------------------------------------
   ipriorKernel <- iprior::kernL(formula, data, model = list(kernel = kernel,
-                                                            one.lam = one.lam))
+                                                            one.lam = one.lam,
+                                                            parsm = parsm))
   est <- iprobit.default(y = ipriorKernel, control = control, silent = silent)
 
   # Changing the call to simply iprobit ----------------------------------------

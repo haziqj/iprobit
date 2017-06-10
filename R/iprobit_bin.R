@@ -14,8 +14,8 @@ iprobit_bin <- function(ipriorKernel, maxit = 200, stop.crit = 1e-5,
   y <- Y
 
   # Initialise -----------------------------------------------------------------
-  if (is.null(lambda0)) lambda0 <- abs(rnorm(l))
   if (is.null(alpha0)) alpha0 <- rnorm(1)
+  if (is.null(lambda0)) lambda0 <- abs(rnorm(l))
   if (is.null(w0)) w0 <- rep(0, n)
   lambda <- ct <- lambda0
   lambda.sq <- lambda0 ^ 2
@@ -60,11 +60,11 @@ iprobit_bin <- function(ipriorKernel, maxit = 200, stop.crit = 1e-5,
       .lambdaExpand(env = iprobit.env)
       BlockB(k)
       ct[k] <- sum(Psql[[k]] * W)
-      d <- as.numeric(
+      dt <- as.numeric(
         crossprod(ystar - alpha, Pl[[k]]) %*% w - sum(Sl[[k]] * W) / 2
       )
-      lambda[k] <- d / ct[k]
-      lambda.sq[k] <- 1 / ct[k] + (d / ct[k]) ^ 2
+      lambda[k] <- dt / ct[k]
+      lambda.sq[k] <- 1 / ct[k] + (dt / ct[k]) ^ 2
     }
     .lambdaExpand(env = iprobit.env)
     HlamFn(iprobit.env)
@@ -88,7 +88,7 @@ iprobit_bin <- function(ipriorKernel, maxit = 200, stop.crit = 1e-5,
   time.taken <- end.time - start.time
 
   # Calculate standard errors from posterior variance --------------------------
-  se.lambda <- sqrt(1 / ct)
+  se.lambda <- sqrt(1 / ct[1:l])
   se.alpha <- sqrt(1 / n)
   se.ystar <- NA #iprobitSE(y = y, eta = eta, thing1 = thing1, thing0 = thing0)
 
@@ -100,7 +100,7 @@ iprobit_bin <- function(ipriorKernel, maxit = 200, stop.crit = 1e-5,
   }
 
   res <- list(ystar = ystar, w = w, lambda = lambda[1:l], alpha = alpha,
-              lower.bound = lower.bound, kernel = kernel, ipriorKernel = ipriorKernel,
+              lower.bound = lower.bound, ipriorKernel = ipriorKernel,
               se = c(se.alpha, se.lambda), se.ystar = se.ystar,
               y.levels = y.levels, Varw = Varw, start.time = start.time,
               end.time = end.time, time = time.taken, call = match.call(),

@@ -1,20 +1,6 @@
-interceptAndLambdaNames <- function(x) {
-  Intercept <- x$alpha
-  if (length(Intercept) > 1)
-    names(Intercept) <- paste0("alpha[", seq_along(Intercept), "]")
-  else
-    names(Intercept) <- "alpha"
-  lambda <- x$lambda
-  if (length(lambda) > 1)
-    names(lambda) <- paste0("lambda[", seq_along(lambda), "]")
-  else
-    names(lambda) <- "lambda"
-  c(Intercept, lambda)
-}
-
 #' @export
 print.iprobitMod <- function(x) {
-  theta <- interceptAndLambdaNames(x)
+  theta <- coef(x)
 
   cat("Lower bound value = ", x$lower.bound[x$niter], "\n")
   cat("Iterations = ", x$niter, "\n\n")
@@ -23,7 +9,8 @@ print.iprobitMod <- function(x) {
 
 #' @export
 summary.iprobitMod <- function(x) {
-  theta <- interceptAndLambdaNames(x)
+  if (is.iprobitMod_bin(x)) theta <- coef(x)
+  if (is.iprobitMod_mult(x)) theta <- get_coef_mult(x)
   se <- x$se
 
   tab <- cbind(
@@ -33,13 +20,17 @@ summary.iprobitMod <- function(x) {
     "97.5%" = round(theta + 1.96 * se, digits = 4)
   )
 
-  res <- list(call = x$call, kernel = x$ipriorKernel$model$kernel,
-              Hurst = x$ipriorKernel$model$Hurst, tab = tab,
+  kernel.used <- get_kernel(x)
+  if (compare(kernel.used)) kernel.used <- kernel.used[1]
+  else kernel.used <- paste0(kernel.used, collapse = ", ")
+
+  res <- list(call = x$call, kernel.used = kernel.used, tab = tab,
               maxit = x$maxit, niter = x$niter, stop.crit = x$stop.crit,
               lb = x$lower.bound)
   class(res) <- "iprobitSummary"
   res
 }
+
 
 #' @export
 print.iprobitSummary <- function(x) {
@@ -47,8 +38,7 @@ print.iprobitSummary <- function(x) {
   print(x$call)
 
   cat("\nRKHS used: ")
-  kernel.used <- paste0(x$kernel, ",", x$Hurst)
-  cat(kernel.used[1], "\n\n")
+  cat(x$kernel.used, "\n\n")
 
   cat("Parameter estimates:\n")
   print(x$tab)
