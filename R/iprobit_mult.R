@@ -109,9 +109,9 @@ iprobit_mult <- function(ipriorKernel, maxit = 100, stop.crit = 1e-5,
     lb.ystar <- sum(logClb)
     lb.w <- 0.5 * (nm - sum(sapply(W, function(x) sum(diag(x)))) - sum(logdetA))
     if (isTRUE(common.RKHS.scale))
-      lb.lambda <- l * 0.5 * (1 + log(2 * pi) - sum(log(sum(ct[1:l, ]))))
+      lb.lambda <- (l / 2) * (1 + log(2 * pi)) - sum(log(apply(ct, 1, sum))) / 2
     else
-      lb.lambda <- l * (m / 2) * (1 + log(2 * pi) - mean(log(ct)))
+      lb.lambda <- (m / 2) * (l * (1 + log(2 * pi)) - sum(log(ct)) / m)
     if (isTRUE(common.intercept))
       lb.alpha <- 0.5 * (1 + log(2 * pi) - log(nm))
     else

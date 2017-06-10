@@ -102,25 +102,30 @@ test_that("Predict (with test error rate)", {
 
 })
 
-# test_that("Convergence", {
-#
-#   set.seed(123)
-#   m <- 3
-#   dat <- gen_mixture(n = 10, m = m)
-#   mod <- iprobit(dat$y, dat$X, control = list(maxit = 500, silent = TRUE))
-#   modf <- iprobit(y ~ ., dat, one.lam = TRUE,
-#                   control = list(maxit = 500, silent = TRUE))
-#   expect_equal(mod$lambda, 0.11646, tolerance = 1e-3)
-#   expect_equal(modf$lambda, 0.11646, tolerance = 1e-3)
-#
-#   # Single lambda
-#   # mod <- iprobit_bin(dat$y, dat$X, silent = TRUE, maxit = 200)
-#   # > mod
-#   # Lower bound value =  -4.89696
-#   # Iterations =  106
-#   #
-#   # alpha   lambda
-#   # -0.00901  0.11646
-#
-# })
+test_that("Convergence", {
+
+  set.seed(123)
+  m <- 3
+  dat <- gen_mixture(n = 10, m = m)
+  mod <- iprobit(dat$y, dat$X,
+                 control = list(maxit = 500, silent = TRUE,
+                                alpha0 = rep(1, m),
+                                lambda0 = rep(1, m)))
+  modf <- iprobit(y ~ ., dat, one.lam = TRUE,
+                  control = list(maxit = 500, silent = TRUE,
+                                 alpha0 = rep(1, m),
+                                 lambda0 = rep(1, m)))
+  expect_equal(get_lambda(mod)[2], 0.1743832, tolerance = 1e-3)
+  expect_equal(get_lambda(modf)[2], 0.1743832, tolerance = 1e-3)
+
+  # Single lambda
+  # > modf
+  # Lower bound value =  -12.87286
+  # Iterations =  136
+  #
+  # Class = 1 Class = 2 Class = 3
+  # alpha    0.60748   1.76979   0.62274
+  # lambda   0.00000   0.17438   0.00000
+
+})
 
