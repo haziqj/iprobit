@@ -9,7 +9,8 @@ test_that("FBM kernel (binary)", {
   # FBM = 0.5
   mod <- iprobit(y ~ ., dat, kernel = "FBM", silent = TRUE)
   expect_equivalent(get_Hurst(mod), c(0.5, 0.5))
-  mod <- iprobit(dat$y, dat$X, kernel = "FBM", silent = TRUE)
+  mod <- iprobit(dat$y, dat$X, kernel = "FBM", silent = TRUE,
+                 control = list(maxit = 2))
   expect_equivalent(get_Hurst(mod), 0.5)
 
   # FBM = 0.1, 0.9
@@ -89,7 +90,8 @@ test_that("FBM kernel (multinomial)", {
   # FBM = 0.5
   mod <- iprobit(y ~ ., dat, kernel = "FBM", silent = TRUE)
   expect_equivalent(get_Hurst(mod), c(0.5, 0.5))
-  mod <- iprobit(dat$y, dat$X, kernel = "FBM", silent = TRUE)
+  mod <- iprobit(dat$y, dat$X, kernel = "FBM", silent = TRUE,
+                 control = list(maxit = 2))
   expect_equivalent(get_Hurst(mod), 0.5)
 
   # FBM = 0.1, 0.9
@@ -160,4 +162,10 @@ test_that("Squared terms (multinomial)", {
 
 })
 
+test_that("Lots of squared terms (multinomial)", {
 
+  mod <- iprobit(Species ~ . ^ 2, iris, silent = TRUE,
+                 control = list(maxit = 2))
+  expect_s3_class(mod, "iprobitMod")
+
+})

@@ -240,11 +240,16 @@ HlamsqFn_mult <- function(env = environment()) {
   assign("Hlam.matsq", res.Hlam.matsq, envir = env)
 }
 
-Hlam_two_way_index <- function(lam = c(1,2,3), lamsq = c(4,5,6)) {
+Hlam_two_way_index <- function(lam = c(1,2,3,4), lamsq = c(4,5,6,7)) {
   # ind1 <- c(1, 1, 2)
   # ind2 <- c(2, 3, 3)
   # intr <- matrix(c(1,2), ncol = 1)
   # l <- 2
+  # mod <- iprior::kernL(Species ~ . ^ 2, iris)
+  # iprobit.env <- environment()
+  # list2env(mod, iprobit.env)
+  # list2env(BlockBstuff, iprobit.env)
+  # list2env(model, iprobit.env)
 
   comb.ind12 <- cbind(ind1, ind2)
   comb.ind12 <- split(comb.ind12, row(comb.ind12))
@@ -261,54 +266,54 @@ Hlam_two_way_index <- function(lam = c(1,2,3), lamsq = c(4,5,6)) {
   }
 
   lam_ind <- function(x) {
-    if (length(x) > 2) {
-      here <- which(duplicated(x))
+    here <- which(duplicated(x))
+    if (length(here > 0)) {
       what <- x[here]
       what.not <- x[x != what]
-      lamsq[what] * lam[what.not]
+      prod(lamsq[what]) * prod(lam[what.not])
     } else {
-      lam[x[1]] * lam[x[2]]
+      prod(lam[x])
     }
   }
 
   lapply(lapply(comb.ind12, replace_ind), lam_ind)
 }
 
-# myfun <- function() {
-#   # Function to test lambdaExpand_mult() and the Hlam*_mult functions
-#   set.seed(123)
-#   dat <- gen_mixture(n = 4, m = 3)
-#   mod <- iprior::kernL(y ~ . ^ 2, dat)
-#   iprobit.env <- environment()
-#   list2env(mod, iprobit.env)
-#   list2env(BlockBstuff, iprobit.env)
-#   list2env(model, iprobit.env)
-#   environment(lambdaExpand_mult) <- iprobit.env
-#   environment(HlamFn_mult) <- iprobit.env
-#   environment(HlamsqFn_mult) <- iprobit.env
-#   environment(Hlam_two_way_index) <- iprobit.env
-#   m <- length(y.levels)
-#   lambda <- matrix(2:3, ncol = m, nrow = l)
-#   lambda.sq <- lambda ^ 2
-#   lambdaExpand_mult(x = lambda, y = lambda.sq, env = iprobit.env)
-#   HlamFn_mult(env = iprobit.env)
-#   HlamsqFn_mult(env = iprobit.env)
-#   list(H = Hl, Hsq = Hsql, lambda = lambda, lambda.sq = lambda.sq,
-#        Hlam.mat = Hlam.mat[[1]], Hlam.matsq = Hlam.matsq[[1]])
-#
-#   # CHECK
-#   # 2 3 6 (lambda)
-#   # 4 9 36 (lambda.sq)
-#   #
-#   # H1 <- H[[1]]
-#   # H2 <- H[[2]]
-#   # H12 <- H[[1]] * H[[2]]
-#   # H1sq <- H1 %*% H1
-#   # H2sq <- H2 %*% H2
-#   # H12sq <- H12 %*% H12
-#   #
-#   # 4 * H1sq + 9 * H2sq + 36 * H12sq + 2 * 3 * (H1 %*% H2 + H2 %*% H1) + 4 * 3 * (H1 %*% H12 + H12 %*% H1) + 9 * 2 * (H2 %*% H12 + H12 %*% H2)
-# }
+myfun <- function() {
+  # Function to test lambdaExpand_mult() and the Hlam*_mult functions
+  set.seed(123)
+  dat <- gen_mixture(n = 4, m = 3)
+  mod <- iprior::kernL(y ~ . ^ 2, dat)
+  iprobit.env <- environment()
+  list2env(mod, iprobit.env)
+  list2env(BlockBstuff, iprobit.env)
+  list2env(model, iprobit.env)
+  environment(lambdaExpand_mult) <- iprobit.env
+  environment(HlamFn_mult) <- iprobit.env
+  environment(HlamsqFn_mult) <- iprobit.env
+  environment(Hlam_two_way_index) <- iprobit.env
+  m <- length(y.levels)
+  lambda <- matrix(2:3, ncol = m, nrow = l)
+  lambda.sq <- lambda ^ 2
+  lambdaExpand_mult(x = lambda, y = lambda.sq, env = iprobit.env)
+  HlamFn_mult(env = iprobit.env)
+  HlamsqFn_mult(env = iprobit.env)
+  list(H = Hl, Hsq = Hsql, lambda = lambda, lambda.sq = lambda.sq,
+       Hlam.mat = Hlam.mat[[1]], Hlam.matsq = Hlam.matsq[[1]])
+
+  # CHECK
+  # 2 3 6 (lambda)
+  # 4 9 36 (lambda.sq)
+  #
+  # H1 <- H[[1]]
+  # H2 <- H[[2]]
+  # H12 <- H[[1]] * H[[2]]
+  # H1sq <- H1 %*% H1
+  # H2sq <- H2 %*% H2
+  # H12sq <- H12 %*% H12
+  #
+  # 4 * H1sq + 9 * H2sq + 36 * H12sq + 2 * 3 * (H1 %*% H2 + H2 %*% H1) + 4 * 3 * (H1 %*% H12 + H12 %*% H1) + 9 * 2 * (H2 %*% H12 + H12 %*% H2)
+}
 
 as.time <- function(x) {
   # For difftime objects

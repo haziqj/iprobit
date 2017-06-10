@@ -22,30 +22,23 @@ iplot_fitted <- function(object) {
     theme_bw()
 }
 
-#' @export
-plot.iprobitMult <- function(x, levels = NULL, ...) {
-  fitted.plot <- iplot_fitted_mult(x, levels = levels)
-  fitted.plot
-}
-
-#' @export
-iplot_fitted_mult <- function(x, levels = NULL) {
-  list2env(x, envir = environment())
-  n <- length(y)
-  y.lev <- levels(y)
-  m <- length(y.lev)
-  nm <- n * m
-  p <- ncol(X)
-
-  probs <- fitted(x)$probs
-  df.plot <- data.frame(probs, i = 1:n)
-  df.plot <- reshape2::melt(df.plot, id.vars = "i")
-  ggplot(df.plot, aes(x = i, y = value)) +
-    geom_area(aes(col = variable, fill = variable), position = "stack") +
-    coord_cartesian(ylim = c(0, 1)) +
-    labs(col = "Class", fill = "Class", x = "Index", y = "Fitted probabilities") +
-    theme_bw()
-}
+# iplot_fitted_mult <- function(x, levels = NULL) {
+#   list2env(x, envir = environment())
+#   n <- length(y)
+#   y.lev <- levels(y)
+#   m <- length(y.lev)
+#   nm <- n * m
+#   p <- ncol(X)
+#
+#   probs <- fitted(x)$probs
+#   df.plot <- data.frame(probs, i = 1:n)
+#   df.plot <- reshape2::melt(df.plot, id.vars = "i")
+#   ggplot(df.plot, aes(x = i, y = value)) +
+#     geom_area(aes(col = variable, fill = variable), position = "stack") +
+#     coord_cartesian(ylim = c(0, 1)) +
+#     labs(col = "Class", fill = "Class", x = "Index", y = "Fitted probabilities") +
+#     theme_bw()
+# }
 
 #' @export
 iplot_lb <- function(x, niter.plot = NULL, lab.pos = c("up", "down")) {
@@ -117,14 +110,14 @@ iplot_predict <- function(object, test.data = NULL) {
   xx <- seq(from = x[1] - 1, to = x[2] + 1, length.out = 100)
   yy <- seq(from = y[1] - 1, to = y[2] + 1, length.out = 100)
   plot.df <- expand.grid(xx, yy)
-  xname <- object$ipriorKernel$model$xname
+  xname <- object$ipriorKernel$model$xname[1:2]
 
   points.df <- data.frame(tmp, factor(object$ipriorKernel$Y,
                                       levels = object$ipriorKernel$y.levels))
 
   if (!is.null(object$formula)) {
     # Fitted using formula
-    colnames(plot.df) <- attr(object$ipriorKernel$terms, "term.labels")
+    colnames(plot.df) <- attr(object$ipriorKernel$terms, "term.labels")[1:2]
     prob <- predict(object, newdata = plot.df)$prob
     if (!is.null(test.data)) {
       if (is.iprobitData(test.data)) test.data <- as.data.frame(test.data)

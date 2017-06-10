@@ -57,7 +57,7 @@ predict.iprobitMod <- function(object, newdata = list(), y.test = NULL,
   list2env(model, environment())
 
   if (length(newdata) == 0) {
-    return("Use fitted instead")
+    return(cat("No new data supplied. Use fitted() instead."))
   } else {
     if (!is.null(object$formula)) {
       # Model has been fitted using formula interface
