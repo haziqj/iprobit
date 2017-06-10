@@ -146,7 +146,10 @@ get_coef_se_mult <- function(object) {
 
   if (isTRUE(object$control$common.RKHS.scale)) {
     lambda <- theta[-1, 1]
-    names(lambda) <- "lambda"
+    if (length(lambda) > 1)
+      names(lambda) <- paste0("lambda[", seq_along(lambda), ",]")
+    else
+      names(lambda) <- "lambda"
     lambda.se <- object$se.lambda[, 1]
   } else {
     lambda <- c(t(theta[-1, ]))

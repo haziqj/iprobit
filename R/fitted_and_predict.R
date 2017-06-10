@@ -146,7 +146,7 @@ predict_iprobit_mult <- function(ystar, y.levels) {
   y.hat <- factor(y.hat, levels = y.levels)
 
   p.hat <- ystar
-  for (i in seq_along(y.hat)) {
+  for (i in seq_len(nrow(ystar))) {
     for (j in 1:m) {
       p.hat[i, j] <- EprodPhiZ(ystar[i, j] - ystar[i, (1:m)[-j]])
     }

@@ -37,15 +37,18 @@ iprobit_mult <- function(ipriorKernel, maxit = 100, stop.crit = 1e-5,
   lb <- rep(NA, maxit)
   W <- list(NULL)
   logClb <- rep(NA, n)
+  w.ind <- seq_len(
+    ifelse(isTRUE(common.intercept) && isTRUE(common.RKHS.scale), 1, m)
+  )
   niter <- 1
 
   if (!silent) pb <- txtProgressBar(min = 0, max = maxit - 1, style = 3)
   start.time <- Sys.time()
   for (t in 1:(maxit - 1)) {
-    # Update f
+    # Update f -----------------------------------------------------------------
     f.tmp <- rep(alpha, each = n) + mapply("%*%", Hlam.mat, split(w, col(w)))
 
-    # Update ystar
+    # Update ystar -------------------------------------------------------------
     for (i in 1:n) {
       j <- as.numeric(y[i])
       fi <- f.tmp[i, ]
@@ -67,16 +70,26 @@ iprobit_mult <- function(ipriorKernel, maxit = 100, stop.crit = 1e-5,
       ystar[i, j] <- fi[j] - sum(ystar[i, -j] - fi[-j])
     }
 
-    # Update w
-    for (j in 1:m) {
+    # Update w -----------------------------------------------------------------
+    for (j in w.ind) {
       A <- Hlam.matsq[[j]] + diag(1, n)
-      a <- Hlam.mat[[j]] %*% (ystar[, j] - alpha[j])
-      w[, j] <- solve(A, a)
-      W[[j]] <- solve(A) + tcrossprod(w[, j])
+      a <- as.numeric(crossprod(Hlam.mat[[j]], ystar[, j] - alpha[j]))
+      eigenA <- iprior::eigenCpp(A)
+      V <- eigenA$vec
+      u <- eigenA$val + 1e-8  # ensure positive eigenvalues
+      uinv.Vt <- t(V) / u
+      w[, j] <- as.numeric(crossprod(a, V) %*% uinv.Vt)
+      Varw <- iprior::fastVDiag(V, 1 / u)  # V %*% uinv.Vt
+      W[[j]] <- Varw + tcrossprod(w[, j])
       logdetA[j] <- determinant(A)$mod
     }
+    if (isTRUE(common.intercept) && isTRUE(common.RKHS.scale)) {
+      w <- matrix(w[, 1], nrow = n, ncol = m)
+      W <- rep(list(W[[1]]), m)
+      logdetA <- rep(logdetA[1], m)
+    }
 
-    # Update lambda
+    # Update lambda ------------------------------------------------------------
     for (k in 1:l) {
       for (j in 1:m) {
         lambdaExpand_mult(env = iprobit.env)
@@ -96,12 +109,12 @@ iprobit_mult <- function(ipriorKernel, maxit = 100, stop.crit = 1e-5,
       }
     }
 
-    # Update H.lam and H.lam.sq
+    # Update H.lam and H.lam.sq ------------------------------------------------
     lambdaExpand_mult(env = iprobit.env)
     HlamFn_mult(env = iprobit.env)
     HlamsqFn_mult(env = iprobit.env)
 
-    # Update alpha
+    # Update alpha -------------------------------------------------------------
     alpha <- apply(ystar - mapply("%*%", Hlam.mat, split(w, col(w))), 2, mean)
     if (isTRUE(common.intercept)) alpha <- rep(mean(alpha), m)
 
@@ -136,7 +149,7 @@ iprobit_mult <- function(ipriorKernel, maxit = 100, stop.crit = 1e-5,
     se.lambda <- matrix(sqrt(1 / ct[1:l, ]), ncol = m, nrow = l)
   se.ystar <- NA #iprobitSE(y = y, eta = eta, thing1 = thing1, thing0 = thing0)
 
-  # Clean up and close
+  # Clean up and close ---------------------------------------------------------
   lambda <- matrix(lambda[1:l, ], ncol = m, nrow = l)
   if (!silent) {
     close(pb)

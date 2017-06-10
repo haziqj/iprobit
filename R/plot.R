@@ -59,7 +59,7 @@ iplot_lb <- function(x, niter.plot = NULL, lab.pos = c("up", "down")) {
   niter.plot <- niter.plot[1]:niter.plot[2]
   lb <- lb.original[niter.plot]
   plot.df <- data.frame(Iteration = niter.plot, lb = lb)
-  time.per.iter <- as.numeric(x$time) / (x$niter - 1)
+  time.per.iter <- mod$time$time / (x$niter - 1)
   if (time.per.iter < 0.001) time.per.iter <- 0.001
 
   ggplot(plot.df, aes(x = Iteration, y = lb, label = max(lb))) +
