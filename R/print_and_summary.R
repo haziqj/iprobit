@@ -32,7 +32,7 @@ summary.iprobitMod <- function(x) {
 
   res <- list(call = x$call, kernel.used = kernel.used, tab = tab,
               maxit = x$maxit, niter = x$niter, stop.crit = x$stop.crit,
-              lb = x$lower.bound)
+              lb = x$lower.bound, classes = x$y.levels)
   class(res) <- "iprobitSummary"
   res
 }
@@ -43,10 +43,13 @@ print.iprobitSummary <- function(x) {
   cat("\nCall:\n")
   print(x$call)
 
-  cat("\nRKHS used: ")
-  cat(x$kernel.used, "\n\n")
+  cat("\nClasses: ")
+  cat(x$classes, "\n")
 
-  cat("Parameter estimates:\n")
+  cat("\nRKHS used: ")
+  cat(x$kernel.used, "\n")
+
+  cat("\nParameter estimates:\n")
   print(x$tab)
 
   if (x$niter == x$maxit) {

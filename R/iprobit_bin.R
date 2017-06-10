@@ -103,7 +103,7 @@ iprobit_bin <- function(ipriorKernel, maxit = 200, stop.crit = 1e-5,
               lower.bound = lower.bound, ipriorKernel = ipriorKernel,
               se = c(se.alpha, se.lambda), se.ystar = se.ystar,
               y.levels = y.levels, Varw = Varw, start.time = start.time,
-              end.time = end.time, time = time.taken, call = match.call(),
+              end.time = end.time, time = time.taken,
               stop.crit = stop.crit, niter = niter, maxit = maxit)
   class(res) <- c("iprobitMod", "iprobitMod_bin")
   res

@@ -53,10 +53,21 @@ iprobit.default <- function(y, ..., kernel = "Canonical", silent = FALSE,
     param <- rbind(get_alpha(res), get_lambda(res))
   }
 
-  # Include these in the ipriorMod object --------------------------------------
+  # Change the call to "iprobit" -----------------------------------------------
+  res$fullcall <- cl <- match.call()
+  ynamefromcall <- as.character(cl[2])
+  check.yname <- is.null(ipriorKernel$model$yname)
+  if (check.yname) model$yname <- ynamefromcall
+  cl[[1L]] <- as.name("iprobit")
+  m <- match(c("control"), names(cl), 0L)
+  if (any(m > 0)) cl <- cl[-m]
+  res$call <- cl
+
+  # Include these also in the ipriorMod object ---------------------------------
   res$control      <- con
   res$coefficients <- param
 
+  class(res) <- c(class(res), "test")
   res
 }
 

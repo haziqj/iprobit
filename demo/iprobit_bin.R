@@ -1,0 +1,6 @@
+require(iprobit)
+dat <- gen_spiral()
+mod <- iprobit(y ~ ., dat, kernel = "FBM", one.lam = TRUE)
+print(mod)
+summary(mod)
+iplot_predict(mod)

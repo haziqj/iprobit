@@ -124,7 +124,6 @@ iplot_predict <- function(object, test.data = NULL, X.var = c(1, 2)) {
     xx.avg <- apply(X.avg, 2, mean)
     plot.df <- cbind(plot.df, lapply(xx.avg, function(x) x))
   }
-  colnames(plot.df)[1:2] <- attr(object$ipriorKernel$terms, "term.labels")[X.var]
 
   classes <- factor(object$ipriorKernel$Y)
   levels(classes) <- object$ipriorKernel$y.levels
@@ -132,6 +131,8 @@ iplot_predict <- function(object, test.data = NULL, X.var = c(1, 2)) {
 
   if (!is.null(object$formula)) {
     # Fitted using formula
+    xname <- colnames(plot.df)[1:2] <-
+      attr(object$ipriorKernel$terms, "term.labels")[X.var]
     prob <- predict(object, newdata = plot.df)$prob
     if (!is.null(test.data)) {
       if (is.iprobitData(test.data)) test.data <- as.data.frame(test.data)
