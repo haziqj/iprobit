@@ -19,8 +19,6 @@ test_that("Print", {
   modf <- iprobit(y ~ ., dat, silent = TRUE, one.lam = TRUE, control = list(maxit = 5))
   expect_that(print(mod), prints_text("Lower bound value ="))
   expect_that(print(modf), prints_text("Lower bound value ="))
-  mod.summary <- summary(mod)
-  expect_s3_class(mod.summary, "iprobitSummary")
 
 })
 

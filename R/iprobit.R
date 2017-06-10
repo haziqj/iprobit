@@ -43,7 +43,8 @@ iprobit.default <- function(y, ..., kernel = "Canonical", silent = FALSE,
     stop("Can't fit more than three-way interactions yet.")
 
   # Pass to the correct VB routine ---------------------------------------------
-  if (length(ipriorKernel$y.levels) == 2) {
+  ipriorKernel$m <- m <- length(ipriorKernel$y.levels)
+  if (m == 2) {
     res <- iprobit_bin(ipriorKernel, maxit, stop.crit, silent, alpha0, lambda0, w0)
     param <- c(get_alpha(res), get_lambda(res))
   } else {

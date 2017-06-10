@@ -6,9 +6,13 @@ plot.iprobitMod <- function(object, niter.plot = NULL, levels = NULL, ...) {
 
 #' @export
 iplot_fitted <- function(object) {
-  list2env(object$ipriorKernel, envir = environment())
+  list2env(object, environment())
+  list2env(ipriorKernel, environment())
+  list2env(model, environment())
+
   probs <- fitted(object)$prob
   df.plot <- data.frame(probs, i = 1:n)
+  colnames(df.plot) <- c(y.levels, "i")
   df.plot <- reshape2::melt(df.plot, id.vars = "i")
 
   ggplot(df.plot, aes(x = i, y = value)) +
@@ -146,6 +150,48 @@ iplot_predict <- function(object, test.data = NULL) {
     theme_bw()
 }
 
+iplot_predict_mult <- function(object, test.data = NULL) {
+  tmp <- object$ipriorKernel$x
+  class(tmp) <- NULL
+  tmp <- as.data.frame(tmp)
+  maxmin <- cbind(apply(tmp, 2, min), apply(tmp, 2, max))
+  x <- maxmin[1, ]
+  y <- maxmin[2, ]
+  xx <- seq(from = x[1] - 1, to = x[2] + 1, length.out = 100)
+  yy <- seq(from = y[1] - 1, to = y[2] + 1, length.out = 100)
+  plot.df <- expand.grid(xx, yy)
+  xname <- object$ipriorKernel$model$xname
+
+  points.df <- data.frame(tmp, factor(object$ipriorKernel$Y,
+                                      levels = object$ipriorKernel$y.levels))
+
+  if (!is.null(object$formula)) {
+    # Fitted using formula
+    colnames(plot.df) <- attr(object$ipriorKernel$terms, "term.labels")
+    prob <- predict(object, newdata = plot.df)$prob
+    if (!is.null(test.data)) {
+      if (is.iprobitData(test.data)) test.data <- as.data.frame(test.data)
+      points.df <- test.data
+    }
+  } else {
+    prob <- predict(object, newdata = list(plot.df))$prob
+    if (!is.null(test.data)) {
+      if (is.iprobitData(test.data)) test.data <- as.data.frame(test.data)
+      points.df <- test.data
+    }
+  }
+  plot.df <- cbind(plot.df, prob)
+  colnames(plot.df) <- c(xname, paste0("class", seq_along(mod$y.levels)))
+  colnames(points.df) <- c(xname, "Class")
+
+  ggplot() +
+    geom_raster(data = plot.df, aes(X1, X2, fill = class2 ), alpha = 0.5) +
+    scale_fill_gradient(low = "#F8766D", high = "#00BFC4", limits = c(0, 1)) +
+    geom_point(data = points.df, aes(X1, X2, col = Class)) +
+    coord_cartesian(xlim = x, ylim = y) +
+    guides(fill = FALSE) +
+    theme_bw()
+}
 
 # iplot_decbound <- function(x, levels = NULL) {
 #   classes <- as.factor(x$y)

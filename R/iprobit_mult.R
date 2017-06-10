@@ -29,9 +29,9 @@ iprobit_mult <- function(ipriorKernel, maxit = 100, stop.crit = 1e-5,
   alpha <- alpha0
   lambda <- ct <- dt <- matrix(lambda0, ncol = m, nrow = l)
   lambda.sq <- lambda ^ 2
-  lambdaExpand_mult()
-  HlamFn_mult()
-  HlamsqFn_mult()
+  lambdaExpand_mult(env = iprobit.env)
+  HlamFn_mult(env = iprobit.env)
+  HlamsqFn_mult(env = iprobit.env)
   w <- f.tmp <- ystar <- w0
   logdetA <- rep(NA, m)
   lb <- rep(NA, maxit)
@@ -79,7 +79,7 @@ iprobit_mult <- function(ipriorKernel, maxit = 100, stop.crit = 1e-5,
     # Update lambda
     for (k in 1:l) {
       for (j in 1:m) {
-        lambdaExpand_mult()
+        lambdaExpand_mult(env = iprobit.env)
         BlockB(k, lambda[, j])
         ct[k, j] <- sum(Psql[[k]] * W[[j]])
         dt[k, j] <- as.numeric(
@@ -97,9 +97,9 @@ iprobit_mult <- function(ipriorKernel, maxit = 100, stop.crit = 1e-5,
     }
 
     # Update H.lam and H.lam.sq
-    lambdaExpand_mult()
-    HlamFn_mult()
-    HlamsqFn_mult()
+    lambdaExpand_mult(env = iprobit.env)
+    HlamFn_mult(env = iprobit.env)
+    HlamsqFn_mult(env = iprobit.env)
 
     # Update alpha
     alpha <- apply(ystar - mapply("%*%", Hlam.mat, split(w, col(w))), 2, mean)

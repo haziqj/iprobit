@@ -18,14 +18,14 @@
 #
 ################################################################################
 
-HlamFn <- function(env) {
+HlamFn <- function(env = environment()) {
   # Hl (list) and lambda (vector), both must be of same length, should be
   # defined in  environment.
   res.Hlam.mat <- Reduce("+", mapply("*", Hl, lambda, SIMPLIFY = FALSE))
   assign("Hlam.mat", res.Hlam.mat, envir = env)
 }
 
-HlamsqFn <- function(env) {
+HlamsqFn <- function(env = environment()) {
   # Hl, Hsql, (both lists) and lambda, lambda.sq (both vectors), all of which
   # must be the same length, should be defined in  environment. Further, ind1
   # and ind2 are indices of all possible two-way multiplications obtained from
@@ -101,7 +101,7 @@ get_lambda <- function(object) {
       names(lambda) <- "lambda"
   } else if (is.iprobitMod_mult(object)) {
     if (nrow(lambda) > 1)
-      rownames(lambda) <- paste0("lambda[", seq_along(lambda), ",]")
+      rownames(lambda) <- paste0("lambda[", seq_along(lambda[, 1]), ",]")
     else
       rownames(lambda) <- "lambda"
     colnames(lambda) <- paste0("Class = ", seq_along(object$y.levels))
@@ -144,14 +144,17 @@ get_coef_se_mult <- function(object) {
     alpha.se <- rep(object$se.alpha, m)
   }
 
-
   if (isTRUE(object$control$common.RKHS.scale)) {
     lambda <- theta[-1, 1]
     names(lambda) <- "lambda"
     lambda.se <- object$se.lambda[, 1]
   } else {
     lambda <- c(t(theta[-1, ]))
-    names(lambda) <- paste0("lambda[", 1:l, ",", paste0(1:m, "]"))
+    lambda.names <- NULL
+    for (k in 1:l) {
+      lambda.names <- c(lambda.names, paste0("lambda[", k, ",", 1:m, "]"))
+    }
+    names(lambda) <- lambda.names
     lambda.se <- c(t(object$se.lambda))
   }
 
@@ -174,7 +177,7 @@ lambdaExpand_mult <- function(x = lambda, env = iprobit.env) {
   assign("lambda", matrix(unlist(lambda.tmp), ncol = m, nrow = l), envir = env)
 }
 
-HlamFn_mult <- function(env = iprobit.env) {
+HlamFn_mult <- function(env = environment()) {
   res.Hlam.mat <- NULL
   for (j in 1:m) {
     res.Hlam.mat[[j]] <- Reduce("+", mapply("*", Hl, lambda[, j], SIMPLIFY = FALSE))
@@ -182,7 +185,7 @@ HlamFn_mult <- function(env = iprobit.env) {
   assign("Hlam.mat", res.Hlam.mat, envir = env)
 }
 
-HlamsqFn_mult <- function(env = iprobit.env) {
+HlamsqFn_mult <- function(env = environment()) {
   res.Hlam.matsq <- NULL
   for (j in 1:m) {
     if (is.null(Hsql))

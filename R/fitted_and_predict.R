@@ -24,36 +24,37 @@ fitted.iprobitMod_bin <- function(x, upper.or.lower = NULL, round.digits = 4) {
 }
 
 #' @export
-fitted.iprobitMod_mult <- function(x, round.digits = 4) {
-  list2env(x, envir = environment())
-  n <- length(y)
-  y.lev <- levels(y)
-  m <- length(y.lev)
+fitted.iprobitMod_mult <- function(object, round.digits = 4) {
+  list2env(object, environment())
+  list2env(ipriorKernel, environment())
+  list2env(model, environment())
 
-  y.hat <- factor(apply(ystar, 1, function(x) which(x == max(x))))
-  levels(y.hat) <- y.lev
+  y.hat <- factor(
+    apply(ystar, 1, function(x) which(x == max(x))),
+    levels = y.levels
+  )
 
-  probs <- ystar
+  p.hat <- ystar
   for (i in 1:n) {
     for (j in 1:m) {
-      probs[i, j] <- EprodPhiZ(ystar[i, j] - ystar[i, (1:m)[-j]])
+      p.hat[i, j] <- EprodPhiZ(ystar[i, j] - ystar[i, (1:m)[-j]])
     }
-    # probs[i, m] <- 1 - sum(probs[i, 1:(m - 1)])
+    # p.hat[i, m] <- 1 - sum(p.hat[i, 1:(m - 1)])
   }
-  probs <- round(probs, round.digits)
-  probs <- probs / matrix(rep(apply(probs, 1, sum), m), ncol = m)  # normalise
-  probs <- round(probs, round.digits)
-  colnames(probs) <- y.lev
+  p.hat <- round(p.hat, round.digits)
+  p.hat <- p.hat / matrix(rep(apply(p.hat, 1, sum), m), ncol = m)  # normalise
+  p.hat <- round(p.hat, round.digits)
+  colnames(p.hat) <- y.levels
 
-  list(y = y.hat, prob = as.data.frame(probs))
+  list(y = y.hat, prob = as.data.frame(p.hat))
 }
 
 #' @export
 predict.iprobitMod <- function(object, newdata = list(), y.test = NULL,
                                upper.or.lower = NULL) {
-  list2env(object$ipriorKernel, environment())
+  list2env(object, environment())
+  list2env(ipriorKernel, environment())
   list2env(model, environment())
-  environment(.lambdaExpand) <- environment()
 
   if (length(newdata) == 0) {
     return("Use fitted instead")
@@ -79,29 +80,35 @@ predict.iprobitMod <- function(object, newdata = list(), y.test = NULL,
     }
 
     # Define new kernel matrix -------------------------------------------------
-    Hl <- .hMatList(x, kernel, intr, no.int, model$Hurst, intr.3plus,
+    Hl <- .hMatList(x, kernel, intr, no.int, Hurst, intr.3plus,
                     rootkern = FALSE, xstar)
-    .lambdaExpand(object$lambda, env = environment())
-    # if (rootkern) {
-    #   Hlam.mat <- object$psi *
-    #     Reduce("+", mapply("*", Hl, lambda ^ 2, SIMPLIFY = FALSE))
-    #   w.hat <- varyinv(object) %*% (Y - object$alpha)
-    # } else {
-    Hlam.mat <- Reduce("+", mapply("*", Hl, lambda, SIMPLIFY = FALSE))
-    w.hat <- object$w
-    # }
 
-    # Calculate fitted ystar values --------------------------------------------
-    ystar <- as.vector(object$alpha + (Hlam.mat %*% w.hat))
-    names(ystar) <- xrownames
+    # Pass to appropriate prediction function ----------------------------------
+    if (is.iprobitMod_bin(object)) {
+      environment(.lambdaExpand) <- environment()
+      environment(HlamFn) <- environment()
+      .lambdaExpand(lambda, env = environment())
+      HlamFn(env = environment())
+      # Hlam.mat <- Reduce("+", mapply("*", Hl, lambda, SIMPLIFY = FALSE))
+      ystar.new <- as.vector(alpha + (Hlam.mat %*% w))
+      names(ystar.new) <- xrownames
+      yp <- predict_iprobit_bin(ystar.new, y.levels)
+    }
+    if (is.iprobitMod_mult(object)) {
+      environment(lambdaExpand_mult) <- environment()
+      environment(HlamFn_mult) <- environment()
+      lambdaExpand_mult(env = environment())
+      HlamFn_mult(env = environment())
+      ystar.new <- rep(alpha, each = nrow(Hlam.mat[[1]])) +
+        mapply("%*%", Hlam.mat, split(w, col(w)))
+      names(ystar.new) <- xrownames
+      yp <- predict_iprobit_mult(ystar.new, y.levels)
+    }
   }
-
-  if (is.iprobitMod_bin(object)) yp <- predict_iprobit_bin(ystar, y.levels)
-  if (is.iprobitMod_mult(object)) yp <- predict_iprobit_mult(ystar, y.levels)
 
   test.error.rate <- NULL
   if (!is.null(y.test)) {
-    test.error.rate <- round(mean(yp$y != y.test) * 100, 2)
+    test.error.rate <- round(mean(as.numeric(yp$y) != as.numeric(y.test)) * 100, 2)
   }
 
   structure(list(y = yp$y, prob = yp$p, test.error.rate = test.error.rate),
@@ -111,7 +118,7 @@ predict.iprobitMod <- function(object, newdata = list(), y.test = NULL,
 predict_iprobit_bin <- function(ystar, y.levels) {
   y.hat <- rep(1, length(ystar))
   y.hat[ystar >= 0] <- 2
-  y.hat <- as.factor(y.hat)
+  y.hat <- factor(y.hat, levels = y.levels)
 
   # se.ystar <- iprobitSE(y = y.hat, eta = ystar)
   # if (!is.null(upper.or.lower)) {
@@ -127,9 +134,7 @@ predict_iprobit_bin <- function(ystar, y.levels) {
 
   p.hat <- pnorm(ystar)
   p.hat <- data.frame(1 - p.hat, p.hat)
-  y.levels
-
-  colnames(p.hat) <- levels(y.hat) <- y.levels
+  colnames(p.hat) <- y.levels
 
   list(y.hat = y.hat, p.hat = as.data.frame(p.hat))
 }
@@ -195,9 +200,28 @@ predict_iprobit_bin <- function(ystar, y.levels) {
 # ## 2.241403
 # lower tail truncated at zero are symmetric opposites of the above.
 
+predict_iprobit_mult <- function(ystar, y.levels) {
+  m <- length(y.levels)
+
+  y.hat <- apply(ystar, 1, function(x) which(x == max(x)))
+  y.hat <- factor(y.hat, levels = y.levels)
+
+  p.hat <- ystar
+  for (i in seq_along(y.hat)) {
+    for (j in 1:m) {
+      p.hat[i, j] <- EprodPhiZ(ystar[i, j] - ystar[i, (1:m)[-j]])
+    }
+    # probs[i, m] <- 1 - sum(probs[i, 1:(m - 1)])
+  }
+  p.hat <- round(p.hat, 4)
+  p.hat <- p.hat / matrix(rep(apply(p.hat, 1, sum), m), ncol = m)  # normalise
+  p.hat <- round(p.hat, 4)
+  colnames(p.hat) <- y.levels
+
+  list(y.hat = y.hat, p.hat = as.data.frame(p.hat))
+}
 
 
-#' @export
 predict.iprobitMult <- function(object, X.test, y.test = NULL,
                                 upper.or.lower = NULL) {
   newdata <- X.test
