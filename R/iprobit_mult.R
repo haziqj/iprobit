@@ -89,7 +89,7 @@ iprobit_mult <- function(ipriorKernel, maxit = 100, stop.crit = 1e-5,
       }
       if (isTRUE(common.RKHS.scale)) {
         lambda[k, ] <- rep(sum(dt[k, ]) / sum(ct[k, ]), m)
-        lambda.sq[k, ] <- rep(1 / sum(ct[k, ]) + lambda[k, ] ^ 2, m)
+        lambda.sq[k, ] <- rep(1 / sum(ct[k, ]) + lambda[k, 1] ^ 2, m)
       } else {
         lambda[k, ] <- dt[k, ] / ct[k, ]
         lambda.sq[k, ] <- 1 / ct[k, ] + lambda[k, ] ^ 2
@@ -103,15 +103,16 @@ iprobit_mult <- function(ipriorKernel, maxit = 100, stop.crit = 1e-5,
 
     # Update alpha
     alpha <- apply(ystar - mapply("%*%", Hlam.mat, split(w, col(w))), 2, mean)
+    if (isTRUE(common.intercept)) alpha <- rep(mean(alpha), m)
 
     # Calculate lower bound
     lb.ystar <- sum(logClb)
     lb.w <- 0.5 * (nm - sum(sapply(W, function(x) sum(diag(x)))) - sum(logdetA))
     if (isTRUE(common.RKHS.scale))
-      lb.lambda <- 0.5 * (1 + log(2 * pi) - log(sum(ct)))
+      lb.lambda <- l * 0.5 * (1 + log(2 * pi) - sum(log(sum(ct[1:l, ]))))
     else
-      lb.lambda <- (m / 2) * (1 + log(2 * pi) - mean(log(ct)))
-    if (isTRUE(common.RKHS.scale))
+      lb.lambda <- l * (m / 2) * (1 + log(2 * pi) - mean(log(ct)))
+    if (isTRUE(common.intercept))
       lb.alpha <- 0.5 * (1 + log(2 * pi) - log(nm))
     else
       lb.alpha <- (m / 2) * (1 + log(2 * pi) - log(n))
@@ -126,11 +127,17 @@ iprobit_mult <- function(ipriorKernel, maxit = 100, stop.crit = 1e-5,
   end.time <- Sys.time()
   time.taken <- end.time - start.time
 
+  # Calculate standard errors from posterior variance --------------------------
+  if (isTRUE(common.intercept)) se.alpha <- sqrt(1 / nm)
+  else se.alpha <- sqrt(1 / n)
+  if (isTRUE(common.RKHS.scale))
+    se.lambda <- matrix(sqrt(1 / apply(ct, 1, sum)), ncol = m, nrow = l)
+  else
+    se.lambda <- matrix(sqrt(1 / ct[1:l, ]), ncol = m, nrow = l)
+  se.ystar <- NA #iprobitSE(y = y, eta = eta, thing1 = thing1, thing0 = thing0)
+
   # Clean up and close
   lambda <- matrix(lambda[1:l, ], ncol = m, nrow = l)
-  # if (isTRUE(common.RKHS.scale)) lambda <- lambda[1:l, 1]
-  # else lambda <- lambda[1:l, ]
-  # if (isTRUE(common.intercept)) alpha <- alpha[1]
   if (!silent) {
     close(pb)
     if (niter == maxit) cat("Convergence criterion not met.\n")
@@ -138,8 +145,8 @@ iprobit_mult <- function(ipriorKernel, maxit = 100, stop.crit = 1e-5,
   }
 
   res <- list(ystar = ystar, w = w, lambda = lambda, alpha = alpha,
-              lower.bound = lb, ipriorKernel = ipriorKernel,
-              se = NA, se.ystar = NA,
+              lower.bound = lb, ipriorKernel = ipriorKernel, se.alpha = se.alpha,
+              se.lambda = se.lambda, se.ystar = se.ystar,
               y.levels = y.levels, start.time = start.time,
               end.time = end.time, time = time.taken, call = match.call(),
               stop.crit = stop.crit, niter = niter, maxit = maxit)

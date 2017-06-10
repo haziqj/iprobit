@@ -84,7 +84,8 @@ test_that("Convergence", {
   set.seed(123)
   dat <- gen_mixture(n = 10)
   mod <- iprobit(dat$y, dat$X, control = list(maxit = 500, silent = TRUE))
-  modf <- iprobit(y ~ ., dat, one.lam = TRUE, silent = TRUE)
+  modf <- iprobit(y ~ ., dat, one.lam = TRUE,
+                  control = list(maxit = 500, silent = TRUE))
   expect_equal(mod$lambda, 0.11646, tolerance = 1e-3)
   expect_equal(modf$lambda, 0.11646, tolerance = 1e-3)
 

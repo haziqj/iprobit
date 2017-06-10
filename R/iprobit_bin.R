@@ -88,8 +88,8 @@ iprobit_bin <- function(ipriorKernel, maxit = 200, stop.crit = 1e-5,
   time.taken <- end.time - start.time
 
   # Calculate standard errors from posterior variance --------------------------
-  se.lambda <- sqrt(1 / ct[1:l])
   se.alpha <- sqrt(1 / n)
+  se.lambda <- sqrt(1 / ct[1:l])
   se.ystar <- NA #iprobitSE(y = y, eta = eta, thing1 = thing1, thing0 = thing0)
 
   # Close function -------------------------------------------------------------

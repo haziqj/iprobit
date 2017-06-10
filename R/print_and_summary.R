@@ -9,9 +9,15 @@ print.iprobitMod <- function(x) {
 
 #' @export
 summary.iprobitMod <- function(x) {
-  if (is.iprobitMod_bin(x)) theta <- coef(x)
-  if (is.iprobitMod_mult(x)) theta <- get_coef_mult(x)
-  se <- x$se
+  if (is.iprobitMod_bin(x)) {
+    theta <- coef(x)
+    se <- x$se
+  }
+  if (is.iprobitMod_mult(x)) {
+    tmp <- get_coef_se_mult(x)
+    theta <- tmp$theta
+    se <- tmp$se
+  }
 
   tab <- cbind(
     Mean    = round(theta, digits = 4),
@@ -21,7 +27,7 @@ summary.iprobitMod <- function(x) {
   )
 
   kernel.used <- get_kernel(x)
-  if (compare(kernel.used)) kernel.used <- kernel.used[1]
+  if (all.same(kernel.used)) kernel.used <- kernel.used[1]
   else kernel.used <- paste0(kernel.used, collapse = ", ")
 
   res <- list(call = x$call, kernel.used = kernel.used, tab = tab,

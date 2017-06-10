@@ -129,18 +129,36 @@ get_alpha <- function(object) {
   alpha
 }
 
-get_coef_mult <- function(object) {
-  tmp <- coef(object)
-  m <- ncol(tmp)
-  l <- nrow(tmp) - 1
-  alpha.names <- paste0("alpha[", 1:m, "]")
-  lambda.names <- paste0("lambda[", 1:l, ",", paste0(1:m, "]"))
-  theta <- c(t(tmp))
-  names(theta) <- c(alpha.names, lambda.names)
-  theta
+get_coef_se_mult <- function(object) {
+  theta <- coef(object)
+  m <- ncol(theta)
+  l <- nrow(theta) - 1
+
+  if (isTRUE(object$control$common.intercept)) {
+    alpha <- theta[1, 1]
+    names(alpha) <- "alpha"
+    alpha.se <- object$se.alpha
+  } else {
+    alpha <- theta[1, ]
+    names(alpha) <- paste0("alpha[", 1:m, "]")
+    alpha.se <- rep(object$se.alpha, m)
+  }
+
+
+  if (isTRUE(object$control$common.RKHS.scale)) {
+    lambda <- theta[-1, 1]
+    names(lambda) <- "lambda"
+    lambda.se <- object$se.lambda[, 1]
+  } else {
+    lambda <- c(t(theta[-1, ]))
+    names(lambda) <- paste0("lambda[", 1:l, ",", paste0(1:m, "]"))
+    lambda.se <- c(t(object$se.lambda))
+  }
+
+  list(theta = c(alpha, lambda), se = c(alpha.se, lambda.se))
 }
 
-compare <- function(v) {
+all.same <- function(v) {
   # https://stackoverflow.com/questions/4752275/test-for-equality-among-all-elements-of-a-single-vector
   all(sapply(as.list(v[-1]), FUN = function(z) identical(z, v[1])))
 }
