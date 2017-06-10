@@ -26,11 +26,20 @@ summary.iprobitMod <- function(x) {
     "97.5%" = round(theta + 1.96 * se, digits = 4)
   )
 
-  kernel.used <- get_kernel(x)
-  if (all.same(kernel.used)) kernel.used <- kernel.used[1]
-  else kernel.used <- paste0(kernel.used, collapse = ", ")
+  kernel.used <- factor(get_kernel(x))
+  kernels <- levels(kernel.used)
+  kernels <- gsub("FBM,", "Fractional Brownian motion with Hurst coef. ", kernels)
+  x.var.list <- rep(list(NULL), length(kernels))
+  x.var <- x$ipriorKernel$model$xname
+  for (i in seq_along(x.var)) {
+    x.var.list[[as.numeric(kernel.used[i])]] <-
+      c(x.var.list[[as.numeric(kernel.used[i])]], x.var[i])
+  }
+  x.var.list <- lapply(x.var.list, function(x) paste0(x, collapse = ", "))
+  x.var.list <- mapply(FUN = function(x, y) paste0(x, " (", y, ")"),
+                       kernels, x.var.list)
 
-  res <- list(call = x$call, kernel.used = kernel.used, tab = tab,
+  res <- list(call = x$call, kernel.used = x.var.list, tab = tab,
               maxit = x$maxit, niter = x$niter, stop.crit = x$stop.crit,
               lb = x$lower.bound, classes = x$y.levels)
   class(res) <- "iprobitSummary"
@@ -44,10 +53,11 @@ print.iprobitSummary <- function(x) {
   print(x$call)
 
   cat("\nClasses: ")
-  cat(x$classes, "\n")
+  cat(paste0(x$classes, collapse = ", "), "\n")
 
-  cat("\nRKHS used: ")
-  cat(x$kernel.used, "\n")
+  cat("\nRKHS used:\n")
+  for (i in seq_along(x$kernel.used))
+    cat(x$kernel.used[[i]], "\n")
 
   cat("\nParameter estimates:\n")
   print(x$tab)

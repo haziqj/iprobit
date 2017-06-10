@@ -1,6 +1,6 @@
 require(iprobit)
-dat <- gen_spiral()
-mod <- iprobit(y ~ ., dat, kernel = "FBM", one.lam = TRUE)
+dat <- gen_mixture(10)
+mod <- iprobit(y ~ ., dat, kernel = "FBM")
 print(mod)
 summary(mod)
 iplot_predict(mod)
