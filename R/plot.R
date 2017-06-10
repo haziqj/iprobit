@@ -99,26 +99,39 @@ iplot_prob <- function(x, covariate = 1, levels = NULL) {
     theme_bw()
 }
 
+create_x_range <- function(X, X.var) {
+
+}
+
 #' @export
-iplot_predict <- function(object, test.data = NULL) {
-  tmp <- object$ipriorKernel$x
-  class(tmp) <- NULL
-  tmp <- as.data.frame(tmp)
-  maxmin <- cbind(apply(tmp, 2, min), apply(tmp, 2, max))
-  x <- maxmin[1, ]
-  y <- maxmin[2, ]
-  xx <- seq(from = x[1] - 1, to = x[2] + 1, length.out = 100)
-  yy <- seq(from = y[1] - 1, to = y[2] + 1, length.out = 100)
-  plot.df <- expand.grid(xx, yy)
-  xname <- object$ipriorKernel$model$xname[1:2]
+iplot_predict <- function(object, test.data = NULL, X.var = c(1, 2)) {
+  X <- object$ipriorKernel$x
+  class(X) <- NULL
+  X <- as.data.frame(X)
+  p <- ncol(X)
+  xname <- object$ipriorKernel$model$xname[X.var]
+
+  maxmin <- cbind(apply(X, 2, min), apply(X, 2, max))
+  xx <- list(NULL)
+  for (j in 1:2) {
+    mm <- maxmin[X.var[j], ]
+    xx[[j]] <- seq(from = mm[1] - 1, to = mm[2] + 1, length.out = 100)
+  }
+  mm <- maxmin[X.var, ]
+  plot.df <- expand.grid(xx[[1]], xx[[2]])
+  if (p > 2) {
+    X.avg <- X[, -X.var]
+    xx.avg <- apply(X.avg, 2, mean)
+    plot.df <- cbind(plot.df, lapply(xx.avg, function(x) x))
+  }
+  colnames(plot.df)[1:2] <- attr(object$ipriorKernel$terms, "term.labels")[X.var]
 
   classes <- factor(object$ipriorKernel$Y)
   levels(classes) <- object$ipriorKernel$y.levels
-  points.df <- data.frame(tmp, classes)
+  points.df <- data.frame(X[, X.var], classes)
 
   if (!is.null(object$formula)) {
     # Fitted using formula
-    colnames(plot.df) <- attr(object$ipriorKernel$terms, "term.labels")[1:2]
     prob <- predict(object, newdata = plot.df)$prob
     if (!is.null(test.data)) {
       if (is.iprobitData(test.data)) test.data <- as.data.frame(test.data)
@@ -132,18 +145,25 @@ iplot_predict <- function(object, test.data = NULL) {
     }
   }
   plot.df <- cbind(plot.df, prob)
-  colnames(plot.df) <- c("X1", "X2", paste0("class", seq_along(object$y.levels)))
+  colnames(plot.df)[1:2] <- c("X1", "X2")
+  colnames(plot.df)[-(1:p)] <- paste0("class", seq_along(object$y.levels))
   colnames(points.df) <- c("X1", "X2", "Class")
 
-  if (is.iprobitMod_bin(object)) p <- iplot_predict_bin(plot.df, points.df, x, y)
-  if (is.iprobitMod_mult(object)) p <- iplot_predict_mult(plot.df, points.df, x, y)
+  if (is.iprobitMod_bin(object))
+    p <- iplot_predict_bin(plot.df, points.df, mm[1, ], mm[2, ],
+                           length(levels(classes)))
+  if (is.iprobitMod_mult(object))
+    p <- iplot_predict_mult(plot.df, points.df, mm[1, ],mm[2, ],
+                            length(levels(classes)))
 
+  yname <- ifelse(object$ipriorKernel$model$yname == "y", "Class",
+                  object$ipriorKernel$model$yname)
   p <- p +
-    labs(x = xname[1], y = xname[2], col = object$ipriorKernel$model$yname)
+    labs(x = xname[1], y = xname[2], col = yname)
   p
 }
 
-iplot_predict_bin <- function(plot.df, points.df, x, y) {
+iplot_predict_bin <- function(plot.df, points.df, x, y, m) {
   ggplot() +
     geom_raster(data = plot.df, aes(X1, X2, fill = class2), alpha = 0.5) +
     scale_fill_gradient(low = "#F8766D", high = "#00BFC4", limits = c(0, 1)) +
@@ -153,10 +173,10 @@ iplot_predict_bin <- function(plot.df, points.df, x, y) {
     theme_bw()
 }
 
-iplot_predict_mult <- function(plot.df, points.df, x, y) {
-  m <- ncol(plot.df) - 2
+iplot_predict_mult <- function(plot.df, points.df, x, y, m) {
   fill.col <- iprior::ggColPal(m)
   alpha <- 0.6
+  class.ind <- sort(seq(from = ncol(plot.df), by = -1, length = m))
 
   # decbound.df <- NULL
   # for (j in 1:m) {
@@ -167,15 +187,15 @@ iplot_predict_mult <- function(plot.df, points.df, x, y) {
   # Add first layer ------------------------------------------------------------
   p <- ggplot() +
     geom_raster(data = plot.df, aes(X1, X2, fill = fill.col[1],
-                                    alpha = alpha * plot.df[, 1 + 2])) +
+                                    alpha = alpha * plot.df[, class.ind[1]])) +
     scale_alpha_continuous(range = c(0, 0.5))
     # geom_line(data = decbound.df[[1]], aes(X1, X2))
 
   # Add subsequent layers ------------------------------------------------------
   for (j in 2:m) {
     p <- p +
-      annotate(geom = "raster", x = plot.df$X1, y = plot.df$X2,
-               alpha = alpha * plot.df[, j + 2], fill = fill.col[j])
+      annotate(geom = "raster", x = plot.df[, 1], y = plot.df[, 2],
+               alpha = alpha * plot.df[, class.ind[j]], fill = fill.col[j])
       # geom_line(data = decbound.df[[j]], aes(X1, X2))
   }
 

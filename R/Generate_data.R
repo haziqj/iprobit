@@ -22,7 +22,7 @@ gen_mixture <- function(n = 500, m = 2, mu = m / 2 + 1, sd = 1,
     X[y == i, ] <- mix[[i]][y == i, ]
   }
 
-  res <- list(X = X[order(y), ], Class = y[order(y)])
+  res <- list(X = X[order(y), ], y = y[order(y)])
   class(res) <- "iprobitData"
   res
 }
@@ -50,7 +50,7 @@ gen_spiral <- function(n = 300, m = 2, cycles = 2, sd = 0) {
     X <- rbind(X, spirals[[j]])
   }
 
-  res <- list(X = X[order(y), ], Class = y[order(y)])
+  res <- list(X = X[order(y), ], y = y[order(y)])
   class(res) <- "iprobitData"
   res
 }
@@ -69,7 +69,7 @@ gen_circle <- function(n = 100, m = 2, sd = 0.1 / sqrt(m)) {
     X <- rbind(X, tmp)
   }
 
-  res <- list(X = X[order(y), ], Class = y[order(y)])
+  res <- list(X = X[order(y), ], y = y[order(y)])
   class(res) <- "iprobitData"
   res
 }
