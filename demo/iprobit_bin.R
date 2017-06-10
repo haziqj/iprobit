@@ -1,5 +1,5 @@
 require(iprobit)
-dat <- gen_mixture(10)
+dat <- gen_mixture()
 mod <- iprobit(y ~ ., dat, kernel = "FBM")
 print(mod)
 summary(mod)
