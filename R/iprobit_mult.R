@@ -125,7 +125,7 @@ iprobit_mult <- function(ipriorKernel, maxit = 100, stop.crit = 1e-5,
     if (!silent) setTxtProgressBar(pb, t)
   }
   end.time <- Sys.time()
-  time.taken <- end.time - start.time
+  time.taken <- as.time(end.time - start.time)
 
   # Calculate standard errors from posterior variance --------------------------
   if (isTRUE(common.intercept)) se.alpha <- sqrt(1 / nm)

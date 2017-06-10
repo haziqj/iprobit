@@ -139,7 +139,34 @@ predict_iprobit_bin <- function(ystar, y.levels) {
   list(y.hat = y.hat, p.hat = as.data.frame(p.hat))
 }
 
+predict_iprobit_mult <- function(ystar, y.levels) {
+  m <- length(y.levels)
 
+  y.hat <- apply(ystar, 1, function(x) which(x == max(x)))
+  y.hat <- factor(y.hat, levels = y.levels)
+
+  p.hat <- ystar
+  for (i in seq_along(y.hat)) {
+    for (j in 1:m) {
+      p.hat[i, j] <- EprodPhiZ(ystar[i, j] - ystar[i, (1:m)[-j]])
+    }
+    # probs[i, m] <- 1 - sum(probs[i, 1:(m - 1)])
+  }
+  p.hat <- round(p.hat, 4)
+  p.hat <- p.hat / matrix(rep(apply(p.hat, 1, sum), m), ncol = m)  # normalise
+  p.hat <- round(p.hat, 4)
+  colnames(p.hat) <- y.levels
+
+  list(y.hat = y.hat, p.hat = as.data.frame(p.hat))
+}
+
+#' @export
+print.iprobitPredict <- function(x) {
+  if (!is.null(x$test.error.rate))
+    cat("Test error rate:", x$test.error.rate, "%\n\n")
+  else
+    cat("Test data not provided.\n\n")
+}
 
 # fitted2 <- function(x, upper.or.lower = NULL) {
 #   ystar <- x$ystar
@@ -161,9 +188,6 @@ predict_iprobit_bin <- function(ystar, y.levels) {
 #
 #   list(y = y.hat, prob = p.hat)
 # }
-#
-#
-#
 #
 # predict2 <- function(object, newdata, upper.or.lower = NULL) {
 #   w <- object$w
@@ -199,83 +223,3 @@ predict_iprobit_bin <- function(ystar, y.levels) {
 # ## 0.03133798
 # ## 2.241403
 # lower tail truncated at zero are symmetric opposites of the above.
-
-predict_iprobit_mult <- function(ystar, y.levels) {
-  m <- length(y.levels)
-
-  y.hat <- apply(ystar, 1, function(x) which(x == max(x)))
-  y.hat <- factor(y.hat, levels = y.levels)
-
-  p.hat <- ystar
-  for (i in seq_along(y.hat)) {
-    for (j in 1:m) {
-      p.hat[i, j] <- EprodPhiZ(ystar[i, j] - ystar[i, (1:m)[-j]])
-    }
-    # probs[i, m] <- 1 - sum(probs[i, 1:(m - 1)])
-  }
-  p.hat <- round(p.hat, 4)
-  p.hat <- p.hat / matrix(rep(apply(p.hat, 1, sum), m), ncol = m)  # normalise
-  p.hat <- round(p.hat, 4)
-  colnames(p.hat) <- y.levels
-
-  list(y.hat = y.hat, p.hat = as.data.frame(p.hat))
-}
-
-
-predict.iprobitMult <- function(object, X.test, y.test = NULL,
-                                upper.or.lower = NULL) {
-  newdata <- X.test
-  w <- object$w
-  n <- nrow(w); m <- ncol(w); n.new <- nrow(newdata)
-  lambda <- 0; lambda[1:m] <- object$lambda
-  alpha <- 0; alpha[1:m] <- object$alpha
-  if (object$kernel == "FBM")
-    H.tilde <- iprior::fnH3(x = object$X, y = newdata)
-  else
-    H.tilde <- iprior::fnH2(x = object$X, y = newdata)
-  class(H.tilde) <- NULL
-  ystar <- rep(alpha, each = n.new) + rep(lambda, each = n.new) * (H.tilde %*% w)
-
-  y.hat <- apply(ystar, 1, function(x) which(x == max(x)))
-
-  # se.ystar <- iprobitSE(y = y.hat, eta = ystar)
-  # if (!is.null(upper.or.lower)) {
-  #   if (upper.or.lower == "upper") {
-  #     ystar[ystar >= 0] <- ystar[ystar >= 0] + 2.241403 * se.ystar[ystar >= 0]
-  #     ystar[ystar < 0] <- ystar[ystar < 0] - 0.03133798 * se.ystar[ystar < 0]
-  #   } else if (upper.or.lower == "lower") {
-  #     ystar[ystar >= 0] <- ystar[ystar >= 0] + 0.03133798 * se.ystar[ystar >= 0]
-  #     ystar[ystar < 0] <- ystar[ystar < 0] - 2.241403 * se.ystar[ystar < 0]
-  #   }
-  #   y.hat <- rep(0, nrow(newdata)); y.hat[ystar >= 0] <- 1
-  # }
-  p.hat <- ystar
-  for (i in 1:n.new) {
-    for (j in 1:m) {
-      p.hat[i, j] <- EprodPhiZ(ystar[i, j] - ystar[i, (1:m)[-j]])
-    }
-    # probs[i, m] <- 1 - sum(probs[i, 1:(m - 1)])
-  }
-  p.hat <- round(p.hat, 3)
-  p.hat <- p.hat / matrix(rep(apply(p.hat, 1, sum), m), ncol = m)  # normalise
-  p.hat <- round(p.hat, 3)
-  y.hat <- as.factor(y.hat)
-  colnames(p.hat) <- levels(y.hat) <- levels(object$y)
-
-  test.error.rate <- NULL
-  if (!is.null(y.test)) {
-    test.error.rate <- round(mean(y.hat != y.test) * 100, 2)
-  }
-
-  structure(list(y = y.hat, prob = as.data.frame(p.hat),
-                 test.error.rate = test.error.rate),
-            class = "iprobitMultPredict")
-}
-
-#' @export
-print.iprobitPredict <- function(x) {
-  if (!is.null(x$test.error.rate))
-    cat("Test error rate:", x$test.error.rate, "%\n\n")
-  else
-    cat("Test data not provided.\n\n")
-}

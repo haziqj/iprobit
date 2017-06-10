@@ -231,3 +231,14 @@ HlamsqFn_mult <- function(env = environment()) {
 #        Hlam.matsq = Hlam.matsq[[1]])
 # }
 
+as.time <- function(x) {
+  # For difftime objects
+  time <- as.numeric(x)
+  unit <- attr(x, "units")
+  structure(list(time = time, unit = unit), class = "iprobitTime")
+}
+
+print.iprobitTime <- function(x) {
+  cat(x$time, x$unit)
+}
+

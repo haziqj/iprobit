@@ -138,11 +138,17 @@ iplot_predict <- function(object, test.data = NULL) {
     }
   }
   plot.df <- cbind(plot.df, prob)
-  colnames(plot.df) <- c(xname, paste0("class", seq_along(mod$y.levels)))
+  colnames(plot.df) <- c(xname, paste0("class", seq_along(object$y.levels)))
   colnames(points.df) <- c(xname, "Class")
 
+  if (is.iprobitMod_bin(object)) p <- iplot_predict_bin(plot.df, points.df, x, y)
+  if (is.iprobitMod_mult(object)) p <- iplot_predict_mult(plot.df, points.df, x, y)
+  p
+}
+
+iplot_predict_bin <- function(plot.df, points.df, x, y) {
   ggplot() +
-    geom_raster(data = plot.df, aes(X1, X2, fill = class2 ), alpha = 0.5) +
+    geom_raster(data = plot.df, aes(X1, X2, fill = class2), alpha = 0.5) +
     scale_fill_gradient(low = "#F8766D", high = "#00BFC4", limits = c(0, 1)) +
     geom_point(data = points.df, aes(X1, X2, col = Class)) +
     coord_cartesian(xlim = x, ylim = y) +
@@ -150,47 +156,39 @@ iplot_predict <- function(object, test.data = NULL) {
     theme_bw()
 }
 
-iplot_predict_mult <- function(object, test.data = NULL) {
-  tmp <- object$ipriorKernel$x
-  class(tmp) <- NULL
-  tmp <- as.data.frame(tmp)
-  maxmin <- cbind(apply(tmp, 2, min), apply(tmp, 2, max))
-  x <- maxmin[1, ]
-  y <- maxmin[2, ]
-  xx <- seq(from = x[1] - 1, to = x[2] + 1, length.out = 100)
-  yy <- seq(from = y[1] - 1, to = y[2] + 1, length.out = 100)
-  plot.df <- expand.grid(xx, yy)
-  xname <- object$ipriorKernel$model$xname
+iplot_predict_mult <- function(plot.df, points.df, x, y) {
+  m <- ncol(plot.df) - 2
+  fill.col <- iprior::ggColPal(m)
+  alpha <- 0.6
 
-  points.df <- data.frame(tmp, factor(object$ipriorKernel$Y,
-                                      levels = object$ipriorKernel$y.levels))
+  # decbound.df <- NULL
+  # for (j in 1:m) {
+  #   tmp <- plot.df[round(plot.df[, 2 + j], 1) == 0.5, 1:2]
+  #   decbound.df[[j]] <- tmp[order(tmp[, 1]), ]
+  # }
 
-  if (!is.null(object$formula)) {
-    # Fitted using formula
-    colnames(plot.df) <- attr(object$ipriorKernel$terms, "term.labels")
-    prob <- predict(object, newdata = plot.df)$prob
-    if (!is.null(test.data)) {
-      if (is.iprobitData(test.data)) test.data <- as.data.frame(test.data)
-      points.df <- test.data
-    }
-  } else {
-    prob <- predict(object, newdata = list(plot.df))$prob
-    if (!is.null(test.data)) {
-      if (is.iprobitData(test.data)) test.data <- as.data.frame(test.data)
-      points.df <- test.data
-    }
+  # Add first layer ------------------------------------------------------------
+  p <- ggplot() +
+    geom_raster(data = plot.df, aes(X1, X2, fill = fill.col[1],
+                                    alpha = alpha * plot.df[, 1 + 2])) +
+    scale_alpha_continuous(range = c(0, 0.5))
+    # geom_line(data = decbound.df[[1]], aes(X1, X2))
+
+  # Add subsequent layers ------------------------------------------------------
+  for (j in 2:m) {
+    p <- p +
+      annotate(geom = "raster", x = plot.df$X1, y = plot.df$X2,
+               alpha = alpha * plot.df[, j + 2], fill = fill.col[j])
+      # geom_line(data = decbound.df[[j]], aes(X1, X2))
   }
-  plot.df <- cbind(plot.df, prob)
-  colnames(plot.df) <- c(xname, paste0("class", seq_along(mod$y.levels)))
-  colnames(points.df) <- c(xname, "Class")
 
-  ggplot() +
-    geom_raster(data = plot.df, aes(X1, X2, fill = class2 ), alpha = 0.5) +
-    scale_fill_gradient(low = "#F8766D", high = "#00BFC4", limits = c(0, 1)) +
+  # Add points and touch up remaining plot  ------------------------------------
+  p <- p +
     geom_point(data = points.df, aes(X1, X2, col = Class)) +
     coord_cartesian(xlim = x, ylim = y) +
-    guides(fill = FALSE) +
+    guides(fill = FALSE, alpha = FALSE) +
     theme_bw()
+  p
 }
 
 # iplot_decbound <- function(x, levels = NULL) {
