@@ -1,6 +1,8 @@
 R/iprobit: Binary and multinomial probit regression using I-priors
 ================
 
+[![Build Status](https://travis-ci.org/haziqjamil/iprobit.svg?branch=master)](https://travis-ci.org/haziqjamil/iprobit)
+
 This is an `R` package which extends I-prior regression to unordered categorical responses via a probit link function. This allows the user to fit models for classification or inference using fitted probabilities. Estimation is performed using a variational EM algorithm.
 
 Binary classification (toy example)
