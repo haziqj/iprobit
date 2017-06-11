@@ -169,7 +169,12 @@ iplot_predict_bin <- function(plot.df, points.df, x, y, m) {
   ggplot() +
     geom_raster(data = plot.df, aes(X1, X2, fill = class2), alpha = 0.5) +
     scale_fill_gradient(low = "#F8766D", high = "#00BFC4", limits = c(0, 1)) +
+    # annotate(geom = "raster", x = plot.df[, 1], y = plot.df[, 2],
+    #          alpha = 0.6 * plot.df[, 3], fill = "#F8766D") +
+    # annotate(geom = "raster", x = plot.df[, 1], y = plot.df[, 2],
+    #          alpha = 0.6 * plot.df[, 4], fill = "#00BFC4") +
     geom_point(data = points.df, aes(X1, X2, col = Class)) +
+               # col = "black", shape = 21, stroke = 0.8) +
     coord_cartesian(xlim = x, ylim = y) +
     guides(fill = FALSE) +
     theme_bw()
