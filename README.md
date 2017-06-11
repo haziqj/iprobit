@@ -72,7 +72,7 @@ iplot_predict(mod)
 
 ![](README_files/figure-markdown_github/unnamed-chunk-5-1.png)
 
-#### Obtain out-of-sample test error rates
+#### Obtain out-of-sample test error rates, predicted classes and probabilities
 
 ``` r
 dat.test <- gen_mixture(n = 100, m = 4, sd = 1.5)

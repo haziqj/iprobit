@@ -46,7 +46,7 @@ dat <- gen_mixture(n = 500, m = 4, sd = 1.5)  # generate 4-class toy example dat
 iplot_predict(mod)
 ```
 
-#### Obtain out-of-sample test error rates
+#### Obtain out-of-sample test error rates, predicted classes and probabilities
 
 ```{r}
 dat.test <- gen_mixture(n = 100, m = 4, sd = 1.5)
