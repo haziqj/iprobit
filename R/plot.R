@@ -16,7 +16,8 @@ iplot_fitted <- function(object) {
   df.plot <- reshape2::melt(df.plot, id.vars = "i")
 
   ggplot(df.plot, aes(x = i, y = value)) +
-    geom_area(aes(col = variable, fill = variable), position = "stack") +
+    geom_area(aes(col = variable, fill = variable), position = "stack",
+              alpha = 0.95) +
     labs(col = "Class", fill = "Class", x = "Index", y = "Fitted probabilities") +
     coord_cartesian(expand = FALSE) +
     theme_bw()
