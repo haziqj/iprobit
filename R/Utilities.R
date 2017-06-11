@@ -1,6 +1,6 @@
 ################################################################################
 #
-#   iprobit: Binary Probit Regression with I-priors
+#   iprobit: Binary and Multinomial Probit Regression with I-priors
 #   Copyright (C) 2017  Haziq Jamil
 #
 #   This program is free software: you can redistribute it and/or modify
@@ -10,61 +10,13 @@
 #
 #   This program is distributed in the hope that it will be useful,
 #   but WITHOUT ANY WARRANTY; without even the implied warranty of
-#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 #   GNU General Public License for more details.
 #
 #   You should have received a copy of the GNU General Public License
-#   along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#   along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 ################################################################################
-
-lambdaExpand_bin <- function(x = lambda, y = lambda.sq, env = iprobit.env) {
-  environment(.lambdaExpand) <- environment()
-  original.lambda <- x
-  .lambdaExpand(x = original.lambda, env = environment())
-  lambda.tmp <- lambda
-  assign("lambda", lambda.tmp, envir = env)
-
-  if (!is.null(y)) {
-    original.lambda.sq <- y
-    lambda.sq.tmp <- NULL
-    .lambdaExpand(x = original.lambda.sq, env = environment())
-    lambda.sq.tmp <- lambda
-    assign("lambda.sq", lambda.sq.tmp, envir = env)
-  }
-}
-
-HlamFn <- function(env = environment()) {
-  # Hl (list) and lambda (vector), both must be of same length, should be
-  # defined in  environment.
-  res.Hlam.mat <- Reduce("+", mapply("*", Hl, lambda, SIMPLIFY = FALSE))
-  assign("Hlam.mat", res.Hlam.mat, envir = env)
-}
-
-HlamsqFn <- function(env = environment()) {
-  # Hl, Hsql, (both lists) and lambda, lambda.sq (both vectors), all of which
-  # must be the same length, should be defined in  environment. Further, ind1
-  # and ind2 are indices of all possible two-way multiplications obtained from
-  # iprior::kernL$BlockBstuff
-  environment(Hlam_two_way_index) <- env
-  if (is.null(Hsql))
-    square.terms <- Reduce("+", mapply("*", Psql[1:q], lambda.sq[1:q],
-                                       SIMPLIFY = FALSE))
-  else
-    square.terms <- Reduce("+", mapply("*", Hsql[1:q], lambda.sq[1:q],
-                                       SIMPLIFY = FALSE))
-
-  if (is.null(ind1) && is.null(ind2))
-    two.way.terms <- 0
-  else {
-    lambda.two.way <- Hlam_two_way_index(lambda, lambda.sq)
-    two.way.terms <-
-      Reduce("+", mapply("*", H2l, lambda.two.way, SIMPLIFY = FALSE))
-    }
-
-  res.Hlam.matsq <- square.terms + two.way.terms
-  assign("Hlam.matsq", res.Hlam.matsq, envir = env)
-}
 
 is.iprobitMod_bin <- function(x) {
   any(class(x) == "iprobitMod_bin")
@@ -78,17 +30,22 @@ is.iprobitData <- function(x) {
   any(class(x) == "iprobitData")
 }
 
-splitKernel <- function(kernel) {
-   # Helper function to split the FBMs from the Hurst coefficients, if any
-     paste(lapply(strsplit(kernel, ","), function(x) x[1]))
+#' Extract the variational lower bound
+#'
+#' @param object an object of class \code{ipriorProbit}.
+#'
+#' @return The variational lower bound.
+#' @export
+logLik.iprobitMod <- function(object) {
+  lb <- object$lower.bound[!is.na(x$lower.bound)]
+  lb <- lb[length(lb)]
+  class(lb) <- "iprobitLowerBound"
+  lb
 }
 
-splitHurst <- function(kernel) {
-  # Helper function to split the FBMs from the Hurst coefficients, if any
-    suppressWarnings(
-        tmp <- as.numeric(paste(lapply(strsplit(kernel, ","), function(x) x[2])))
-     )
-  tmp
+#' @export
+print.iprobitLowerBound <- function(x) {
+  cat("Lower bound =", x)
 }
 
 get_Hurst <- function(object) {
@@ -185,6 +142,69 @@ all.same <- function(v) {
   # https://stackoverflow.com/questions/4752275/test-for-equality-among-all-elements-of-a-single-vector
   all(sapply(as.list(v[-1]), FUN = function(z) identical(z, v[1])))
 }
+
+as.time <- function(x) {
+  # For difftime objects
+  time <- as.numeric(x)
+  unit <- attr(x, "units")
+  structure(list(time = time, unit = unit), class = "iprobitTime")
+}
+
+print.iprobitTime <- function(x) {
+  cat(x$time, x$unit)
+}
+
+# lambda expansion and Hlam.mat calculation for binary models ------------------
+
+lambdaExpand_bin <- function(x = lambda, y = lambda.sq, env = iprobit.env) {
+  environment(.lambdaExpand) <- environment()
+  original.lambda <- x
+  .lambdaExpand(x = original.lambda, env = environment())
+  lambda.tmp <- lambda
+  assign("lambda", lambda.tmp, envir = env)
+
+  if (!is.null(y)) {
+    original.lambda.sq <- y
+    lambda.sq.tmp <- NULL
+    .lambdaExpand(x = original.lambda.sq, env = environment())
+    lambda.sq.tmp <- lambda
+    assign("lambda.sq", lambda.sq.tmp, envir = env)
+  }
+}
+
+HlamFn <- function(env = environment()) {
+  # Hl (list) and lambda (vector), both must be of same length, should be
+  # defined in  environment.
+  res.Hlam.mat <- Reduce("+", mapply("*", Hl, lambda, SIMPLIFY = FALSE))
+  assign("Hlam.mat", res.Hlam.mat, envir = env)
+}
+
+HlamsqFn <- function(env = environment()) {
+  # Hl, Hsql, (both lists) and lambda, lambda.sq (both vectors), all of which
+  # must be the same length, should be defined in  environment. Further, ind1
+  # and ind2 are indices of all possible two-way multiplications obtained from
+  # iprior::kernL$BlockBstuff
+  environment(Hlam_two_way_index) <- env
+  if (is.null(Hsql))
+    square.terms <- Reduce("+", mapply("*", Psql[1:q], lambda.sq[1:q],
+                                       SIMPLIFY = FALSE))
+  else
+    square.terms <- Reduce("+", mapply("*", Hsql[1:q], lambda.sq[1:q],
+                                       SIMPLIFY = FALSE))
+
+  if (is.null(ind1) && is.null(ind2))
+    two.way.terms <- 0
+  else {
+    lambda.two.way <- Hlam_two_way_index(lambda, lambda.sq)
+    two.way.terms <-
+      Reduce("+", mapply("*", H2l, lambda.two.way, SIMPLIFY = FALSE))
+  }
+
+  res.Hlam.matsq <- square.terms + two.way.terms
+  assign("Hlam.matsq", res.Hlam.matsq, envir = env)
+}
+
+# lambda expansion and Hlam.mat calculation for multinomial IIA models ---------
 
 lambdaExpand_mult <- function(x = lambda, y = lambda.sq, env = iprobit.env) {
   environment(.lambdaExpand) <- environment()
@@ -310,17 +330,3 @@ Hlam_two_way_index <- function(lam = c(1, 2, 3, 4), lamsq = c(4, 5, 6, 7)) {
 #   #
 #   # 4 * H1sq + 9 * H2sq + 36 * H12sq + 2 * 3 * (H1 %*% H2 + H2 %*% H1) + 4 * 3 * (H1 %*% H12 + H12 %*% H1) + 9 * 2 * (H2 %*% H12 + H12 %*% H2)
 # }
-
-as.time <- function(x) {
-  # For difftime objects
-  time <- as.numeric(x)
-  unit <- attr(x, "units")
-  structure(list(time = time, unit = unit), class = "iprobitTime")
-}
-
-print.iprobitTime <- function(x) {
-  cat(x$time, x$unit)
-}
-
-
-

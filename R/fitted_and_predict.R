@@ -1,3 +1,23 @@
+################################################################################
+#
+#   iprobit: Binary and Multinomial Probit Regression with I-priors
+#   Copyright (C) 2017  Haziq Jamil
+#
+#   This program is free software: you can redistribute it and/or modify
+#   it under the terms of the GNU General Public License as published by
+#   the Free Software Foundation, either version 3 of the License, or
+#   (at your option) any later version.
+#
+#   This program is distributed in the hope that it will be useful,
+#   but WITHOUT ANY WARRANTY; without even the implied warranty of
+#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+#   GNU General Public License for more details.
+#
+#   You should have received a copy of the GNU General Public License
+#   along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+################################################################################
+
 #' @export
 fitted.iprobitMod_bin <- function(x, upper.or.lower = NULL, round.digits = 4) {
   ystar <- x$ystar
@@ -167,55 +187,6 @@ print.iprobitPredict <- function(x) {
   else
     cat("Test data not provided.\n")
 }
-
-# fitted2 <- function(x, upper.or.lower = NULL) {
-#   ystar <- x$ystar
-#   y.hat <- rep(0, length(x$ystar)); y.hat[ystar >= 0] <- 1
-#   se.ystar <- iprobitSE(y = y.hat, eta = ystar)
-#
-#   if (!is.null(upper.or.lower)) {
-#     if (upper.or.lower == "upper") {
-#       ystar[ystar >= 0] <- ystar[ystar >= 0] + 1.96 * se.ystar[ystar >= 0]
-#       ystar[ystar < 0] <- ystar[ystar < 0] + 1.96 * se.ystar[ystar < 0]
-#     } else if (upper.or.lower == "lower") {
-#       ystar[ystar >= 0] <- ystar[ystar >= 0] - 1.96 * se.ystar[ystar >= 0]
-#       ystar[ystar < 0] <- ystar[ystar < 0] - 1.96 * se.ystar[ystar < 0]
-#     }
-#     y.hat[ystar >= 0] <- 1
-#   }
-#   p.hat <- pnorm(ystar)
-#   y.hat <- as.factor(y.hat); levels(y.hat) <- x$y.levels
-#
-#   list(y = y.hat, prob = p.hat)
-# }
-#
-# predict2 <- function(object, newdata, upper.or.lower = NULL) {
-#   w <- object$w
-#   lambda <- object$lambda
-#   alpha <- object$alpha
-#
-#   H.tilde <- ikernL(Xl = list(object$X), newdata = list(newdata),
-#                     kernel = object$kernel)[[1]]
-#   class(H.tilde) <- NULL
-#   ystar <- as.numeric(alpha + lambda * H.tilde %*% w)
-#   y.hat <- rep(0, nrow(newdata)); y.hat[ystar >= 0] <- 1
-#   se.ystar <- iprobitSE(y = y.hat, eta = ystar)
-#
-#   if (!is.null(upper.or.lower)) {
-#     if (upper.or.lower == "upper") {
-#       ystar[ystar >= 0] <- ystar[ystar >= 0] + 1.96 * se.ystar[ystar >= 0]
-#       ystar[ystar < 0] <- ystar[ystar < 0] + 1.96 * se.ystar[ystar < 0]
-#     } else if (upper.or.lower == "lower") {
-#       ystar[ystar >= 0] <- ystar[ystar >= 0] - 1.96 * se.ystar[ystar >= 0]
-#       ystar[ystar < 0] <- ystar[ystar < 0] - 1.96 * se.ystar[ystar < 0]
-#     }
-#     y.hat <- rep(0, nrow(newdata)); y.hat[ystar >= 0] <- 1
-#   }
-#   p.hat <- pnorm(ystar)
-#   y.hat <- as.factor(y.hat); levels(y.hat) <- object$y.levels
-#
-#   list(y = y.hat, prob = p.hat)
-# }
 
 # Note: Quantiles for truncated normal distribution are
 # qtruncnorm(0.025, a = 0)  # upper tail truncated at zero

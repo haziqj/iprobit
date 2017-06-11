@@ -1,4 +1,23 @@
-#' @import ggplot2
+################################################################################
+#
+#   iprobit: Binary and Multinomial Probit Regression with I-priors
+#   Copyright (C) 2017  Haziq Jamil
+#
+#   This program is free software: you can redistribute it and/or modify
+#   it under the terms of the GNU General Public License as published by
+#   the Free Software Foundation, either version 3 of the License, or
+#   (at your option) any later version.
+#
+#   This program is distributed in the hope that it will be useful,
+#   but WITHOUT ANY WARRANTY; without even the implied warranty of
+#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+#   GNU General Public License for more details.
+#
+#   You should have received a copy of the GNU General Public License
+#   along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+################################################################################
+
 #' @export
 plot.iprobitMod <- function(object, niter.plot = NULL, levels = NULL, ...) {
   iplot_fitted(object)
@@ -22,24 +41,6 @@ iplot_fitted <- function(object) {
     coord_cartesian(expand = FALSE) +
     theme_bw()
 }
-
-# iplot_fitted_mult <- function(x, levels = NULL) {
-#   list2env(x, envir = environment())
-#   n <- length(y)
-#   y.lev <- levels(y)
-#   m <- length(y.lev)
-#   nm <- n * m
-#   p <- ncol(X)
-#
-#   probs <- fitted(x)$probs
-#   df.plot <- data.frame(probs, i = 1:n)
-#   df.plot <- reshape2::melt(df.plot, id.vars = "i")
-#   ggplot(df.plot, aes(x = i, y = value)) +
-#     geom_area(aes(col = variable, fill = variable), position = "stack") +
-#     coord_cartesian(ylim = c(0, 1)) +
-#     labs(col = "Class", fill = "Class", x = "Index", y = "Fitted probabilities") +
-#     theme_bw()
-# }
 
 #' @export
 iplot_lb <- function(x, niter.plot = NULL, lab.pos = c("up", "down")) {
@@ -71,37 +72,6 @@ iplot_lb <- function(x, niter.plot = NULL, lab.pos = c("up", "down")) {
              vjust = lab.pos, label = round(max(lb.original), 2), size = 3.7) +
     labs(y = "Variational lower bound") +
     theme_bw()
-}
-
-#' @export
-iplot_prob <- function(x, covariate = 1, levels = NULL) {
-  if (!is.numeric(covariate)) {
-    covariate <- grep(covariate, colnames(mod$X))
-  }
-  classes <- as.factor(x$y)
-  if (!is.null(levels)) levels(classes) <- levels
-  else levels(classes) <- x$y.levels
-  mean.X <- apply(x$X, 2, mean)
-  X.new <- x$X
-  X.new[, -covariate] <- mean.X[-covariate]
-  p.hat <- predict(x, X.new)$prob
-  p.hat.lower <- predict(x, X.new, "lower")$prob
-  p.hat.upper <- predict(x, X.new, "upper")$prob
-  plot.df <- data.frame(x = x$X[, covariate], y = x$y, prob = p.hat,
-                        low = p.hat.lower, high = p.hat.upper,
-                        Class = classes)
-  x.axis.lab <- colnames(x$X)[covariate]
-
-  ggplot(plot.df, aes(x = x, y = y)) +
-    geom_line(aes(x = x, y = prob)) +
-    geom_point(aes(col = Class)) +
-    geom_ribbon(aes(x = x, ymin = low, ymax = high), fill = "grey70", alpha = 0.5) +
-    labs(x = x.axis.lab, y = "Probability") +
-    theme_bw()
-}
-
-create_x_range <- function(X, X.var) {
-
 }
 
 #' @export
@@ -214,6 +184,32 @@ iplot_predict_mult <- function(plot.df, points.df, x, y, m) {
     theme_bw()
   p
 }
+
+# iplot_prob <- function(x, covariate = 1, levels = NULL) {
+#   if (!is.numeric(covariate)) {
+#     covariate <- grep(covariate, colnames(mod$X))
+#   }
+#   classes <- as.factor(x$y)
+#   if (!is.null(levels)) levels(classes) <- levels
+#   else levels(classes) <- x$y.levels
+#   mean.X <- apply(x$X, 2, mean)
+#   X.new <- x$X
+#   X.new[, -covariate] <- mean.X[-covariate]
+#   p.hat <- predict(x, X.new)$prob
+#   p.hat.lower <- predict(x, X.new, "lower")$prob
+#   p.hat.upper <- predict(x, X.new, "upper")$prob
+#   plot.df <- data.frame(x = x$X[, covariate], y = x$y, prob = p.hat,
+#                         low = p.hat.lower, high = p.hat.upper,
+#                         Class = classes)
+#   x.axis.lab <- colnames(x$X)[covariate]
+#
+#   ggplot(plot.df, aes(x = x, y = y)) +
+#     geom_line(aes(x = x, y = prob)) +
+#     geom_point(aes(col = Class)) +
+#     geom_ribbon(aes(x = x, ymin = low, ymax = high), fill = "grey70", alpha = 0.5) +
+#     labs(x = x.axis.lab, y = "Probability") +
+#     theme_bw()
+# }
 
 # iplot_decbound <- function(x, levels = NULL) {
 #   classes <- as.factor(x$y)
