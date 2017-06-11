@@ -1,6 +1,0 @@
-require(iprobit)
-dat <- gen_mixture()
-mod <- iprobit(y ~ ., dat, kernel = "FBM")
-print(mod)
-summary(mod)
-iplot_predict(mod)

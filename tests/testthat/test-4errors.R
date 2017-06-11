@@ -9,6 +9,7 @@ test_that("Fit factors only", {
 
 test_that(">3-way interactions", {
 
+  data(iris)
   expect_error(iprobit(Species ~ . ^ 3, iris))
 
 })

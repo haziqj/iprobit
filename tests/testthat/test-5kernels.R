@@ -164,6 +164,7 @@ test_that("Squared terms (multinomial)", {
 
 test_that("Lots of squared terms (multinomial)", {
 
+  data(iris)
   mod <- iprobit(Species ~ . ^ 2, iris, silent = TRUE,
                  control = list(maxit = 2))
   expect_s3_class(mod, "iprobitMod")
