@@ -28,7 +28,7 @@ iprobit_bin <- function(ipriorKernel, maxit = 200, stop.crit = 1e-5,
   lower.bound <- rep(NA, maxit)
   lb.const <- (n + 1 + l - log(n) + (l + 1) * log(2 * pi)) / 2
 
-  if (!silent) pb <- txtProgressBar(min = 0, max = maxit - 1, style = 3)
+  if (!silent) pb <- txtProgressBar(min = 0, max = maxit - 1, style = 1)
   start.time <- Sys.time()
   for (t in 1:(maxit - 1)) {
     # Update ystar -------------------------------------------------------------

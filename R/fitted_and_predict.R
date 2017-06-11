@@ -66,7 +66,8 @@ predict.iprobitMod <- function(object, newdata = list(), y.test = NULL,
       tt <- object$ipriorKernel$terms
       Terms <- delete.response(tt)
       xstar <- model.frame(Terms, newdata)
-      y.test <- newdata[, attr(tt, "response")]
+      if (any(colnames(newdata) == yname))
+        y.test <- model.extract(model.frame(tt, newdata), "response")
       xrownames <- rownames(xstar)
       if (one.lam) {
         xstar <- list(as.matrix(xstar))
@@ -162,9 +163,9 @@ predict_iprobit_mult <- function(ystar, y.levels) {
 #' @export
 print.iprobitPredict <- function(x) {
   if (!is.null(x$test.error.rate))
-    cat("Test error rate:", x$test.error.rate, "%\n\n")
+    cat("Test error rate:", x$test.error.rate, "%\n")
   else
-    cat("Test data not provided.\n\n")
+    cat("Test data not provided.\n")
 }
 
 # fitted2 <- function(x, upper.or.lower = NULL) {

@@ -1,0 +1,88 @@
+---
+title: "R/iprobit: Binary and multinomial probit regression using I-priors"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, collapse = TRUE)
+library(iprobit)
+```
+
+This is an `R` package which extends I-prior regression to unordered categorical responses via a probit link function. This allows the user to fit models for classification or inference using fitted probabilities. Estimation is performed using a variational EM algorithm.
+
+## Binary classification (toy example)
+
+#### Model fitting
+
+```{r, cache = TRUE}
+dat <- gen_spiral(n = 300)  # generate binary toy example data set
+mod <- iprobit(y ~ X1 + X2, dat, one.lam = TRUE, kernel = "FBM")
+```
+
+#### Model summary
+
+```{r}
+summary(mod)
+```
+
+#### Boundary plot for two-dimensional covariates
+
+```{r}
+iplot_predict(mod)
+```
+
+## Multiclass classification (toy example)
+
+#### Model fit report and parameter estimates
+
+```{r, cache = TRUE}
+dat <- gen_mixture(n = 500, m = 4, sd = 1.5)  # generate 4-class toy example data set
+(mod <- iprobit(y ~ X1 + X2, dat, control = list(maxit = 10)))
+```
+
+#### Boundary plot for two-dimensional covariates
+
+```{r}
+iplot_predict(mod)
+```
+
+#### Obtain out-of-sample test error rates
+
+```{r}
+dat.test <- gen_mixture(n = 100, m = 4, sd = 1.5)
+(mod.pred <- predict(mod, newdata = dat.test))
+
+mod.pred$y
+
+head(mod.pred$prob)
+```
+
+## Fisher's Iris data set
+
+#### Model fitting (common RKHS scale across classes for each covariate)
+
+```{r, cache = TRUE}
+mod <- iprobit(Species ~ ., iris, kernel = "FBM", one.lam = TRUE,
+               control = list(alpha0 = 1, lambda0 = 1, 
+                              stop.crit = 1e-1,
+                              common.RKHS.scale = TRUE, 
+                              common.intercept = FALSE))
+
+summary(mod)
+```
+
+#### Monitor convergence
+
+```{r}
+iplot_lb(mod)
+```
+
+#### Plot of fitted probabilities
+
+```{r}
+iplot_fitted(mod)
+```
+
+***
+
+Copyright (C) 2017 [Haziq Jamil](http://haziqj.ml).

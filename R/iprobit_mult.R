@@ -42,7 +42,7 @@ iprobit_mult <- function(ipriorKernel, maxit = 100, stop.crit = 1e-5,
   )
   niter <- 1
 
-  if (!silent) pb <- txtProgressBar(min = 0, max = maxit - 1, style = 3)
+  if (!silent) pb <- txtProgressBar(min = 0, max = maxit - 1, style = 1)
   start.time <- Sys.time()
   for (t in 1:(maxit - 1)) {
     # Update f -----------------------------------------------------------------
