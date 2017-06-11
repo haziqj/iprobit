@@ -12,9 +12,9 @@ iprobit_bin <- function(ipriorKernel, maxit = 200, stop.crit = 1e-5,
   environment(HlamFn) <- iprobit.env
   environment(HlamsqFn) <- iprobit.env
   y <- Y
+  maxit <- max(1, maxit)
 
   # Initialise -----------------------------------------------------------------
-  maxit <- max(1, maxit)
   if (is.null(alpha0)) alpha0 <- rnorm(1)
   if (is.null(lambda0)) lambda0 <- abs(rnorm(l))
   if (is.null(w0)) w0 <- rep(0, n)
@@ -25,19 +25,23 @@ iprobit_bin <- function(ipriorKernel, maxit = 200, stop.crit = 1e-5,
   HlamsqFn(env = iprobit.env)
   alpha <- alpha0
   w <- w0
+
+  # Variational lower bound and loopy stuff ------------------------------------
   niter <- 0
-  lower.bound <- rep(NA, maxit)
+  lb <- rep(NA, maxit)
   lb.const <- (n + 1 + l - log(n) + (l + 1) * log(2 * pi)) / 2
   loop.logical <- function() {
-    lb.diff <- abs(lower.bound[niter] - lower.bound[niter - 1])
+    lb.diff <- abs(lb[niter] - lb[niter - 1])
     ifelse(length(lb.diff) == 0, TRUE,
            ifelse(is.na(lb.diff), niter != maxit,
            (niter != maxit) && (abs(lb.diff) > stop.crit)))
   }
 
+  # The variational EM loop ----------------------------------------------------
   if (maxit == 1) silent <- TRUE
   if (!silent) pb <- txtProgressBar(min = 0, max = maxit - 1, style = 1)
   start.time <- Sys.time()
+
   while (loop.logical()) {
     # Update ystar -------------------------------------------------------------
     eta <- as.numeric(alpha + Hlam.mat %*% w)
@@ -81,17 +85,16 @@ iprobit_bin <- function(ipriorKernel, maxit = 200, stop.crit = 1e-5,
     # Update alpha -------------------------------------------------------------
     alpha <- mean(ystar - Hlam.mat %*% w)
 
-    # Lower bound --------------------------------------------------------------
-    lower.bound[niter + 1] <- lb.const +
+    # Calculate lower bound ----------------------------------------------------
+    lb[niter + 1] <- lb.const +
       sum(pnorm(eta[y == 2], log.p = TRUE)) +
       sum(pnorm(-eta[y == 1], log.p = TRUE)) -
       (sum(diag(W)) + determinant(A)$modulus + sum(log(ct))) / 2
 
-    # lb.diff <- abs(lower.bound[t + 1] - lower.bound[t])
-    # if (!is.na(lb.diff) && (lb.diff < stop.crit)) break
     niter <- niter + 1
     if (!silent) setTxtProgressBar(pb, niter)
   }
+
   end.time <- Sys.time()
   time.taken <- as.time(end.time - start.time)
 
@@ -100,7 +103,7 @@ iprobit_bin <- function(ipriorKernel, maxit = 200, stop.crit = 1e-5,
   se.lambda <- sqrt(1 / ct[1:l])
   se.ystar <- NA #iprobitSE(y = y, eta = eta, thing1 = thing1, thing0 = thing0)
 
-  # Close function -------------------------------------------------------------
+  # Clean up and close ---------------------------------------------------------
   if (!silent) {
     close(pb)
     if (niter == maxit) cat("Convergence criterion not met.\n")
@@ -108,8 +111,8 @@ iprobit_bin <- function(ipriorKernel, maxit = 200, stop.crit = 1e-5,
   }
 
   res <- list(ystar = ystar, w = w, lambda = lambda[1:l], alpha = alpha,
-              lower.bound = lower.bound, ipriorKernel = ipriorKernel,
-              se = c(se.alpha, se.lambda), se.ystar = se.ystar,
+              lower.bound = lb, ipriorKernel = ipriorKernel,
+              se.alpha = se.alpha, se.lambda = se.lambda, se.ystar = se.ystar,
               y.levels = y.levels, start.time = start.time,
               end.time = end.time, time = time.taken,
               stop.crit = stop.crit, niter = niter, maxit = maxit)

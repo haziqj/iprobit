@@ -15,6 +15,7 @@ iprobit_mult <- function(ipriorKernel, maxit = 100, stop.crit = 1e-5,
   y <- Y
   m <- length(y.levels)
   nm <- n * m
+  maxit <- max(1, maxit)
 
   # Initialise -----------------------------------------------------------------
   if (is.null(alpha0)) {
@@ -33,18 +34,29 @@ iprobit_mult <- function(ipriorKernel, maxit = 100, stop.crit = 1e-5,
   HlamFn_mult(env = iprobit.env)
   HlamsqFn_mult(env = iprobit.env)
   w <- f.tmp <- ystar <- w0
-  logdetA <- rep(NA, m)
-  lb <- rep(NA, maxit)
   W <- list(NULL)
-  logClb <- rep(NA, n)
+  logdetA <- rep(NA, m)
   w.ind <- seq_len(
     ifelse(isTRUE(common.intercept) && isTRUE(common.RKHS.scale), 1, m)
   )
-  niter <- 1
 
+  # Variational lower bound and loopy stuff ------------------------------------
+  niter <- 0
+  lb <- rep(NA, maxit)
+  logClb <- rep(NA, n)
+  loop.logical <- function() {
+    lb.diff <- abs(lb[niter] - lb[niter - 1])
+    ifelse(length(lb.diff) == 0, TRUE,
+           ifelse(is.na(lb.diff), niter != maxit,
+                  (niter != maxit) && (abs(lb.diff) > stop.crit)))
+  }
+
+  # The variational EM loop ----------------------------------------------------
+  if (maxit == 1) silent <- TRUE
   if (!silent) pb <- txtProgressBar(min = 0, max = maxit - 1, style = 1)
   start.time <- Sys.time()
-  for (t in 1:(maxit - 1)) {
+
+  while (loop.logical()) {
     # Update f -----------------------------------------------------------------
     f.tmp <- rep(alpha, each = n) + mapply("%*%", Hlam.mat, split(w, col(w)))
 
@@ -118,7 +130,7 @@ iprobit_mult <- function(ipriorKernel, maxit = 100, stop.crit = 1e-5,
     alpha <- apply(ystar - mapply("%*%", Hlam.mat, split(w, col(w))), 2, mean)
     if (isTRUE(common.intercept)) alpha <- rep(mean(alpha), m)
 
-    # Calculate lower bound
+    # Calculate lower bound ----------------------------------------------------
     lb.ystar <- sum(logClb)
     lb.w <- 0.5 * (nm - sum(sapply(W, function(x) sum(diag(x)))) - sum(logdetA))
     if (isTRUE(common.RKHS.scale))
@@ -129,14 +141,12 @@ iprobit_mult <- function(ipriorKernel, maxit = 100, stop.crit = 1e-5,
       lb.alpha <- 0.5 * (1 + log(2 * pi) - log(nm))
     else
       lb.alpha <- (m / 2) * (1 + log(2 * pi) - log(n))
-    lb[t + 1] <- lb.ystar + lb.w + lb.lambda + lb.alpha
+    lb[niter + 1] <- lb.ystar + lb.w + lb.lambda + lb.alpha
 
-    # Lower bound difference
-    lb.diff <- abs(lb[t + 1] - lb[t])
-    if (!is.na(lb.diff) && (lb.diff < stop.crit)) break
     niter <- niter + 1
     if (!silent) setTxtProgressBar(pb, t)
   }
+
   end.time <- Sys.time()
   time.taken <- as.time(end.time - start.time)
 
@@ -161,7 +171,7 @@ iprobit_mult <- function(ipriorKernel, maxit = 100, stop.crit = 1e-5,
               lower.bound = lb, ipriorKernel = ipriorKernel, se.alpha = se.alpha,
               se.lambda = se.lambda, se.ystar = se.ystar,
               y.levels = y.levels, start.time = start.time,
-              end.time = end.time, time = time.taken, call = match.call(),
+              end.time = end.time, time = time.taken,
               stop.crit = stop.crit, niter = niter, maxit = maxit)
   class(res) <- c("iprobitMod", "iprobitMod_mult")
   res

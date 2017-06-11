@@ -11,7 +11,7 @@ print.iprobitMod <- function(x) {
 summary.iprobitMod <- function(x) {
   if (is.iprobitMod_bin(x)) {
     theta <- coef(x)
-    se <- x$se
+    se <- c(x$se.alpha, x$se.lambda)
   }
   if (is.iprobitMod_mult(x)) {
     tmp <- get_coef_se_mult(x)
