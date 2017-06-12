@@ -6,6 +6,27 @@ cache: packages
 
 sudo: false
 
+r:
+  - oldrel
+  - release
+  - devel
+
 r_check_args: '--as-cran'
 
-r_github_packages: haziqjamil/iprior
+r_github_packages:
+  - haziqjamil/iprior
+  - hadley/testthat
+  - jimhester/covr
+
+after_success:
+  - test $TRAVIS_R_VERSION_STRING = "release" && Rscript -e 'covr::codecov()'
+
+notifications:
+  on_success: change # default: never
+  on_failure: change # default: always
+  email: false
+  pushover:
+    api_key:
+      secure: sIOG/rbeX7747Nf2UbAb/89IuBj9Uoo5+m+eOUA6a+eKlg/bhsJf1sdrObnOnvyo3r5ntGMY1uWSPzrd/Lw8kNa+daUfqDszeiL/dq1g70+bclBNn0QtiOx43cLh76Hz9icchWviwTN6ozqNirCEWBhM466cHuPXxpWqcYdnd0v9CdJwZLLbeyRs1dTCQcKxcXLAfpc9x3ugX6QBAHMiucTKy6oQihv/iNRFVWPAB/bSjaOghTGkZzWSt2t2qWE5tE5vo/XkO6HPGQ5vAT1sYAo6IurSXAAKnvHefrn7JToeJhCgelBb7M6rb8RskK2c3MuzAlsyIwcvQ1euiSMWxsYm2kJmqt6xWRcT3WgIpqT/b1sYI1SaTQ6KC1kAPpGS/4kXfP0t37G7gNuxHVarJJX9NrRvqSz18j3tV+ieitDpAWVr5a5GSYIKZHr8xbrGEh1mmsWYWmDDcZOifqeQMGRGHAK0cx9EUVlIrt2uCy7yeDLUiKrNHoEccrTJtcWJZ4Cw4+rDTh+L1g64nwmTXf7uyvZVfUB1ySUpG5F509GWzP1n/49hG7YdDV4ncZoXzKF0M+vjgUApgSYEOPdW8/8428pKQTEFsivF2ut4sbAbf3mR7tSw0ahzcpsjXw6RZ4vpN66EbF00jjzwtpZe8C9sRzEx+qKSF3Dfi6FKuSw=
+    users:
+      secure: cZN/wPG+rFVYVKeiwvvgch6OApPL16jtybYzPlZo7yYPchuLgNEY2S1dBbaqlbWsfp1W7y3JJhTfDyoq626zm4uxVJNul+ZriOEASztOovLA0x1ftOJ+bf+4oRSUf6vc9jVps955Fpl1X5UMoGBd7r6s3x3nwdG1ymHKOE0dxzOc/fYcHrJpYtUx0CK5tzDY0Wm8pZYUBsfvbg34L3AFgjwsucwi2y6aZKPADk7k+vUJCRzX3uEh/P5LyJzO/RgsblZPeQk59EMxqkWfS+xMyXmqRjGJIbs14I2byursZ05oWAJljLSocDDIqz72l5IcspgjLXUA6ACS+aK/Hund0p5r+m55+dq14O/q6uzKN8BNlA32PP7rkfkQnw9U5FaaUL1MI7n5Cm82i2jQ97yUCGV0U9B1aO6Ktf9Kkmapt02GHjDAQpdwK53XlodZUxtFSagjYSWIXuBlD/59dMfGLvj+E7kYSGAKRCaTzHfJ/xpk9FN0eLYhva5dr5CmR8egkaOG5YzkZn4fiSe6BSqnLLM7FC+2qEMH2OY7J2i/KKCoAR96DQ5OHl4DgNAZFba2E2KpKyJIzoYKSB+jXamzmgHdqFbVX4mlCTtvx8EWnT/P+6WBWDKoVhl7De+0Nwa54M5sezUQlkBEaY82RHXl8g+jC5iHLLgzvMyTEY/f/a8=
