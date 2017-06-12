@@ -2,10 +2,6 @@
 #' @importFrom stats coef delete.response dnorm fitted integrate kernel
 #'   model.extract model.frame pnorm predict rnorm logLik
 #' @importFrom utils data setTxtProgressBar txtProgressBar
-#' @importFrom mlbench mlbench.1spiral
-#' @importFrom mvtnorm rmvnorm
-#' @importFrom reshape2 melt
-#' @importFrom scales pretty_breaks
 #' @import iprior
 #' @import ggplot2
 NULL

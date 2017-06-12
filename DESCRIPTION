@@ -9,7 +9,11 @@ License: GPL (>= 3.0)
 Encoding: UTF-8
 Imports: 
   ggplot2,
-  iprior (>= 0.6.4.9004)
+  iprior (>= 0.6.4.9004),
+  mlbench,
+  mvtnorm,
+  reshape2,
+  scales
 Suggests:
   knitr,
   rmarkdown,
