@@ -60,5 +60,6 @@ artifacts:
 
 notifications:
   - provider: Email
+    subject: '[AppVeyor] Build {{status}}: {{projectName}} {{buildVersion}}'
     to:
       - uu666zc9tu@pomail.net
