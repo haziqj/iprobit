@@ -164,7 +164,7 @@ iprobit_mult <- function(ipriorKernel, maxit = 100, stop.crit = 1e-5,
     lb[niter + 1] <- lb.ystar + lb.w + lb.lambda + lb.alpha
 
     niter <- niter + 1
-    if (!silent) setTxtProgressBar(pb, t)
+    if (!silent) setTxtProgressBar(pb, niter)
   }
 
   end.time <- Sys.time()
