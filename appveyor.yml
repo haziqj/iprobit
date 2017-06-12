@@ -57,3 +57,8 @@ artifacts:
 
   - path: '\*_*.zip'
     name: Bits
+
+notifications:
+  - provider: Email
+    to:
+      - uu666zc9tu@pomail.net
