@@ -75,7 +75,7 @@ gen_circle <- function(n = 100, m = 2, sd = 0.1 / sqrt(m)) {
 }
 
 #' @export
-plot.iprobitData <- function(x) {
+plot.iprobitData <- function(x, ...) {
   plot.df <- data.frame(X = x$X, class = x$y)
   colnames(plot.df)
 
@@ -86,6 +86,6 @@ plot.iprobitData <- function(x) {
 }
 
 #' @export
-as.data.frame.iprobitData <- function(x) {
+as.data.frame.iprobitData <- function(x, ...) {
   data.frame(x$X, y = x$y)
 }

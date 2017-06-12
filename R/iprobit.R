@@ -74,7 +74,7 @@ iprobit.default <- function(y, ..., kernel = "Canonical", silent = FALSE,
 #' @export
 iprobit.formula <- function(formula, data = parent.frame(), kernel = "Canonical",
                             silent = FALSE, one.lam = FALSE, parsm = TRUE,
-                            control = list()) {
+                            control = list(), ...) {
   # Pass to iprobit default ----------------------------------------------------
   ipriorKernel <- iprior::kernL(formula, data, model = list(kernel = kernel,
                                                             one.lam = one.lam,

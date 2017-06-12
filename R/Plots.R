@@ -19,8 +19,8 @@
 ################################################################################
 
 #' @export
-plot.iprobitMod <- function(object, niter.plot = NULL, levels = NULL, ...) {
-  iplot_fitted(object)
+plot.iprobitMod <- function(x, niter.plot = NULL, levels = NULL, ...) {
+  iplot_fitted(x)
 }
 
 #' @export

@@ -18,17 +18,14 @@
 #
 ################################################################################
 
-is.iprobitMod_bin <- function(x) {
-  any(class(x) == "iprobitMod_bin")
-}
+#' @export
+is.iprobitMod_bin <- function(x) inherits(x, "iprobitMod_bin")
 
-is.iprobitMod_mult <- function(x) {
-  any(class(x) == "iprobitMod_mult")
-}
+#' @export
+is.iprobitMod_mult <- function(x) inherits(x, "iprobitMod_mult")
 
-is.iprobitData <- function(x) {
-  any(class(x) == "iprobitData")
-}
+#' @export
+is.iprobitData <- function(x) inherits(x, "iprobitData")
 
 #' Extract the variational lower bound
 #'
@@ -36,7 +33,7 @@ is.iprobitData <- function(x) {
 #'
 #' @return The variational lower bound.
 #' @export
-logLik.iprobitMod <- function(object) {
+logLik.iprobitMod <- function(object, ...) {
   lb <- object$lower.bound[!is.na(x$lower.bound)]
   lb <- lb[length(lb)]
   class(lb) <- "iprobitLowerBound"
@@ -44,7 +41,7 @@ logLik.iprobitMod <- function(object) {
 }
 
 #' @export
-print.iprobitLowerBound <- function(x) {
+print.iprobitLowerBound <- function(x, ...) {
   cat("Lower bound =", x)
 }
 

@@ -4,7 +4,7 @@
 \alias{logLik.iprobitMod}
 \title{Extract the variational lower bound}
 \usage{
-\method{logLik}{iprobitMod}(object)
+\method{logLik}{iprobitMod}(object, ...)
 }
 \arguments{
 \item{object}{an object of class \code{ipriorProbit}.}

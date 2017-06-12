@@ -19,9 +19,10 @@
 ################################################################################
 
 #' @export
-fitted.iprobitMod_bin <- function(x, upper.or.lower = NULL, round.digits = 4) {
-  ystar <- x$ystar
-  y.hat <- rep(0, length(x$ystar)); y.hat[ystar >= 0] <- 1
+fitted.iprobitMod_bin <- function(object, upper.or.lower = NULL,
+                                  round.digits = 4, ...) {
+  ystar <- object$ystar
+  y.hat <- rep(0, length(object$ystar)); y.hat[ystar >= 0] <- 1
   se.ystar <- iprobitSE(y = y.hat, eta = ystar)
 
   if (!is.null(upper.or.lower)) {
@@ -37,14 +38,14 @@ fitted.iprobitMod_bin <- function(x, upper.or.lower = NULL, round.digits = 4) {
   p.hat <- pnorm(ystar)
   p.hat <- cbind(1 - p.hat, p.hat)
   p.hat <- round(p.hat, round.digits)
-  colnames(p.hat) <- x$y.lev
-  y.hat <- as.factor(y.hat); levels(y.hat) <- x$y.levels
+  colnames(p.hat) <- object$y.lev
+  y.hat <- as.factor(y.hat); levels(y.hat) <- object$y.levels
 
   list(y = y.hat, prob = as.data.frame(p.hat))
 }
 
 #' @export
-fitted.iprobitMod_mult <- function(object, round.digits = 4) {
+fitted.iprobitMod_mult <- function(object, round.digits = 4, ...) {
   list2env(object, environment())
   list2env(ipriorKernel, environment())
   list2env(model, environment())
@@ -71,7 +72,7 @@ fitted.iprobitMod_mult <- function(object, round.digits = 4) {
 
 #' @export
 predict.iprobitMod <- function(object, newdata = list(), y.test = NULL,
-                               upper.or.lower = NULL) {
+                               upper.or.lower = NULL, round.digits = 4, ...) {
   list2env(object, environment())
   list2env(ipriorKernel, environment())
   list2env(model, environment())
@@ -112,7 +113,7 @@ predict.iprobitMod <- function(object, newdata = list(), y.test = NULL,
       HlamFn(env = environment())
       ystar.new <- as.vector(alpha + (Hlam.mat %*% w))
       names(ystar.new) <- xrownames
-      yp <- predict_iprobit_bin(ystar.new, y.levels)
+      yp <- predict_iprobit_bin(ystar.new, y.levels, round.digits)
     }
     if (is.iprobitMod_mult(object)) {
       environment(lambdaExpand_mult) <- environment()
@@ -122,7 +123,7 @@ predict.iprobitMod <- function(object, newdata = list(), y.test = NULL,
       ystar.new <- rep(alpha, each = nrow(Hlam.mat[[1]])) +
         mapply("%*%", Hlam.mat, split(w, col(w)))
       names(ystar.new) <- xrownames
-      yp <- predict_iprobit_mult(ystar.new, y.levels)
+      yp <- predict_iprobit_mult(ystar.new, y.levels, round.digits)
     }
   }
 
@@ -135,7 +136,7 @@ predict.iprobitMod <- function(object, newdata = list(), y.test = NULL,
             class = "iprobitPredict")
 }
 
-predict_iprobit_bin <- function(ystar, y.levels) {
+predict_iprobit_bin <- function(ystar, y.levels, round.digits) {
   y.hat <- rep(1, length(ystar))
   y.hat[ystar >= 0] <- 2
   y.hat <- factor(y.hat, levels = y.levels)
@@ -154,12 +155,13 @@ predict_iprobit_bin <- function(ystar, y.levels) {
 
   p.hat <- pnorm(ystar)
   p.hat <- data.frame(1 - p.hat, p.hat)
+  p.hat <- round(p.hat, round.digits)
   colnames(p.hat) <- y.levels
 
   list(y.hat = y.hat, p.hat = as.data.frame(p.hat))
 }
 
-predict_iprobit_mult <- function(ystar, y.levels) {
+predict_iprobit_mult <- function(ystar, y.levels, round.digits) {
   m <- length(y.levels)
 
   y.hat <- apply(ystar, 1, function(x) which(x == max(x)))
@@ -172,20 +174,27 @@ predict_iprobit_mult <- function(ystar, y.levels) {
     }
     # probs[i, m] <- 1 - sum(probs[i, 1:(m - 1)])
   }
-  p.hat <- round(p.hat, 4)
+  p.hat <- round(p.hat, round.digits)
   p.hat <- p.hat / matrix(rep(apply(p.hat, 1, sum), m), ncol = m)  # normalise
-  p.hat <- round(p.hat, 4)
+  p.hat <- round(p.hat, round.digits)
   colnames(p.hat) <- y.levels
 
   list(y.hat = y.hat, p.hat = as.data.frame(p.hat))
 }
 
 #' @export
-print.iprobitPredict <- function(x) {
+print.iprobitPredict <- function(x, ...) {
   if (!is.null(x$test.error.rate))
     cat("Test error rate:", x$test.error.rate, "%\n")
   else
     cat("Test data not provided.\n")
+
+  cat("\nPredicted classes:\n")
+  print(x$y)
+
+  cat("\nPredicted probabilities:\n")
+  print(head(x$p, 10))
+  if (nrow(x$p > 10)) cat("...")
 }
 
 # Note: Quantiles for truncated normal distribution are
