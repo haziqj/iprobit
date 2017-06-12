@@ -7,7 +7,9 @@
 \method{logLik}{iprobitMod}(object, ...)
 }
 \arguments{
-\item{object}{an object of class \code{ipriorProbit}.}
+\item{object}{An object of class \code{ipriorProbit}.}
+
+\item{...}{This is not used here.}
 }
 \value{
 The variational lower bound.

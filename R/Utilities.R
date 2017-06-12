@@ -29,7 +29,8 @@ is.iprobitData <- function(x) inherits(x, "iprobitData")
 
 #' Extract the variational lower bound
 #'
-#' @param object an object of class \code{ipriorProbit}.
+#' @param object An object of class \code{ipriorProbit}.
+#' @param ... This is not used here.
 #'
 #' @return The variational lower bound.
 #' @export

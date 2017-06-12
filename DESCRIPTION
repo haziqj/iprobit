@@ -5,7 +5,9 @@ Version: 0.1.0.9002
 Authors@R: person("Haziq", "Jamil", email = "haziq.jamil@gmail.com",
                   role = c("aut", "cre"))
 Description: Fit I-prior probit models to binary and multinomial data for classification or inference using fitted probabilities.
-License: GPL (>= 3.0)
+URL: https://github.com/haziqjamil/iprobit
+BugReports: https://github.com/haziqjamil/iprobit/issues
+License: GPL (>= 3.0) | file LICENSE
 Encoding: UTF-8
 Imports: 
   ggplot2,
@@ -20,4 +22,5 @@ Suggests:
   testthat
 URL: https://github.com/haziqjamil/iprobit
 BugReports: https://github.com/haziqjamil/iprobit/issues
+LazyData: yes
 RoxygenNote: 6.0.1

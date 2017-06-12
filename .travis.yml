@@ -8,4 +8,4 @@ sudo: false
 
 r_check_args: '--as-cran'
 
-r_github_packages: 'haziqjamil/iprior'
+r_github_packages: haziqjamil/iprior
