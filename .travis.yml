@@ -6,11 +6,6 @@ cache: packages
 
 sudo: false
 
-r:
-  - oldrel
-  - release
-  - devel
-
 r_check_args: '--as-cran'
 
 r_github_packages:
@@ -19,7 +14,7 @@ r_github_packages:
   - jimhester/covr
 
 after_success:
-  - test $TRAVIS_R_VERSION_STRING = "release" && Rscript -e 'covr::codecov()'
+  - Rscript -e 'covr::codecov(quiet = FALSE)'
 
 notifications:
   on_success: change # default: never
