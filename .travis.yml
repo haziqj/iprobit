@@ -6,6 +6,8 @@ cache: packages
 
 sudo: false
 
+warnings_are_errors: false
+
 r_check_args: '--as-cran'
 
 r_github_packages:
