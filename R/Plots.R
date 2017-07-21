@@ -30,6 +30,7 @@ iplot_fitted <- function(object) {
   list2env(model, environment())
 
   probs <- fitted(object)$prob
+  if (isNystrom(ipriorKernel)) probs <- probs[order(Nystrom$Nys.samp), ]
   df.plot <- data.frame(probs, i = 1:n)
   colnames(df.plot) <- c(y.levels, "i")
   df.plot <- reshape2::melt(df.plot, id.vars = "i")
