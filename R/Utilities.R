@@ -27,6 +27,11 @@ is.iprobitMod_mult <- function(x) inherits(x, "iprobitMod_mult")
 #' @export
 is.iprobitData <- function(x) inherits(x, "iprobitData")
 
+isNystrom <- function(x) {
+  if (!is.list(x$Nystrom)) return(x$Nystrom)
+  else return(TRUE)
+}
+
 #' Extract the variational lower bound
 #'
 #' @param object An object of class \code{ipriorProbit}.

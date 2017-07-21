@@ -65,10 +65,10 @@ iprobit_mult <- function(ipriorKernel, maxit = 100, stop.crit = 1e-5,
   lb <- rep(NA, maxit)
   logClb <- rep(NA, n)
   loop.logical <- function() {
-    lb.diff <- abs(lb[niter] - lb[niter - 1])
+    lb.diff <- (lb[niter] - lb[niter - 1])
     ifelse(length(lb.diff) == 0, TRUE,
            ifelse(is.na(lb.diff), niter != maxit,
-                  (niter != maxit) && (abs(lb.diff) > stop.crit)))
+                  (niter != maxit) && (lb.diff > stop.crit)))
   }
 
   # The variational EM loop ----------------------------------------------------
@@ -106,14 +106,28 @@ iprobit_mult <- function(ipriorKernel, maxit = 100, stop.crit = 1e-5,
     for (j in w.ind) {
       A <- Hlam.matsq[[j]] + diag(1, n)
       a <- as.numeric(crossprod(Hlam.mat[[j]], ystar[, j] - alpha[j]))
-      eigenA <- iprior::eigenCpp(A)
-      V <- eigenA$vec
-      u <- eigenA$val + 1e-8  # ensure positive eigenvalues
-      uinv.Vt <- t(V) / u
-      w[, j] <- as.numeric(crossprod(a, V) %*% uinv.Vt)
-      Varw <- iprior::fastVDiag(V, 1 / u)  # V %*% uinv.Vt
-      W[[j]] <- Varw + tcrossprod(w[, j])
-      logdetA[j] <- determinant(A)$mod
+      if (!isNystrom(ipriorKernel)) {
+        eigenA <- iprior::eigenCpp(A)
+        V <- eigenA$vec
+        u <- eigenA$val + 1e-8  # ensure positive eigenvalues
+        uinv.Vt <- t(V) / u
+        w[, j] <- as.numeric(crossprod(a, V) %*% uinv.Vt)
+        Varw <- iprior::fastVDiag(V, 1 / u)  # V %*% uinv.Vt
+        W[[j]] <- Varw + tcrossprod(w[, j])
+        logdetA[j] <- determinant(A)$mod
+      } else {
+        # Nystrom approximation
+        K.mm <- Hlam.matsq[[j]][1:Nystrom$m, 1:Nystrom$m]
+        eigenK.mm <- eigen(K.mm)
+        V <- Hlam.matsq[[j]][, 1:Nystrom$m] %*% eigenK.mm$vec
+        u <- eigenK.mm$val
+        u.Vt <- t(V) * u
+        D <- u.Vt %*% V + diag(1, Nystrom$m)
+        E <- solve(D, u.Vt)
+        w[, j] <- as.numeric(a - V %*% (E %*% a))
+        W[[j]] <- (diag(1, n) - V %*% E) + tcrossprod(w[, j])
+        logdetA[j] <- determinant(A)$mod
+      }
     }
     if (isTRUE(common.intercept) && isTRUE(common.RKHS.scale)) {
       w <- matrix(w[, 1], nrow = n, ncol = m)

@@ -19,7 +19,7 @@
 ################################################################################
 
 #' @export
-iprobit_bin <- function(ipriorKernel, maxit = 200, stop.crit = 1e-5,
+iprobit_bin <- function(ipriorKernel, maxit = 100, stop.crit = 1e-5,
                         silent = FALSE, alpha0 = NULL, lambda0 = NULL,
                         w0 = NULL) {
   # Declare all variables and functions to be used into environment ------------
@@ -51,10 +51,10 @@ iprobit_bin <- function(ipriorKernel, maxit = 200, stop.crit = 1e-5,
   lb <- rep(NA, maxit)
   lb.const <- (n + 1 + l - log(n) + (l + 1) * log(2 * pi)) / 2
   loop.logical <- function() {
-    lb.diff <- abs(lb[niter] - lb[niter - 1])
+    lb.diff <- (lb[niter] - lb[niter - 1])
     ifelse(length(lb.diff) == 0, TRUE,
            ifelse(is.na(lb.diff), niter != maxit,
-           (niter != maxit) && (abs(lb.diff) > stop.crit)))
+                  (niter != maxit) && (lb.diff > stop.crit)))
   }
 
   # The variational EM loop ----------------------------------------------------
@@ -79,13 +79,26 @@ iprobit_bin <- function(ipriorKernel, maxit = 200, stop.crit = 1e-5,
     # Update w -----------------------------------------------------------------
     A <- Hlam.matsq + diag(1, n)
     a <- as.numeric(crossprod(Hlam.mat, ystar - alpha))
-    eigenA <- iprior::eigenCpp(A)
-    V <- eigenA$vec
-    u <- eigenA$val + 1e-8  # ensure positive eigenvalues
-    uinv.Vt <- t(V) / u
-    w <- as.numeric(crossprod(a, V) %*% uinv.Vt)
-    Varw <- iprior::fastVDiag(V, 1 / u)  # V %*% uinv.Vt
-    W <- Varw + tcrossprod(w)
+    if (!isNystrom(ipriorKernel)) {
+      eigenA <- iprior::eigenCpp(A)
+      V <- eigenA$vec
+      u <- eigenA$val + 1e-8  # ensure positive eigenvalues
+      uinv.Vt <- t(V) / u
+      w <- as.numeric(crossprod(a, V) %*% uinv.Vt)
+      Varw <- iprior::fastVDiag(V, 1 / u)  # V %*% uinv.Vt
+      W <- Varw + tcrossprod(w)
+    } else {
+      # Nystrom approximation
+      K.mm <- Hlam.matsq[1:Nystrom$m, 1:Nystrom$m]
+      eigenK.mm <- eigen(K.mm)
+      V <- Hlam.matsq[, 1:Nystrom$m] %*% eigenK.mm$vec
+      u <- eigenK.mm$val
+      u.Vt <- t(V) * u
+      D <- u.Vt %*% V + diag(1, Nystrom$m)
+      E <- solve(D, u.Vt)
+      w <- as.numeric(a - V %*% (E %*% a))
+      W <- (diag(1, n) - V %*% E) + tcrossprod(w)
+    }
 
     # Update lambda ------------------------------------------------------------
     for (k in 1:l) {

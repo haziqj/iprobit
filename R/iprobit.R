@@ -15,7 +15,9 @@ iprobit.default <- function(y, ..., kernel = "Canonical", silent = FALSE,
     lambda0           = NULL,  # routine
     w0                = NULL,
     common.intercept  = FALSE,
-    common.RKHS.scale = FALSE
+    common.RKHS.scale = FALSE,
+    Nystrom           = FALSE,
+    Nys.seed          = NULL
   )
   con_names <- names(con)
   con[(control_names <- names(control))] <- control
@@ -34,6 +36,18 @@ iprobit.default <- function(y, ..., kernel = "Canonical", silent = FALSE,
     ipriorKernel <- iprior::kernL(y, ...,
                                   model = list(kernel = kernel, parsm = parsm,
                                                interactions = interactions))
+  }
+
+  # Take samples and re-order for Nystrom --------------------------------------
+  n <- ipriorKernel$n
+  if (as.numeric(Nystrom) == n) Nystrom <- FALSE
+  if (as.numeric(Nystrom) > 0) {
+    if (!is.null(Nys.seed)) set.seed(Nys.seed)
+    Nys.samp <- sample(seq_len(n), size = n, replace = FALSE)
+    # in the future, should replace this simple sampling with a more
+    # sophisticated procedure, preferably sampling based on each category
+    ipriorKernel <- .reorder_ipriorKernel(ipriorKernel, Nys.samp)
+    ipriorKernel$Nystrom <- list(m = Nystrom, Nys.samp = Nys.samp, Nys.seed = Nys.seed)
   }
 
   # Checks ---------------------------------------------------------------------
@@ -67,7 +81,6 @@ iprobit.default <- function(y, ..., kernel = "Canonical", silent = FALSE,
   res$control      <- con
   res$coefficients <- param
 
-  class(res) <- c(class(res), "test")
   res
 }
 
