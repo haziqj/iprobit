@@ -62,7 +62,8 @@ summary.iprobitMod <- function(object, ...) {
   res <- list(call = object$call, kernel.used = x.var.list, tab = tab,
               maxit = object$maxit, niter = object$niter,
               stop.crit = object$stop.crit, lb = object$lower.bound,
-              classes = object$y.levels)
+              classes = object$y.levels, Nystrom = object$ipriorKernel$Nystrom,
+              Nystrom.check = isNystrom(object$ipriorKernel))
   class(res) <- "iprobitSummary"
   res
 }
@@ -88,6 +89,11 @@ print.iprobitSummary <- function(x, ...) {
     cat("\nConverged to within", x$stop.crit, "tolerance. ")
   }
   cat("No. of iterations:", x$niter)
+
+  if (isTRUE(x$Nystrom.check)) {
+    cat("\nNystrom approximation used (with", x$Nystrom$m, "random subsamples)")
+  }
+
   cat("\nVariational lower bound:", x$lb[x$niter])
   cat("\n\n")
 }

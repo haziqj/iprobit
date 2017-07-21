@@ -21,7 +21,8 @@ branches:
 
 environment:
   global:
-    WARNINGS_ARE_ERRORS:
+    WARNINGS_ARE_ERRORS:  # set to 1 to treat all warnings as errors, otherwise leave empty
+    USE_RTOOLS: true
 
   matrix:
   - R_VERSION: release
