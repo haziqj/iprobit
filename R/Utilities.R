@@ -28,8 +28,14 @@ is.iprobitMod_mult <- function(x) inherits(x, "iprobitMod_mult")
 is.iprobitData <- function(x) inherits(x, "iprobitData")
 
 isNystrom <- function(x) {
-  if (!is.list(x$Nystrom)) return(x$Nystrom)
-  else return(TRUE)
+  if (iprior::is.ipriorKernel(x)) {
+    if (!is.list(x$Nystrom)) res <- x$Nystrom
+    else res <- TRUE
+  } else {
+    if (!is.list(x$ipriorKernel$Nystrom)) res <- x$ipriorKernel$Nystrom
+    else res <- TRUE
+  }
+  res
 }
 
 #' Extract the variational lower bound

@@ -129,10 +129,21 @@ iplot_predict <- function(object, test.data = NULL, X.var = c(1, 2)) {
     p <- iplot_predict_mult(plot.df, points.df, mm[1, ],mm[2, ],
                             length(levels(classes)))
 
+  if (isNystrom(object)) {
+    Nys.m <- object$ipriorKernel$Nystrom$m
+    Nys.lab <- object$ipriorKernel$Nystrom$Nys.samp[1:Nys.m]
+    Nys.df <- points.df[seq_len(Nys.m), ]
+    Nys.df <- cbind(Nys.df, Nys.lab)
+    p <- p +
+      geom_point(data = Nys.df, aes(X1, X2), size = 1.8) +
+      geom_point(data = Nys.df, aes(X1, X2, col = Class), size = 1)
+  }
+
   yname <- ifelse(object$ipriorKernel$model$yname == "y", "Class",
                   object$ipriorKernel$model$yname)
   p <- p +
     labs(x = xname[1], y = xname[2], col = yname)
+
   p
 }
 

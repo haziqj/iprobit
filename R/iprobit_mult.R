@@ -118,12 +118,14 @@ iprobit_mult <- function(ipriorKernel, maxit = 100, stop.crit = 1e-5,
       } else {
         # Nystrom approximation
         K.mm <- Hlam.matsq[[j]][1:Nystrom$m, 1:Nystrom$m]
-        eigenK.mm <- eigen(K.mm)
+        eigenK.mm <- iprior::eigenCpp(K.mm)
         V <- Hlam.matsq[[j]][, 1:Nystrom$m] %*% eigenK.mm$vec
         u <- eigenK.mm$val
         u.Vt <- t(V) * u
         D <- u.Vt %*% V + diag(1, Nystrom$m)
-        E <- solve(D, u.Vt)
+        E <- solve(D, u.Vt, tol = 1e-18)
+        # see https://stackoverflow.com/questions/22134398/mahalonobis-distance-in-r-error-system-is-computationally-singular
+        # see https://stackoverflow.com/questions/21451664/system-is-computationally-singular-error
         w[, j] <- as.numeric(a - V %*% (E %*% a))
         W[[j]] <- (diag(1, n) - V %*% E) + tcrossprod(w[, j])
         logdetA[j] <- determinant(A)$mod

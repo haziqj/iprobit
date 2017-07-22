@@ -78,6 +78,7 @@ iprobit.default <- function(y, ..., kernel = "Canonical", silent = FALSE,
   m <- match(c("control"), names(cl), 0L)
   if (any(m > 0)) cl <- cl[-m]
   res$call <- cl
+  res$formula <- formula(ipriorKernel$call)
 
   # Include these also in the ipriorMod object ---------------------------------
   res$control      <- con
