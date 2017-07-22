@@ -7,6 +7,7 @@ iprobit <- function(...) {
 iprobit.default <- function(y, ..., kernel = "Canonical", silent = FALSE,
                             interactions = NULL, parsm = TRUE, control = list()) {
   # Set up controls ------------------------------------------------------------
+  xname <- as.character(as.list(match.call(expand.dots = FALSE))$...)
   con <- list(
     maxit             = 100,
     stop.crit         = 1e-5,
@@ -35,7 +36,8 @@ iprobit.default <- function(y, ..., kernel = "Canonical", silent = FALSE,
   } else {
     ipriorKernel <- iprior::kernL(y, ...,
                                   model = list(kernel = kernel, parsm = parsm,
-                                               interactions = interactions))
+                                               interactions = interactions,
+                                               xname = xname))
   }
 
   # Take samples and re-order for Nystrom --------------------------------------
