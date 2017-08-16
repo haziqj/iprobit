@@ -38,8 +38,8 @@ test_that("Print (IIA)", {
   dat <- gen_mixture(n = 10, m = m)
   mod <- iprobit(dat$y, dat$X, silent = TRUE, control = list(maxit = 5))
   modf <- iprobit(y ~ ., dat, silent = TRUE, one.lam = TRUE, control = list(maxit = 5))
-  expect_that(print(mod), prints_text("Lower bound value ="))
-  expect_that(print(modf), prints_text("Lower bound value ="))
+  expect_that(print(mod), prints_text("Training error rate"))
+  expect_that(print(modf), prints_text("Training error rate"))
 
 })
 
@@ -62,8 +62,8 @@ test_that("Fitted", {
   dat <- gen_mixture(n = 10, m = m)
   mod <- iprobit(dat$y, dat$X, silent = TRUE, control = list(maxit = 5))
   modf <- iprobit(y ~ ., dat, silent = TRUE, one.lam = TRUE, control = list(maxit = 5))
-  expect_that(fitted(mod), is_a("list"))
-  expect_that(fitted(modf), is_a("list"))
+  expect_that(fitted(mod), is_a("iprobit_predict"))
+  expect_that(fitted(modf), is_a("iprobit_predict"))
 
 })
 
@@ -79,8 +79,8 @@ test_that("Predict (without test error rate)", {
   mod.predict <- predict(mod, newdata = list(dat.test$X))
   modf.predict <- predict(modf, newdata = as.data.frame(dat.test)[, -3])
 
-  expect_s3_class(mod.predict, "iprobitPredict")
-  expect_s3_class(modf.predict, "iprobitPredict")
+  expect_s3_class(mod.predict, "iprobit_predict")
+  expect_s3_class(modf.predict, "iprobit_predict")
   expect_that(print(mod.predict), prints_text("Test data not provided."))
 
 })
@@ -120,8 +120,8 @@ test_that("Convergence", {
 
   # Single lambda
   # > modf
-  # Lower bound value =  -12.87286
-  # Iterations =  136
+  # Training error rate: 20.00 %
+  # Lower bound value: -12.87285
   #
   # Class = 1 Class = 2 Class = 3
   # alpha    0.60748   1.76979   0.62274

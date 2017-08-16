@@ -19,11 +19,14 @@
 ################################################################################
 
 #' @export
-print.iprobitMod <- function(x, ...) {
+print.iprobitMod <- function(x, dp = 2, ...) {
   theta <- coef(x)
 
-  cat("Lower bound value = ", x$lower.bound[x$niter], "\n")
-  cat("Iterations = ", x$niter, "\n\n")
+  cat("Training error rate:", decimal_place(x$fitted.values$train.error, dp), "%\n")
+  # cat("Brier score:", decimal_place(x$brier.score, dp), "\n")
+  cat("Lower bound value:", x$lower.bound[x$niter], "\n")
+  # cat("Iterations = ", x$niter, "\n")
+  cat("\n")
   print(round(theta, 5))
 }
 
@@ -63,7 +66,9 @@ summary.iprobitMod <- function(object, ...) {
               maxit = object$maxit, niter = object$niter,
               stop.crit = object$stop.crit, lb = object$lower.bound,
               classes = object$y.levels, Nystrom = object$ipriorKernel$Nystrom,
-              Nystrom.check = isNystrom(object$ipriorKernel))
+              Nystrom.check = isNystrom(object$ipriorKernel),
+              train.error = object$fitted.values$train.error,
+              brier.score = object$fitted.values$brier.score)
   class(res) <- "iprobitSummary"
   res
 }
@@ -94,6 +99,8 @@ print.iprobitSummary <- function(x, ...) {
     cat("\nNystrom approximation used (with", x$Nystrom$m, "random subsamples)")
   }
 
-  cat("\nVariational lower bound:", x$lb[x$niter])
-  cat("\n\n")
+  cat("\nVariational lower bound:", x$lb[x$niter], "\n")
+  cat("Training error rate:", decimal_place(x$train.error),
+      "%. Brier score:", decimal_place(x$brier.score), "\n")
+  cat("\n")
 }

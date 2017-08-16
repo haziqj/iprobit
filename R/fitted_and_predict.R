@@ -18,57 +18,7 @@
 #
 ################################################################################
 
-#' @export
-fitted.iprobitMod_bin <- function(object, upper.or.lower = NULL,
-                                  round.digits = 4, ...) {
-  ystar <- object$ystar
-  y.hat <- rep(0, length(object$ystar)); y.hat[ystar >= 0] <- 1
-  se.ystar <- iprobitSE(y = y.hat, eta = ystar)
 
-  if (!is.null(upper.or.lower)) {
-    if (upper.or.lower == "upper") {
-      ystar[ystar >= 0] <- ystar[ystar >= 0] + 2.241403 * se.ystar[ystar >= 0]
-      ystar[ystar < 0] <- ystar[ystar < 0] - 0.03133798 * se.ystar[ystar < 0]
-    } else if (upper.or.lower == "lower") {
-      ystar[ystar >= 0] <- ystar[ystar >= 0] + 0.03133798 * se.ystar[ystar >= 0]
-      ystar[ystar < 0] <- ystar[ystar < 0] - 2.241403 * se.ystar[ystar < 0]
-    }
-    y.hat[ystar >= 0] <- 1
-  }
-  p.hat <- pnorm(ystar)
-  p.hat <- cbind(1 - p.hat, p.hat)
-  p.hat <- round(p.hat, round.digits)
-  colnames(p.hat) <- object$y.lev
-  y.hat <- as.factor(y.hat); levels(y.hat) <- object$y.levels
-
-  list(y = y.hat, prob = as.data.frame(p.hat))
-}
-
-#' @export
-fitted.iprobitMod_mult <- function(object, round.digits = 4, ...) {
-  list2env(object, environment())
-  list2env(ipriorKernel, environment())
-  list2env(model, environment())
-
-  y.hat <- factor(
-    apply(ystar, 1, function(x) which(x == max(x))),
-    levels = y.levels
-  )
-
-  p.hat <- ystar
-  for (i in 1:n) {
-    for (j in 1:m) {
-      p.hat[i, j] <- EprodPhiZ(ystar[i, j] - ystar[i, (1:m)[-j]])
-    }
-    # p.hat[i, m] <- 1 - sum(p.hat[i, 1:(m - 1)])
-  }
-  p.hat <- round(p.hat, round.digits)
-  p.hat <- p.hat / matrix(rep(apply(p.hat, 1, sum), m), ncol = m)  # normalise
-  p.hat <- round(p.hat, round.digits)
-  colnames(p.hat) <- y.levels
-
-  list(y = y.hat, prob = as.data.frame(p.hat))
-}
 
 #' @export
 predict.iprobitMod <- function(object, newdata = list(), y.test = NULL,
@@ -113,7 +63,7 @@ predict.iprobitMod <- function(object, newdata = list(), y.test = NULL,
       HlamFn(env = environment())
       ystar.new <- as.vector(alpha + (Hlam.mat %*% w))
       names(ystar.new) <- xrownames
-      yp <- predict_iprobit_bin(ystar.new, y.levels, round.digits)
+      res <- predict_iprobit_bin(y.test, y.levels, ystar.new)
     }
     if (is.iprobitMod_mult(object)) {
       environment(lambdaExpand_mult) <- environment()
@@ -123,26 +73,30 @@ predict.iprobitMod <- function(object, newdata = list(), y.test = NULL,
       ystar.new <- rep(alpha, each = nrow(Hlam.mat[[1]])) +
         mapply("%*%", Hlam.mat, split(w, col(w)))
       names(ystar.new) <- xrownames
-      yp <- predict_iprobit_mult(ystar.new, y.levels, round.digits)
+      res <- predict_iprobit_mult(y.test, y.levels, ystar.new)
     }
   }
 
-  test.error.rate <- NULL
-  if (!is.null(y.test)) {
-    test.error.rate <- round(mean(as.numeric(yp$y) != as.numeric(y.test)) * 100, 2)
-  }
-
-  structure(list(y = yp$y, prob = yp$p, test.error.rate = test.error.rate),
-            class = "iprobitPredict")
+  res$test.error <- res$train.error
+  res$train.error <- NULL
+  res
 }
 
-predict_iprobit_bin <- function(ystar, y.levels, round.digits) {
+brier_score <- function(y, y.hat, prob) {
+  prob <- apply(prob, 1, max)
+  outcome <- (y == y.hat)
+  res <- mean((prob - outcome) ^ 2)
+  res
+}
+
+predict_iprobit_bin <- function(y, y.levels, ystar) {
   y.hat <- rep(1, length(ystar))
   y.hat[ystar >= 0] <- 2
-  y.hat <- factor(y.hat, levels = y.levels)
+  y.hat <- factor(y.hat, levels = 1:2)
+  levels(y.hat) <- y.levels
 
-  # se.ystar <- iprobitSE(y = y.hat, eta = ystar)
   # if (!is.null(upper.or.lower)) {
+  #   se.ystar <- iprobitSE(y = y.hat, eta = ystar)
   #   if (upper.or.lower == "upper") {
   #     ystar[ystar >= 0] <- ystar[ystar >= 0] + 2.241403 * se.ystar[ystar >= 0]
   #     ystar[ystar < 0] <- ystar[ystar < 0] - 0.03133798 * se.ystar[ystar < 0]
@@ -150,36 +104,45 @@ predict_iprobit_bin <- function(ystar, y.levels, round.digits) {
   #     ystar[ystar >= 0] <- ystar[ystar >= 0] + 0.03133798 * se.ystar[ystar >= 0]
   #     ystar[ystar < 0] <- ystar[ystar < 0] - 2.241403 * se.ystar[ystar < 0]
   #   }
-  #   y.hat <- rep(0, nrow(newdata)); y.hat[ystar >= 0] <- 1
+  #   y.hat[ystar >= 0] <- 1
   # }
 
   p.hat <- pnorm(ystar)
   p.hat <- data.frame(1 - p.hat, p.hat)
-  p.hat <- round(p.hat, round.digits)
   colnames(p.hat) <- y.levels
 
-  list(y.hat = y.hat, p.hat = as.data.frame(p.hat))
+  error.rate <- mean(as.numeric(y.hat) != as.numeric(y)) * 100
+  brier.score <- brier_score(as.numeric(y), as.numeric(y.hat), as.data.frame(p.hat))
+
+  structure(list(y = y.hat, prob = as.data.frame(p.hat),
+                 train.error = error.rate, brier.score = brier.score),
+            class = "iprobit_predict")
 }
 
-predict_iprobit_mult <- function(ystar, y.levels, round.digits) {
+predict_iprobit_mult <- function(y, y.levels, ystar) {
   m <- length(y.levels)
-
-  y.hat <- apply(ystar, 1, function(x) which(x == max(x)))
-  y.hat <- factor(y.hat, levels = y.levels)
+  y.hat <- factor(
+    apply(ystar, 1, function(x) which(x == max(x))),
+    levels = seq_len(m)
+  )
+  levels(y.hat) <- y.levels
 
   p.hat <- ystar
-  for (i in seq_len(nrow(ystar))) {
-    for (j in 1:m) {
-      p.hat[i, j] <- EprodPhiZ(ystar[i, j] - ystar[i, (1:m)[-j]])
+  for (i in seq_along(y)) {
+    for (j in seq_along(y.levels)) {
+      p.hat[i, j] <- EprodPhiZ(ystar[i, j] - ystar[i, seq_along(y.levels)[-j]])
     }
-    # probs[i, m] <- 1 - sum(probs[i, 1:(m - 1)])
+    # p.hat[i, m] <- 1 - sum(p.hat[i, 1:(m - 1)])
   }
-  p.hat <- round(p.hat, round.digits)
   p.hat <- p.hat / matrix(rep(apply(p.hat, 1, sum), m), ncol = m)  # normalise
-  p.hat <- round(p.hat, round.digits)
   colnames(p.hat) <- y.levels
 
-  list(y.hat = y.hat, p.hat = as.data.frame(p.hat))
+  error.rate <- mean(as.numeric(y.hat) != as.numeric(y)) * 100
+  brier.score <- brier_score(as.numeric(y), as.numeric(y.hat), as.data.frame(p.hat))
+
+  structure(list(y = y.hat, prob = as.data.frame(p.hat),
+                 train.error = error.rate, brier.score = brier.score),
+            class = "iprobit_predict")
 }
 
 #' @export
@@ -193,8 +156,30 @@ print.iprobitPredict <- function(x, ...) {
   print(x$y)
 
   cat("\nPredicted probabilities:\n")
-  print(head(x$p, 10))
+  print(head(x$p, 10), justify = "right")
   if (nrow(x$p > 10)) cat("...")
+}
+
+#' @export
+print.iprobit_predict <- function(x, rows = 10, dp = 3, ...) {
+  if (!is.null(x$train.error)) {
+    cat("Training error rate:", decimal_place(x$train.error, dp), "%\n")
+    cat("Brier score:", decimal_place(x$brier.score, dp), "\n")
+  } else if (!is.nan(x$test.error)) {
+    cat("Test error rate:", decimal_place(x$test.error, dp), "%\n")
+    cat("Brier score:", decimal_place(x$brier.score, dp), "\n")
+  } else {
+    cat("Test data not provided.\n")
+  }
+
+  cat("\nPredicted classes:\n")
+  print(x$y)
+
+  cat("\nPredicted probabilities:\n")
+  rows <- min(nrow(x$p), rows)
+  tab <- decimal_place(x$p[seq_len(rows), ], dp)
+  print(tab)
+  if (nrow(x$p) > rows) cat("# ... with", nrow(x$p) - rows, "more rows")
 }
 
 # Note: Quantiles for truncated normal distribution are

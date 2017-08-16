@@ -186,6 +186,10 @@ iprobit_mult <- function(ipriorKernel, maxit = 100, stop.crit = 1e-5,
   end.time <- Sys.time()
   time.taken <- as.time(end.time - start.time)
 
+  # Calculate fitted values and error rate -------------------------------------
+  ystar <- rep(alpha, each = n) + mapply("%*%", Hlam.mat, split(w, col(w)))
+  fitted.values <- predict_iprobit_mult(y, y.levels, ystar)
+
   # Calculate standard errors from posterior variance --------------------------
   if (isTRUE(common.intercept)) se.alpha <- sqrt(1 / nm)
   else se.alpha <- sqrt(1 / n)
@@ -206,9 +210,9 @@ iprobit_mult <- function(ipriorKernel, maxit = 100, stop.crit = 1e-5,
   res <- list(ystar = ystar, w = w, lambda = lambda, alpha = alpha,
               lower.bound = lb, ipriorKernel = ipriorKernel, se.alpha = se.alpha,
               se.lambda = se.lambda, se.ystar = se.ystar,
-              y.levels = y.levels, start.time = start.time,
-              end.time = end.time, time = time.taken,
-              stop.crit = stop.crit, niter = niter, maxit = maxit)
+              y.levels = y.levels, start.time = start.time, end.time = end.time,
+              time = time.taken, stop.crit = stop.crit, niter = niter,
+              maxit = maxit, fitted.values = fitted.values)
   class(res) <- c("iprobitMod", "iprobitMod_mult")
   res
 }

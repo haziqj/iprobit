@@ -18,6 +18,8 @@
 #
 ################################################################################
 
+decimal_place <- function(x, k = 2) format(round(x, k), nsmall = k)
+
 #' @export
 is.iprobitMod_bin <- function(x) inherits(x, "iprobitMod_bin")
 
@@ -46,7 +48,7 @@ isNystrom <- function(x) {
 #' @return The variational lower bound.
 #' @export
 logLik.iprobitMod <- function(object, ...) {
-  lb <- object$lower.bound[!is.na(x$lower.bound)]
+  lb <- object$lower.bound[!is.na(object$lower.bound)]
   lb <- lb[length(lb)]
   class(lb) <- "iprobitLowerBound"
   lb
@@ -146,6 +148,12 @@ get_coef_se_mult <- function(object) {
 
   list(theta = c(alpha, lambda), se = c(alpha.se, lambda.se))
 }
+
+#' @export
+get_error_rate <- function(x) x$fitted.values$train.error
+
+#' @export
+get_brier_score <- function(x) x$fitted.values$brier.score
 
 all.same <- function(v) {
   # https://stackoverflow.com/questions/4752275/test-for-equality-among-all-elements-of-a-single-vector

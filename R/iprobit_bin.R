@@ -51,7 +51,7 @@ iprobit_bin <- function(ipriorKernel, maxit = 100, stop.crit = 1e-5,
   lb <- rep(NA, maxit)
   lb.const <- (n + 1 + l - log(n) + (l + 1) * log(2 * pi)) / 2
   loop.logical <- function() {
-    lb.diff <- (lb[niter] - lb[niter - 1])
+    lb.diff <- abs(lb[niter] - lb[niter - 1])
     ifelse(length(lb.diff) == 0, TRUE,
            ifelse(is.na(lb.diff), niter != maxit,
                   (niter != maxit) && (lb.diff > stop.crit)))
@@ -133,6 +133,10 @@ iprobit_bin <- function(ipriorKernel, maxit = 100, stop.crit = 1e-5,
   end.time <- Sys.time()
   time.taken <- as.time(end.time - start.time)
 
+  # Calculate fitted values and error rate -------------------------------------
+  ystar <- as.numeric(alpha + Hlam.mat %*% w)
+  fitted.values <- predict_iprobit_bin(y, y.levels, ystar)
+
   # Calculate standard errors from posterior variance --------------------------
   se.alpha <- sqrt(1 / n)
   se.lambda <- sqrt(1 / ct[1:l])
@@ -148,9 +152,9 @@ iprobit_bin <- function(ipriorKernel, maxit = 100, stop.crit = 1e-5,
   res <- list(ystar = ystar, w = w, lambda = lambda[1:l], alpha = alpha,
               lower.bound = lb, ipriorKernel = ipriorKernel,
               se.alpha = se.alpha, se.lambda = se.lambda, se.ystar = se.ystar,
-              y.levels = y.levels, start.time = start.time,
-              end.time = end.time, time = time.taken,
-              stop.crit = stop.crit, niter = niter, maxit = maxit)
+              y.levels = y.levels, start.time = start.time, end.time = end.time,
+              time = time.taken, stop.crit = stop.crit, niter = niter,
+              maxit = maxit, fitted.values = fitted.values)
   class(res) <- c("iprobitMod", "iprobitMod_bin")
   res
 }
