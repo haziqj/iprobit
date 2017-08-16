@@ -18,8 +18,6 @@
 #
 ################################################################################
 
-
-
 #' @export
 predict.iprobitMod <- function(object, newdata = list(), y.test = NULL,
                                upper.or.lower = NULL, round.digits = 4, ...) {
@@ -128,7 +126,7 @@ predict_iprobit_mult <- function(y, y.levels, ystar) {
   levels(y.hat) <- y.levels
 
   p.hat <- ystar
-  for (i in seq_along(y)) {
+  for (i in seq_len(nrow(ystar))) {
     for (j in seq_along(y.levels)) {
       p.hat[i, j] <- EprodPhiZ(ystar[i, j] - ystar[i, seq_along(y.levels)[-j]])
     }

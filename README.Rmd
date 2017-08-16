@@ -55,10 +55,6 @@ iplot_predict(mod)
 ```{r}
 dat.test <- gen_mixture(n = 100, m = 4, sd = 1.5)
 (mod.pred <- predict(mod, newdata = dat.test))
-
-mod.pred$y
-
-head(mod.pred$prob)
 ```
 
 ## Fisher's Iris data set

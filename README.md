@@ -13,8 +13,8 @@ Binary classification (toy example)
 ``` r
 dat <- gen_spiral(n = 300)  # generate binary toy example data set
 mod <- iprobit(y ~ X1 + X2, dat, one.lam = TRUE, kernel = "FBM")
-## ===========================================================================
-## Convergence criterion not met.
+## ===============================================================
+## Converged after 83 iterations.
 ```
 
 #### Model summary
@@ -33,10 +33,11 @@ summary(mod)
 ## Parameter estimates:
 ##          Mean   S.D.    2.5%  97.5%
 ## alpha  0.0000 0.0577 -0.1132 0.1132
-## lambda 5.6714 0.2321  5.2164 6.1265
+## lambda 5.6717 0.2320  5.2170 6.1264
 ## 
-## Convergence criterion not met. No. of iterations: 100
-## Variational lower bound: -140.7163
+## Converged to within 1e-05 tolerance. No. of iterations: 83
+## Variational lower bound: -140.7109 
+## Training error rate: 0.00 %. Brier score: 0.01
 ```
 
 #### Boundary plot for two-dimensional covariates
@@ -45,7 +46,7 @@ summary(mod)
 iplot_predict(mod)
 ```
 
-![](README_files/figure-markdown_github/unnamed-chunk-3-1.png)
+![](README_files/figure-markdown_github-ascii_identifiers/unnamed-chunk-3-1.png)
 
 Multiclass classification (toy example)
 ---------------------------------------
@@ -57,13 +58,13 @@ dat <- gen_mixture(n = 500, m = 4, sd = 1.5)  # generate 4-class toy example dat
 (mod <- iprobit(y ~ X1 + X2, dat, control = list(maxit = 10)))
 ## ===========================================================================
 ## Convergence criterion not met.
-## Lower bound value =  -257.5504 
-## Iterations =  10 
+## Training error rate: 11.40 %
+## Lower bound value: -255.6279 
 ## 
 ##            Class = 1 Class = 2 Class = 3 Class = 4
-## alpha        0.01109  -0.01772  -0.05802  -0.15256
-## lambda[1,]   0.65506   0.00000   1.11217   0.00000
-## lambda[2,]   0.00000   1.37593   0.00000   0.71118
+## alpha        0.36808   0.40794   0.41848  -0.17639
+## lambda[1,]   0.77036   0.00000   0.28644   0.00000
+## lambda[2,]   0.55650   0.66290   0.00000   0.46823
 ```
 
 #### Boundary plot for two-dimensional covariates
@@ -72,49 +73,35 @@ dat <- gen_mixture(n = 500, m = 4, sd = 1.5)  # generate 4-class toy example dat
 iplot_predict(mod)
 ```
 
-![](README_files/figure-markdown_github/unnamed-chunk-5-1.png)
+![](README_files/figure-markdown_github-ascii_identifiers/unnamed-chunk-5-1.png)
 
 #### Obtain out-of-sample test error rates, predicted classes and probabilities
 
 ``` r
 dat.test <- gen_mixture(n = 100, m = 4, sd = 1.5)
 (mod.pred <- predict(mod, newdata = dat.test))
-## Test error rate: 8 %
+## Test error rate: 11.000 %
+## Brier score: 0.097 
 ## 
 ## Predicted classes:
-##   [1] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 2 1 1 1 1 1 1 2 2 2 2 2 2 2 2 2
-##  [36] 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 1 3 3 3 3 3 3 3 3 3 3 3 3 3 2 1 3 3 3
-##  [71] 3 3 3 3 3 3 3 4 4 4 4 1 3 4 4 4 3 4 4 4 4 4 4 4 4 4 3 4 4 4
+##   [1] 1 1 2 1 1 4 1 2 1 1 2 2 2 1 1 1 1 1 1 1 1 1 2 1 1 2 1 1 1 1 2 2 2 2 2
+##  [36] 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 3 2 3 3 3 3 3 3 3
+##  [71] 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 4 4 4 4 4 4 4 4 4 4 4 1 4 4 3
 ## Levels: 1 2 3 4
 ## 
 ## Predicted probabilities:
-##         1      2      3      4
-## 1  0.9594 0.0240 0.0000 0.0166
-## 2  0.5279 0.4386 0.0156 0.0179
-## 3  0.9557 0.0167 0.0000 0.0276
-## 4  0.8895 0.0761 0.0003 0.0341
-## 5  0.4983 0.0250 0.0201 0.4566
-## 6  0.6884 0.0916 0.0140 0.2060
-## 7  0.9827 0.0150 0.0000 0.0023
-## 8  0.5008 0.4945 0.0026 0.0021
-## 9  0.8401 0.0900 0.0015 0.0684
-## 10 0.7881 0.0529 0.0028 0.1562
-## ...
-
-mod.pred$y
-##   [1] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 2 1 1 1 1 1 1 2 2 2 2 2 2 2 2 2
-##  [36] 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 1 3 3 3 3 3 3 3 3 3 3 3 3 3 2 1 3 3 3
-##  [71] 3 3 3 3 3 3 3 4 4 4 4 1 3 4 4 4 3 4 4 4 4 4 4 4 4 4 3 4 4 4
-## Levels: 1 2 3 4
-
-head(mod.pred$prob)
-##        1      2      3      4
-## 1 0.9594 0.0240 0.0000 0.0166
-## 2 0.5279 0.4386 0.0156 0.0179
-## 3 0.9557 0.0167 0.0000 0.0276
-## 4 0.8895 0.0761 0.0003 0.0341
-## 5 0.4983 0.0250 0.0201 0.4566
-## 6 0.6884 0.0916 0.0140 0.2060
+##        1     2     3     4
+## 1  0.822 0.117 0.004 0.058
+## 2  0.843 0.035 0.001 0.121
+## 3  0.476 0.516 0.006 0.001
+## 4  0.585 0.375 0.023 0.017
+## 5  0.726 0.211 0.014 0.048
+## 6  0.293 0.000 0.000 0.707
+## 7  0.620 0.360 0.010 0.009
+## 8  0.436 0.564 0.000 0.000
+## 9  0.723 0.206 0.016 0.055
+## 10 0.823 0.099 0.004 0.074
+## # ... with 90 more rows
 ```
 
 Fisher's Iris data set
@@ -149,7 +136,8 @@ summary(mod)
 ## lambda   0.3474 0.0116 0.3246 0.3703
 ## 
 ## Converged to within 0.1 tolerance. No. of iterations: 27
-## Variational lower bound: -50.38115
+## Variational lower bound: -50.38115 
+## Training error rate: 4.67 %. Brier score: 0.03
 ```
 
 #### Monitor convergence
@@ -158,7 +146,7 @@ summary(mod)
 iplot_lb(mod)
 ```
 
-![](README_files/figure-markdown_github/unnamed-chunk-8-1.png)
+![](README_files/figure-markdown_github-ascii_identifiers/unnamed-chunk-8-1.png)
 
 #### Plot of fitted probabilities
 
@@ -166,7 +154,7 @@ iplot_lb(mod)
 iplot_fitted(mod)
 ```
 
-![](README_files/figure-markdown_github/unnamed-chunk-9-1.png)
+![](README_files/figure-markdown_github-ascii_identifiers/unnamed-chunk-9-1.png)
 
 ------------------------------------------------------------------------
 
