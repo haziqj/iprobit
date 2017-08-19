@@ -119,7 +119,7 @@ iprobit_bin <- function(ipriorKernel, maxit = 100, stop.crit = 1e-5,
       sum(pnorm(-eta[y == 1], log.p = TRUE)) -
       (sum(diag(W)) + determinant(A)$modulus + sum(log(ct))) / 2
 
-    # Calculate fitted values and error rate -------------------------------------
+    # Calculate fitted values and error rate -----------------------------------
     ystar <- as.numeric(alpha + Hlam.mat %*% w)
     fitted.values <- predict_iprobit_bin(y, y.levels, ystar)
     error.rates[niter + 1] <- fitted.values$train.error

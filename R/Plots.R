@@ -57,10 +57,8 @@ iplot_lb <- function(x, niter.plot = NULL, lab.pos = c("up", "down")) {
   niter.plot <- niter.plot[1]:niter.plot[2]
   lb <- lb.original[niter.plot]
   plot.df <- data.frame(Iteration = niter.plot, lb = lb)
-  time.per.iter <- mod$time$time / (x$niter - 1)
+  time.per.iter <- mod$time$time / x$niter
   if (time.per.iter < 0.001) time.per.iter <- 0.001
-  # my.breaks <- ifelse(x$niter == 2, (1:3),
-  #                     scales::pretty_breaks(n = min(5, x$niter)))
 
   ggplot(plot.df, aes(x = Iteration, y = lb, label = max(lb))) +
     geom_line(col = "grey60") +
@@ -200,6 +198,47 @@ iplot_predict_mult <- function(plot.df, points.df, x, y, m) {
     theme_bw()
   p
 }
+
+#' @export
+iplot_error <- function(x, niter.plot = NULL) {
+  if (x$niter < 2) stop("Nothing to plot.")
+
+  if (is.null(niter.plot)) niter.plot <- c(1, length(x$error))
+  else if (length(niter.plot) == 1) niter.plot <- c(1, niter.plot)
+  niter.plot <- niter.plot[1]:niter.plot[2]
+  plot.df <- data.frame(Iteration = niter.plot,
+                        error     = x$error[niter.plot] / 100,
+                        brier     = x$brier[niter.plot])
+  time.per.iter <- mod$time$time / x$niter
+  if (time.per.iter < 0.001) time.per.iter <- 0.001
+  plot.df <- reshape2::melt(plot.df, id = "Iteration")
+  last.value.df <- subset(plot.df, plot.df$Iteration == max(plot.df$Iteration))
+  last.value.df$lab <- NA
+  last.value.df$lab[1] <- decimal_place(last.value.df$value[1] * 100)
+  last.value.df$lab[1] <- paste0(last.value.df$lab[1], "%")
+  last.value.df$lab[2] <- decimal_place(last.value.df$value[2], 3)
+  last.value.df
+  ggplot(plot.df, aes(x = Iteration, y = value, col = variable)) +
+    geom_line(alpha = 0.5) +
+    directlabels::geom_dl(aes(label = variable), method = ("lines2")) +
+    geom_point(size = 0.9) +
+    geom_text(data = last.value.df, aes(label = lab, y = value + 0.002),
+              vjust = 0, hjust = 0.5) +
+    scale_x_continuous(
+      sec.axis = sec_axis(~ . * time.per.iter, name = "Time (seconds)"),
+      breaks = scales::pretty_breaks(n = min(5, ifelse(x$niter == 2, 1, x$niter)))
+    ) +
+    scale_y_continuous(
+      name = "Training error rate",
+      labels = scales::percent,
+      sec.axis = sec_axis(~ ., name = "Brier score")
+    ) +
+    theme_bw() +
+    theme(legend.position = "none")
+}
+
+# tmp <- cowplot::plot_grid(iplot_lb(mod), NULL, rel_widths = c(1, 0.06))
+# cowplot::plot_grid(tmp, iplot_error(mod), nrow = 2)
 
 # iplot_prob <- function(x, covariate = 1, levels = NULL) {
 #   if (!is.numeric(covariate)) {

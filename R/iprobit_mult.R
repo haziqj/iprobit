@@ -61,7 +61,7 @@ iprobit_mult <- function(ipriorKernel, maxit = 100, stop.crit = 1e-5,
     ifelse(isTRUE(common.intercept) && isTRUE(common.RKHS.scale), 1, m)
   )
   niter <- 0
-  lb <- rep(NA, maxit)
+  lb <- error.rates <- brier.scores <- rep(NA, maxit)
   logClb <- rep(NA, n)
 
   # The variational EM loop ----------------------------------------------------
@@ -172,16 +172,18 @@ iprobit_mult <- function(ipriorKernel, maxit = 100, stop.crit = 1e-5,
       lb.alpha <- (m / 2) * (1 + log(2 * pi) - log(n))
     lb[niter + 1] <- lb.ystar + lb.w + lb.lambda + lb.alpha
 
+    # Calculate fitted values and error rate -----------------------------------
+    ystar <- rep(alpha, each = n) + mapply("%*%", Hlam.mat, split(w, col(w)))
+    fitted.values <- predict_iprobit_mult(y, y.levels, ystar)
+    error.rates[niter + 1] <- fitted.values$train.error
+    brier.scores[niter + 1] <- fitted.values$brier.score
+
     niter <- niter + 1
     if (!silent) setTxtProgressBar(pb, niter)
   }
 
   end.time <- Sys.time()
   time.taken <- as.time(end.time - start.time)
-
-  # Calculate fitted values and error rate -------------------------------------
-  ystar <- rep(alpha, each = n) + mapply("%*%", Hlam.mat, split(w, col(w)))
-  fitted.values <- predict_iprobit_mult(y, y.levels, ystar)
 
   # Calculate standard errors from posterior variance --------------------------
   if (isTRUE(common.intercept)) se.alpha <- sqrt(1 / nm)
@@ -205,7 +207,9 @@ iprobit_mult <- function(ipriorKernel, maxit = 100, stop.crit = 1e-5,
               se.alpha = se.alpha, se.lambda = se.lambda, se.ystar = se.ystar,
               y.levels = y.levels, start.time = start.time, end.time = end.time,
               time = time.taken, stop.crit = stop.crit, niter = niter,
-              maxit = maxit, fitted.values = fitted.values)
+              maxit = maxit, fitted.values = fitted.values,
+              error = error.rates[!is.na(error.rates)],
+              brier = brier.scores[!is.na(brier.scores)])
   class(res) <- c("iprobitMod", "iprobitMod_mult")
   res
 }
