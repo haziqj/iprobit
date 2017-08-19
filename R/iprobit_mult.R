@@ -32,6 +32,7 @@ iprobit_mult <- function(ipriorKernel, maxit = 100, stop.crit = 1e-5,
   environment(lambdaExpand_mult) <- iprobit.env
   environment(HlamFn_mult) <- iprobit.env
   environment(HlamsqFn_mult) <- iprobit.env
+  environment(loop_logical) <- iprobit.env
   y <- Y
   m <- length(y.levels)
   nm <- n * m
@@ -200,8 +201,8 @@ iprobit_mult <- function(ipriorKernel, maxit = 100, stop.crit = 1e-5,
   }
 
   res <- list(ystar = ystar, w = w, lambda = lambda, alpha = alpha,
-              lower.bound = lb, ipriorKernel = ipriorKernel, se.alpha = se.alpha,
-              se.lambda = se.lambda, se.ystar = se.ystar,
+              lower.bound = lb[!is.na(lb)], ipriorKernel = ipriorKernel,
+              se.alpha = se.alpha, se.lambda = se.lambda, se.ystar = se.ystar,
               y.levels = y.levels, start.time = start.time, end.time = end.time,
               time = time.taken, stop.crit = stop.crit, niter = niter,
               maxit = maxit, fitted.values = fitted.values)

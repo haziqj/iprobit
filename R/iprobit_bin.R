@@ -46,10 +46,8 @@ iprobit_bin <- function(ipriorKernel, maxit = 100, stop.crit = 1e-5,
   HlamsqFn(env = iprobit.env)
   alpha <- alpha0
   w <- w0
-
-  # Variational lower bound and loopy stuff ------------------------------------
   niter <- 0
-  lb <- rep(NA, maxit)
+  lb <- error.rates <- brier.scores <- rep(NA, maxit)
   lb.const <- (n + 1 + l - log(n) + (l + 1) * log(2 * pi)) / 2
 
   # The variational EM loop ----------------------------------------------------
@@ -121,16 +119,18 @@ iprobit_bin <- function(ipriorKernel, maxit = 100, stop.crit = 1e-5,
       sum(pnorm(-eta[y == 1], log.p = TRUE)) -
       (sum(diag(W)) + determinant(A)$modulus + sum(log(ct))) / 2
 
+    # Calculate fitted values and error rate -------------------------------------
+    ystar <- as.numeric(alpha + Hlam.mat %*% w)
+    fitted.values <- predict_iprobit_bin(y, y.levels, ystar)
+    error.rates[niter + 1] <- fitted.values$train.error
+    brier.scores[niter + 1] <- fitted.values$brier.score
+
     niter <- niter + 1
     if (!silent) setTxtProgressBar(pb, niter)
   }
 
   end.time <- Sys.time()
   time.taken <- as.time(end.time - start.time)
-
-  # Calculate fitted values and error rate -------------------------------------
-  ystar <- as.numeric(alpha + Hlam.mat %*% w)
-  fitted.values <- predict_iprobit_bin(y, y.levels, ystar)
 
   # Calculate standard errors from posterior variance --------------------------
   se.alpha <- sqrt(1 / n)
@@ -149,7 +149,9 @@ iprobit_bin <- function(ipriorKernel, maxit = 100, stop.crit = 1e-5,
               se.alpha = se.alpha, se.lambda = se.lambda, se.ystar = se.ystar,
               y.levels = y.levels, start.time = start.time, end.time = end.time,
               time = time.taken, stop.crit = stop.crit, niter = niter,
-              maxit = maxit, fitted.values = fitted.values)
+              maxit = maxit, fitted.values = fitted.values,
+              error = error.rates[!is.na(error.rates)],
+              brier = brier.scores[!is.na(brier.scores)])
   class(res) <- c("iprobitMod", "iprobitMod_bin")
   res
 }
