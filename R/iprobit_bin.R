@@ -55,7 +55,7 @@ iprobit_bin <- function(ipriorKernel, maxit = 100, stop.crit = 1e-5,
   if (!silent) pb <- txtProgressBar(min = 0, max = maxit - 1, style = 1)
   start.time <- Sys.time()
 
-  while (loop_logical()) {  # see loop_logical() function in Utilities.R
+  while (loop_logical()) {  # see loop_logical() function in iprobit_helper.R
     # Update ystar -------------------------------------------------------------
     eta <- as.numeric(alpha + Hlam.mat %*% w)
     thing <- rep(NA, n)

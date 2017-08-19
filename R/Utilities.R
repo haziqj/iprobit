@@ -18,20 +18,6 @@
 #
 ################################################################################
 
-# Helper function to determine when to stop the while loop for the VB-EM
-# algorithm.
-# If niter == 0 return TRUE because must complete 1 iteration.
-# If niter == 1 then stop if maxit == 1, otherwise continue (nothing to compare).
-# If niter > 1 then just check whether maxit reached or stop.crit reached.
-loop_logical <- function() {
-  lb.diff <- lb[niter] - lb[niter - 1]  # will also stop when LB becomes smaller
-  crit1 <- (niter != maxit)
-  crit2 <- (lb.diff > stop.crit)
-  if (niter == 0) return(TRUE)
-  else if (niter == 1) return(crit1)
-  else return(crit1 & crit2)
-}
-
 decimal_place <- function(x, k = 2) format(round(x, k), nsmall = k)
 
 #' @export
@@ -69,18 +55,24 @@ logLik.iprobitMod <- function(object, ...) {
 }
 
 #' @export
+get_lbs <- function(x) x$lower.bound
+
+#' @export
 print.iprobitLowerBound <- function(x, ...) {
   cat("Lower bound =", x)
 }
 
+#' @export
 get_Hurst <- function(object) {
   object$ipriorKernel$model$Hurst
 }
 
+#' @export
 get_one.lam <- function(object) {
   object$ipriorKernel$model$one.lam
 }
 
+#' @export
 get_kernel <- function(object, collapse = TRUE) {
   kernel.used <- object$ipriorKernel$model$kernel
   Hurst.used <- get_Hurst(object)
@@ -91,6 +83,7 @@ get_kernel <- function(object, collapse = TRUE) {
   kernel.used
 }
 
+#' @export
 get_lambda <- function(object) {
   lambda <- object$lambda
   if (is.iprobitMod_bin(object)) {
@@ -111,6 +104,7 @@ get_lambda <- function(object) {
   lambda
 }
 
+#' @export
 get_alpha <- function(object) {
   alpha <- object$alpha
   if (is.iprobitMod_bin(object)) {
@@ -128,6 +122,7 @@ get_alpha <- function(object) {
   alpha
 }
 
+#' @export
 get_coef_se_mult <- function(object) {
   theta <- coef(object)
   m <- ncol(theta)
@@ -167,7 +162,21 @@ get_coef_se_mult <- function(object) {
 get_error_rate <- function(x) x$fitted.values$train.error
 
 #' @export
+get_error_rates <- function(x) {
+  res <- x$error
+  names(res) <- seq_along(res)
+  res
+}
+
+#' @export
 get_brier_score <- function(x) x$fitted.values$brier.score
+
+#' @export
+get_brier_scores <- function(x) {
+  res <- x$brier
+  names(res) <- seq_along(res)
+  res
+}
 
 all.same <- function(v) {
   # https://stackoverflow.com/questions/4752275/test-for-equality-among-all-elements-of-a-single-vector
