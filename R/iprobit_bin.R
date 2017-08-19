@@ -51,8 +51,7 @@ iprobit_bin <- function(ipriorKernel, maxit = 100, stop.crit = 1e-5,
   lb.const <- (n + 1 + l - log(n) + (l + 1) * log(2 * pi)) / 2
 
   # The variational EM loop ----------------------------------------------------
-  if (maxit == 1) silent <- TRUE
-  if (!silent) pb <- txtProgressBar(min = 0, max = maxit - 1, style = 1)
+  if (!silent) pb <- txtProgressBar(min = 0, max = maxit, style = 1)
   start.time <- Sys.time()
 
   while (loop_logical()) {  # see loop_logical() function in iprobit_helper.R

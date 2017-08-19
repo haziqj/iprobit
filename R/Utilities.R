@@ -183,6 +183,7 @@ all.same <- function(v) {
   all(sapply(as.list(v[-1]), FUN = function(z) identical(z, v[1])))
 }
 
+#' @export
 as.time <- function(x) {
   # For difftime objects
   time <- as.numeric(x)
@@ -190,6 +191,7 @@ as.time <- function(x) {
   structure(list(time = time, unit = unit), class = "iprobitTime")
 }
 
+#' @export
 print.iprobitTime <- function(x) {
   cat(x$time, x$unit)
 }
