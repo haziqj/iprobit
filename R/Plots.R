@@ -57,7 +57,7 @@ iplot_lb <- function(x, niter.plot = NULL, lab.pos = c("up", "down")) {
   niter.plot <- niter.plot[1]:niter.plot[2]
   lb <- lb.original[niter.plot]
   plot.df <- data.frame(Iteration = niter.plot, lb = lb)
-  time.per.iter <- mod$time$time / x$niter
+  time.per.iter <- x$time$time / x$niter
   if (time.per.iter < 0.001) time.per.iter <- 0.001
 
   ggplot(plot.df, aes(x = Iteration, y = lb, label = max(lb))) +
@@ -209,7 +209,7 @@ iplot_error <- function(x, niter.plot = NULL) {
   plot.df <- data.frame(Iteration = niter.plot,
                         error     = x$error[niter.plot] / 100,
                         brier     = x$brier[niter.plot])
-  time.per.iter <- mod$time$time / x$niter
+  time.per.iter <- x$time$time / x$niter
   if (time.per.iter < 0.001) time.per.iter <- 0.001
   plot.df <- reshape2::melt(plot.df, id = "Iteration")
   last.value.df <- subset(plot.df, plot.df$Iteration == max(plot.df$Iteration))
@@ -217,7 +217,7 @@ iplot_error <- function(x, niter.plot = NULL) {
   last.value.df$lab[1] <- decimal_place(last.value.df$value[1] * 100)
   last.value.df$lab[1] <- paste0(last.value.df$lab[1], "%")
   last.value.df$lab[2] <- decimal_place(last.value.df$value[2], 3)
-  last.value.df
+  
   ggplot(plot.df, aes(x = Iteration, y = value, col = variable)) +
     geom_line(alpha = 0.5) +
     directlabels::geom_dl(aes(label = variable), method = ("lines2")) +
