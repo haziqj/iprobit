@@ -59,24 +59,16 @@ iprobit_mult <- function(ipriorKernel, maxit = 100, stop.crit = 1e-5,
   w.ind <- seq_len(
     ifelse(isTRUE(common.intercept) && isTRUE(common.RKHS.scale), 1, m)
   )
-
-  # Variational lower bound and loopy stuff ------------------------------------
   niter <- 0
   lb <- rep(NA, maxit)
   logClb <- rep(NA, n)
-  loop.logical <- function() {
-    lb.diff <- (lb[niter] - lb[niter - 1])
-    ifelse(length(lb.diff) == 0, TRUE,
-           ifelse(is.na(lb.diff), niter != maxit,
-                  (niter != maxit) && (lb.diff > stop.crit)))
-  }
 
   # The variational EM loop ----------------------------------------------------
   if (maxit == 1) silent <- TRUE
   if (!silent) pb <- txtProgressBar(min = 0, max = maxit - 1, style = 1)
   start.time <- Sys.time()
 
-  while (loop.logical()) {
+  while (loop_logical()) {
     # Update f -----------------------------------------------------------------
     f.tmp <- rep(alpha, each = n) + mapply("%*%", Hlam.mat, split(w, col(w)))
 

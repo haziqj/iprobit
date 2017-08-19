@@ -31,8 +31,9 @@ iprobit_bin <- function(ipriorKernel, maxit = 100, stop.crit = 1e-5,
   environment(lambdaExpand_bin) <- iprobit.env
   environment(HlamFn) <- iprobit.env
   environment(HlamsqFn) <- iprobit.env
+  environment(loop_logical) <- iprobit.env
   y <- Y
-  maxit <- max(1, maxit)
+  maxit <- max(1, maxit)  # cannot have maxit <= 0
 
   # Initialise -----------------------------------------------------------------
   if (is.null(alpha0)) alpha0 <- rnorm(1)
@@ -50,19 +51,13 @@ iprobit_bin <- function(ipriorKernel, maxit = 100, stop.crit = 1e-5,
   niter <- 0
   lb <- rep(NA, maxit)
   lb.const <- (n + 1 + l - log(n) + (l + 1) * log(2 * pi)) / 2
-  loop.logical <- function() {
-    lb.diff <- abs(lb[niter] - lb[niter - 1])
-    ifelse(length(lb.diff) == 0, TRUE,
-           ifelse(is.na(lb.diff), niter != maxit,
-                  (niter != maxit) && (lb.diff > stop.crit)))
-  }
 
   # The variational EM loop ----------------------------------------------------
   if (maxit == 1) silent <- TRUE
   if (!silent) pb <- txtProgressBar(min = 0, max = maxit - 1, style = 1)
   start.time <- Sys.time()
 
-  while (loop.logical()) {
+  while (loop_logical()) {  # see loop_logical() function in Utilities.R
     # Update ystar -------------------------------------------------------------
     eta <- as.numeric(alpha + Hlam.mat %*% w)
     thing <- rep(NA, n)
@@ -82,7 +77,7 @@ iprobit_bin <- function(ipriorKernel, maxit = 100, stop.crit = 1e-5,
     if (!isNystrom(ipriorKernel)) {
       eigenA <- iprior::eigenCpp(A)
       V <- eigenA$vec
-      u <- eigenA$val + 1e-8  # ensure positive eigenvalues
+      u <- eigenA$val
       uinv.Vt <- t(V) / u
       w <- as.numeric(crossprod(a, V) %*% uinv.Vt)
       Varw <- iprior::fastVDiag(V, 1 / u)  # V %*% uinv.Vt
@@ -150,7 +145,7 @@ iprobit_bin <- function(ipriorKernel, maxit = 100, stop.crit = 1e-5,
   }
 
   res <- list(ystar = ystar, w = w, lambda = lambda[1:l], alpha = alpha,
-              lower.bound = lb, ipriorKernel = ipriorKernel,
+              lower.bound = lb[!is.na(lb)], ipriorKernel = ipriorKernel,
               se.alpha = se.alpha, se.lambda = se.lambda, se.ystar = se.ystar,
               y.levels = y.levels, start.time = start.time, end.time = end.time,
               time = time.taken, stop.crit = stop.crit, niter = niter,

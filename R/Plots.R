@@ -45,11 +45,13 @@ iplot_fitted <- function(object) {
 
 #' @export
 iplot_lb <- function(x, niter.plot = NULL, lab.pos = c("up", "down")) {
+  if (x$niter < 2) stop("Nothing to plot.")
+
   lab.pos <- match.arg(lab.pos, c("up", "down"))
   if (lab.pos == "up") lab.pos <- -0.5
   else lab.pos <- 1.5
 
-  lb.original <- x$lower.bound[!is.na(x$lower.bound)]
+  lb.original <- x$lower.bound
   if (is.null(niter.plot)) niter.plot <- c(1, length(lb.original))
   else if (length(niter.plot) == 1) niter.plot <- c(1, niter.plot)
   niter.plot <- niter.plot[1]:niter.plot[2]
@@ -57,6 +59,8 @@ iplot_lb <- function(x, niter.plot = NULL, lab.pos = c("up", "down")) {
   plot.df <- data.frame(Iteration = niter.plot, lb = lb)
   time.per.iter <- mod$time$time / (x$niter - 1)
   if (time.per.iter < 0.001) time.per.iter <- 0.001
+  # my.breaks <- ifelse(x$niter == 2, (1:3),
+  #                     scales::pretty_breaks(n = min(5, x$niter)))
 
   ggplot(plot.df, aes(x = Iteration, y = lb, label = max(lb))) +
     geom_line(col = "grey60") +
@@ -64,7 +68,7 @@ iplot_lb <- function(x, niter.plot = NULL, lab.pos = c("up", "down")) {
     geom_hline(yintercept = max(lb.original), linetype = 2, col = "red") +
     scale_x_continuous(
       sec.axis = sec_axis(~ . * time.per.iter, name = "Time (seconds)"),
-      breaks = scales::pretty_breaks()
+      breaks = scales::pretty_breaks(n = min(5, ifelse(x$niter == 2, 1, x$niter)))
     ) +
     # directlabels::geom_dl(method = "bottom.pieces") +
     geom_text(aes(label = ifelse(lb == max(lb), round(max(lb), 2), "")),

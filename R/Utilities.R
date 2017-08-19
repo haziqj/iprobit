@@ -18,6 +18,20 @@
 #
 ################################################################################
 
+# Helper function to determine when to stop the while loop for the VB-EM
+# algorithm.
+# If niter == 0 return TRUE because must complete 1 iteration.
+# If niter == 1 then stop if maxit == 1, otherwise continue (nothing to compare).
+# If niter > 1 then just check whether maxit reached or stop.crit reached.
+loop_logical <- function() {
+  lb.diff <- lb[niter] - lb[niter - 1]  # will also stop when LB becomes smaller
+  crit1 <- (niter != maxit)
+  crit2 <- (lb.diff > stop.crit)
+  if (niter == 0) return(TRUE)
+  else if (niter == 1) return(crit1)
+  else return(crit1 & crit2)
+}
+
 decimal_place <- function(x, k = 2) format(round(x, k), nsmall = k)
 
 #' @export
