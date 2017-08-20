@@ -4,8 +4,8 @@ context("Utilities and helper functions")
 
 test_that("Stops when lower bound becomes smaller", {
 
-  lb <- c(2, 1)
-  niter <- 2
+  lb <- seq(0, -100, length = 100)
+  niter <- 50
   maxit <- 100
   stop.crit <- 1e-5
   environment(loop_logical) <- environment()

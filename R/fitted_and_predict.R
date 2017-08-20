@@ -19,8 +19,33 @@
 ################################################################################
 
 #' @export
+fitted.iprobitMod <- function(object, upper.or.lower = NULL, level = 0.05, ...) {
+  if (is.null(upper.or.lower)) return(object$fitted.values)
+  else {
+    type <- match.arg(upper.or.lower, c("upper", "lower"))
+    if (type == "upper") sd.shift <- qnorm(1 - level / 2)
+    if (type == "lower") sd.shift <- -qnorm(1 - level / 2)
+  }
+
+  if (is.iprobitMod_bin(object)) {
+    res <- predict_iprobit_bin(y        = object$ipriorKernel$Y,
+                               y.levels = object$ipriorKernel$y.levels,
+                               ystar    = object$ystar + sd.shift)
+  }
+  if (is.iprobitMod_mult(object)) {
+    res <- predict_iprobit_mult(y        = object$ipriorKernel$Y,
+                                y.levels = object$ipriorKernel$y.levels,
+                                ystar    = object$ystar,
+                                shift = sd.shift)
+  }
+
+  class(res) <- "iprobit_predict"
+  res
+}
+
+#' @export
 predict.iprobitMod <- function(object, newdata = list(), y.test = NULL,
-                               upper.or.lower = NULL, round.digits = 4, ...) {
+                               upper.or.lower = NULL, level = 0.05, ...) {
   list2env(object, environment())
   list2env(ipriorKernel, environment())
   list2env(model, environment())
@@ -53,6 +78,14 @@ predict.iprobitMod <- function(object, newdata = list(), y.test = NULL,
     Hl <- .hMatList(x, kernel, intr, no.int, Hurst, intr.3plus,
                     rootkern = FALSE, xstar)
 
+    # Upper or lower
+    if (is.null(upper.or.lower)) sd.shift <- 0
+    else {
+      type <- match.arg(upper.or.lower, c("upper", "lower"))
+      if (type == "upper") sd.shift <- qnorm(1 - level / 2)
+      if (type == "lower") sd.shift <- -qnorm(1 - level / 2)
+    }
+
     # Pass to appropriate prediction function ----------------------------------
     if (is.iprobitMod_bin(object)) {
       environment(lambdaExpand_bin) <- environment()
@@ -61,7 +94,7 @@ predict.iprobitMod <- function(object, newdata = list(), y.test = NULL,
       HlamFn(env = environment())
       ystar.new <- as.vector(alpha + (Hlam.mat %*% w))
       names(ystar.new) <- xrownames
-      res <- predict_iprobit_bin(y.test, y.levels, ystar.new)
+      res <- predict_iprobit_bin(y.test, y.levels, ystar.new + sd.shift)
     }
     if (is.iprobitMod_mult(object)) {
       environment(lambdaExpand_mult) <- environment()
@@ -71,7 +104,7 @@ predict.iprobitMod <- function(object, newdata = list(), y.test = NULL,
       ystar.new <- rep(alpha, each = nrow(Hlam.mat[[1]])) +
         mapply("%*%", Hlam.mat, split(w, col(w)))
       names(ystar.new) <- xrownames
-      res <- predict_iprobit_mult(y.test, y.levels, ystar.new)
+      res <- predict_iprobit_mult(y.test, y.levels, ystar.new, sd.shift)
     }
   }
 
@@ -93,18 +126,6 @@ predict_iprobit_bin <- function(y, y.levels, ystar) {
   y.hat <- factor(y.hat, levels = 1:2)
   levels(y.hat) <- y.levels
 
-  # if (!is.null(upper.or.lower)) {
-  #   se.ystar <- iprobitSE(y = y.hat, eta = ystar)
-  #   if (upper.or.lower == "upper") {
-  #     ystar[ystar >= 0] <- ystar[ystar >= 0] + 2.241403 * se.ystar[ystar >= 0]
-  #     ystar[ystar < 0] <- ystar[ystar < 0] - 0.03133798 * se.ystar[ystar < 0]
-  #   } else if (upper.or.lower == "lower") {
-  #     ystar[ystar >= 0] <- ystar[ystar >= 0] + 0.03133798 * se.ystar[ystar >= 0]
-  #     ystar[ystar < 0] <- ystar[ystar < 0] - 2.241403 * se.ystar[ystar < 0]
-  #   }
-  #   y.hat[ystar >= 0] <- 1
-  # }
-
   p.hat <- pnorm(ystar)
   p.hat <- data.frame(1 - p.hat, p.hat)
   colnames(p.hat) <- y.levels
@@ -117,23 +138,26 @@ predict_iprobit_bin <- function(y, y.levels, ystar) {
             class = "iprobit_predict")
 }
 
-predict_iprobit_mult <- function(y, y.levels, ystar) {
+predict_iprobit_mult <- function(y, y.levels, ystar, shift = 0) {
   m <- length(y.levels)
-  y.hat <- factor(
-    apply(ystar, 1, function(x) which(x == max(x))),
-    levels = seq_len(m)
-  )
-  levels(y.hat) <- y.levels
 
   p.hat <- ystar
   for (i in seq_len(nrow(ystar))) {
     for (j in seq_along(y.levels)) {
-      p.hat[i, j] <- EprodPhiZ(ystar[i, j] - ystar[i, seq_along(y.levels)[-j]])
+      p.hat[i, j] <- EprodPhiZ(ystar[i, j] - ystar[i, seq_along(y.levels)[-j]] + shift)
     }
     # p.hat[i, m] <- 1 - sum(p.hat[i, 1:(m - 1)])
   }
   p.hat <- p.hat / matrix(rep(apply(p.hat, 1, sum), m), ncol = m)  # normalise
   colnames(p.hat) <- y.levels
+
+  if (shift == 0) tmp <- ystar
+  else tmp <- p.hat
+  y.hat <- factor(
+    apply(tmp, 1, function(x) which(x == max(x))),
+    levels = seq_len(m)
+  )
+  levels(y.hat) <- y.levels
 
   error.rate <- mean(as.numeric(y.hat) != as.numeric(y)) * 100
   brier.score <- brier_score(as.numeric(y), as.numeric(y.hat), as.data.frame(p.hat))
