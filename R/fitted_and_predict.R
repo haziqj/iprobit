@@ -193,12 +193,20 @@ print.iprobit_predict <- function(x, rows = 10, dp = 3, ...) {
   } else {
     cat("Test data not provided.\n")
   }
+  rows <- min(nrow(x$p), rows)
 
   cat("\nPredicted classes:\n")
-  print(x$y)
+  y.toprint <- x$y[seq_len(rows)]
+  y.output <- capture.output(y.toprint)
+  y.levels.output <- y.output[length(y.output)]
+  y.levels.output <- gsub(" Levels:", "Levels:", y.levels.output)
+  y.output <- y.output[-length(y.output)]
+  cat(y.output)
+  if (nrow(x$p) > rows) cat(" ...")
+  cat("\n")
+  cat(y.levels.output, "\n")
 
   cat("\nPredicted probabilities:\n")
-  rows <- min(nrow(x$p), rows)
   tab <- decimal_place(x$p[seq_len(rows), ], dp)
   print(tab)
   if (nrow(x$p) > rows) cat("# ... with", nrow(x$p) - rows, "more rows")

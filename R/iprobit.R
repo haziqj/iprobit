@@ -28,7 +28,7 @@ iprobit.default <- function(y, ..., kernel = "Canonical", silent = FALSE,
   }
   silent_ <- silent
   list2env(con, environment())
-  silent <- any(isTRUE(silent), isTRUE(silent_))
+  con$silent <- silent <- any(isTRUE(silent), isTRUE(silent_))
 
   # Pass to kernel loader and then appropriate VB routine ----------------------
   if (iprior::is.ipriorKernel(y)) {
@@ -110,3 +110,40 @@ iprobit.formula <- function(formula, data = parent.frame(), kernel = "Canonical"
 
   est
 }
+
+#' @export
+iprobit.iprobitMod <- function(object, maxit = NULL, stop.crit = NULL,
+                               silent = NULL, ...) {
+  ipriorKernel <- object$ipriorKernel
+  con          <- object$control
+  con$w0       <- object$w
+  con$lambda0  <- object$lambda
+  con$alpha0   <- object$alpha
+  if (!is.null(maxit)) con$maxit <- maxit
+  else {
+    con$maxit <- 100
+    message("Updating iprobit model with 100 iterations.")
+  }
+  if (!is.null(stop.crit)) con$stop.crit <- stop.crit
+  if (!is.null(silent)) con$silent <- silent
+
+  # Pass to iprobit.default ----------------------------------------------------
+  res <- iprobit.default(y = ipriorKernel, control = con)
+
+  # Update time, call, maxit, niter, lb, error, brier --------------------------
+  new.time.diff <- res$end.time - res$start.time
+  old.time.diff <- object$end.time - object$start.time
+  res$time <- as.time(new.time.diff + old.time.diff)
+  res$end.time <- object$end.time + new.time.diff
+  res$call <- object$call
+  res$maxit <- res$maxit + object$maxit
+  res$niter <- res$niter + object$niter
+  res$lower.bound <- c(object$lower.bound, res$lower.bound)
+  res$error <- c(object$error, res$error)
+  res$brier <- c(object$brier, res$brier)
+
+  assign(deparse(substitute(object)), res, envir = parent.frame())
+}
+
+#' @export
+update.iprobitMod <- iprobit.iprobitMod
