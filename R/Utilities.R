@@ -184,7 +184,7 @@ all.same <- function(v) {
 }
 
 #' @export
-as.time <- function(x, ...) {
+as.time <- function(x) {
   # For difftime objects
   time <- as.numeric(x)
   unit <- attr(x, "units")
@@ -192,7 +192,7 @@ as.time <- function(x, ...) {
 }
 
 #' @export
-print.iprobitTime <- function(x) {
+print.iprobitTime <- function(x, ...) {
   cat(x$time, x$unit)
 }
 
