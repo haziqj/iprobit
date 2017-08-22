@@ -1,7 +1,7 @@
 # iprobit package imports ------------------------------------------------------
 #' @importFrom stats coef delete.response dnorm fitted integrate kernel
-#'   model.extract model.frame pnorm predict rnorm logLik
-#' @importFrom utils data head setTxtProgressBar txtProgressBar
+#'   model.extract model.frame pnorm predict qnorm rnorm logLik
+#' @importFrom utils capture.output data head setTxtProgressBar txtProgressBar
 #' @import iprior
 #' @import ggplot2
 NULL

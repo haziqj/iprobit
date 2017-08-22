@@ -23,7 +23,7 @@ iprobit_parallel <- function(ipriorKernel, starts,
                              method = c("lb", "error", "brier"),
                              control = list()) {
   method <- match.arg(method, c("lb", "error", "brier"))
-  no.cores <- parallel::detectCores()
+  no.cores <- min(parallel::detectCores(), starts)
   if (!isTRUE(control$silent))
     cat("Performing", starts, "random restarts on", no.cores, "cores.\n")
   if (!isTRUE(control$silent)) {
@@ -76,10 +76,10 @@ ipar_compare_lb <- function(x) {
 
 ipar_compare_error <- function(x) {
   res <- sapply(x, function(z) get_error_rate(z))
-  which(res == max(res))
+  which(res == min(res))
 }
 
 ipar_compare_brier <- function(x) {
   res <- sapply(x, function(z) get_brier_score(z))
-  which(res == max(res))
+  which(res == min(res))
 }
