@@ -10,10 +10,13 @@ BugReports: https://github.com/haziqjamil/iprobit/issues
 License: GPL (>= 3.0) | file LICENSE
 Encoding: UTF-8
 Imports: 
+  doSNOW,
+  foreach,
   ggplot2,
   iprior (>= 0.6.5.9001),
   mlbench,
   mvtnorm,
+  parallel,
   reshape2,
   scales
 Suggests:

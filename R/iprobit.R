@@ -18,7 +18,9 @@ iprobit.default <- function(y, ..., kernel = "Canonical", silent = FALSE,
     common.intercept  = FALSE,
     common.RKHS.scale = FALSE,
     Nystrom           = FALSE,
-    Nys.seed          = NULL
+    Nys.seed          = NULL,
+    restarts          = 0,
+    restart.method    = c("lb", "error", "brier")
   )
   con_names <- names(con)
   con[(control_names <- names(control))] <- control
@@ -60,13 +62,19 @@ iprobit.default <- function(y, ..., kernel = "Canonical", silent = FALSE,
 
   # Pass to the correct VB routine ---------------------------------------------
   ipriorKernel$m <- m <- length(ipriorKernel$y.levels)
-  if (m == 2) {
-    res <- iprobit_bin(ipriorKernel, maxit, stop.crit, silent, alpha0, lambda0, w0)
-    param <- c(get_alpha(res), get_lambda(res))
+  if (con$restarts > 1) {
+    res <- iprobit_parallel(ipriorKernel, con$restarts, con$restart.method, con)
   } else {
-    res <- iprobit_mult(ipriorKernel, maxit, stop.crit, silent, alpha0, lambda0,
-                        w0, common.intercept, common.RKHS.scale)
-    param <- rbind(get_alpha(res), get_lambda(res))
+    if (m == 2) {
+      res <- iprobit_bin(ipriorKernel, maxit, stop.crit, silent, alpha0,
+                         lambda0, w0)
+      res$coefficients <- c(get_alpha(res), get_lambda(res))
+    } else {
+      res <- iprobit_mult(ipriorKernel, maxit, stop.crit, silent, alpha0,
+                          lambda0, w0, common.intercept, common.RKHS.scale)
+      res$coefficients <- rbind(get_alpha(res), get_lambda(res))
+    }
+    res$ipriorKernel <- ipriorKernel
   }
 
   # Change the call to "iprobit" -----------------------------------------------
@@ -81,8 +89,7 @@ iprobit.default <- function(y, ..., kernel = "Canonical", silent = FALSE,
   res$formula <- ipriorKernel$formula
 
   # Include these also in the ipriorMod object ---------------------------------
-  res$control      <- con
-  res$coefficients <- param
+  res$control <- con
 
   res
 }
@@ -119,6 +126,7 @@ iprobit.iprobitMod <- function(object, maxit = NULL, stop.crit = NULL,
   con$w0       <- object$w
   con$lambda0  <- object$lambda
   con$alpha0   <- object$alpha
+  con$restarts <- 0
   if (!is.null(maxit)) con$maxit <- maxit
   else {
     con$maxit <- 100
@@ -136,14 +144,18 @@ iprobit.iprobitMod <- function(object, maxit = NULL, stop.crit = NULL,
   res$time <- as.time(new.time.diff + old.time.diff)
   res$end.time <- object$end.time + new.time.diff
   res$call <- object$call
-  res$maxit <- res$maxit + object$maxit
+  res$control$maxit <- res$maxit <- res$maxit + object$maxit
   res$niter <- res$niter + object$niter
   res$lower.bound <- c(object$lower.bound, res$lower.bound)
   res$error <- c(object$error, res$error)
   res$brier <- c(object$brier, res$brier)
 
-  assign(deparse(substitute(object)), res, envir = parent.frame())
+  res
 }
 
 #' @export
-update.iprobitMod <- iprobit.iprobitMod
+update.iprobitMod <- function(object, maxit = NULL, stop.crit = NULL,
+                              silent = NULL, ...) {
+  res <- iprobit.iprobitMod(object, maxit, stop.crit, silent, ...)
+  assign(deparse(substitute(object)), res, envir = parent.frame())
+}

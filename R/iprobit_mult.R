@@ -202,7 +202,7 @@ iprobit_mult <- function(ipriorKernel, maxit = 100, stop.crit = 1e-5,
   }
 
   res <- list(ystar = ystar, w = w, lambda = lambda, alpha = alpha,
-              lower.bound = lb[!is.na(lb)], ipriorKernel = ipriorKernel,
+              lower.bound = lb[!is.na(lb)], ipriorKernel = NULL,
               se.alpha = se.alpha, se.lambda = se.lambda, se.ystar = se.ystar,
               y.levels = y.levels, start.time = start.time, end.time = end.time,
               time = time.taken, stop.crit = stop.crit, niter = niter,

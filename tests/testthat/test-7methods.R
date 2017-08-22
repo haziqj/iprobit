@@ -7,7 +7,7 @@ test_that("Update from formula", {
   dat <- gen_mixture(10)
   mod.original <- mod <- iprobit(y ~ ., dat, control = list(maxit = 1),
                                  silent = TRUE)
-  iprobit(mod, maxit = 5)
+  mod <- iprobit(mod, maxit = 5)
 
   expect_s3_class(mod, "iprobitMod")
   expect_equal(mod$niter, 6)
@@ -23,7 +23,7 @@ test_that("Update from non-formula", {
   dat <- gen_mixture(10)
   mod.original <- mod <- iprobit(dat$y, dat$X, control = list(maxit = 1),
                                  silent = TRUE)
-  iprobit(mod, maxit = 5)
+  mod <- iprobit(mod, maxit = 5)
 
   expect_s3_class(mod, "iprobitMod")
   expect_equal(mod$niter, 6)
@@ -40,8 +40,8 @@ test_that("Update options", {
   mod.original <- mod <- iprobit(dat$y, dat$X, control = list(maxit = 1),
                                  silent = TRUE)
 
-  expect_message(iprobit(mod))
-  expect_output(iprobit(mod, stop.crit = 1e-1, maxit = 5, silent = FALSE))
+  expect_message(mod <- iprobit(mod))
+  expect_output(mod <- iprobit(mod, stop.crit = 1e-1, maxit = 5, silent = FALSE))
 
 })
 
