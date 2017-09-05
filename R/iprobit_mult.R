@@ -55,7 +55,7 @@ iprobit_mult <- function(ipriorKernel, maxit = 100, stop.crit = 1e-5,
   HlamFn_mult(env = iprobit.env)
   HlamsqFn_mult(env = iprobit.env)
   w <- f.tmp <- ystar <- w0
-  W <- list(NULL)
+  Varw <- W <- list(NULL)
   logdetA <- rep(NA, m)
   w.ind <- seq_len(
     ifelse(isTRUE(common.intercept) && isTRUE(common.RKHS.scale), 1, m)
@@ -104,8 +104,8 @@ iprobit_mult <- function(ipriorKernel, maxit = 100, stop.crit = 1e-5,
         u <- eigenA$val + 1e-8  # ensure positive eigenvalues
         uinv.Vt <- t(V) / u
         w[, j] <- as.numeric(crossprod(a, V) %*% uinv.Vt)
-        Varw <- iprior::fastVDiag(V, 1 / u)  # V %*% uinv.Vt
-        W[[j]] <- Varw + tcrossprod(w[, j])
+        Varw[[j]] <- iprior::fastVDiag(V, 1 / u)  # V %*% uinv.Vt
+        W[[j]] <- Varw[[j]] + tcrossprod(w[, j])
         logdetA[j] <- determinant(A)$mod
       } else {
         # Nystrom approximation
@@ -203,7 +203,7 @@ iprobit_mult <- function(ipriorKernel, maxit = 100, stop.crit = 1e-5,
 
   res <- list(ystar = ystar, w = w, lambda = lambda, alpha = alpha,
               lower.bound = lb[!is.na(lb)], ipriorKernel = NULL,
-              se.alpha = se.alpha, se.lambda = se.lambda, se.ystar = se.ystar,
+              se.alpha = se.alpha, se.lambda = se.lambda, Varw = Varw,
               y.levels = y.levels, start.time = start.time, end.time = end.time,
               time = time.taken, stop.crit = stop.crit, niter = niter,
               maxit = maxit, fitted.values = fitted.values,

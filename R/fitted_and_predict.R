@@ -19,32 +19,38 @@
 ################################################################################
 
 #' @export
-fitted.iprobitMod <- function(object, quantiles = TRUE, n.samp = 100,
-                              transform = function(x) x, ...) {
+fitted.iprobitMod <- function(object, quantiles = FALSE, n.samp = 100,
+                              transform = function(x) x, raw = FALSE, ...) {
   if (isTRUE(quantiles)) {
-    if (is.iprobitMod_bin(object)) {
-      return(predict_quant(object, n.samp, transform))
-    }
-    if (is.iprobitMod_mult(object)) {
-      return(1)
-    }
+    return(predict_quant(object, n.samp, transform, raw = raw))
   } else {
     return(object$fitted.values)
   }
-
 }
 
-predict_quant <- function(object, n.samp, transform, Hl = NULL, y = NULL) {
-  tmp <- sample_prob_bin(object, n.samp, Hl, y)
+#' @export
+predict_quant <- function(object, n.samp, transform, Hl = NULL, y = NULL,
+                          raw = FALSE) {
+  if (is.iprobitMod_bin(object)) {
+    tmp <- sample_prob_bin(object, n.samp, Hl, y)
+  }
+  if (is.iprobitMod_mult(object)) {
+    tmp <- sample_prob_mult(object, n.samp, Hl, y)
+  }
+
   phats <- convert_prob(tmp$phat.samp, transform)
   names(phats) <- object$ipriorKernel$y.levels
-  res <- list(
-    prob        = quantile_prob(phats),
-    train.error = stats::quantile(tmp$error.samp, probs = c(0.05, 0.25, 0.5, 0.75, 0.95)),
-    brier.score = stats::quantile(tmp$brier.samp, probs = c(0.05, 0.25, 0.5, 0.75, 0.95))
-  )
-  class(res) <- "iprobit_predict_quant"
-  res
+  if (isTRUE(raw)) {
+    return(list(
+      prob = phats, train.error = tmp$error.samp, brier.score = tmp$brier.samp
+    ))
+  } else {
+    return(structure(list(
+      prob        = quantile_prob(phats),
+      train.error = stats::quantile(tmp$error.samp, probs = c(0.05, 0.25, 0.5, 0.75, 0.95)),
+      brier.score = stats::quantile(tmp$brier.samp, probs = c(0.05, 0.25, 0.5, 0.75, 0.95))
+    ), class = "iprobit_predict_quant"))
+  }
 }
 
 #' @export
@@ -53,18 +59,18 @@ print.iprobit_predict_quant <- function(x, rows = 5, dp = 3, ...) {
   rows <- min(rows.act, rows)
   y.levels <- names(x$prob)
 
+  brier <- decimal_place(x$brier.score, dp)
   if (!is.null(x$train.error)) {
     error <- decimal_place(x$train.error, dp)
-    brier <- decimal_place(x$brier.score, dp)
-  } else if (!is.nan(x$test.error)) {
-    # cat("Test error rate:", decimal_place(x$test.error, dp), "%\n")
-    # cat("Brier score:", decimal_place(x$brier.score, dp), "\n")
+    tab <- rbind("Training error (%)" = error, "Brier score" = brier)
+    print(as.data.frame(tab))
+  } else if (all(!is.nan(x$test.error))) {
+    error <- decimal_place(x$test.error, dp)
+    tab <- rbind("Training error (%)" = error, "Brier score" = brier)
+    print(as.data.frame(tab))
   } else {
-    # cat("Test data not provided.\n")
+    cat("Test data not provided.\n")
   }
-
-  tab <- rbind("Training error (%)" = error, "Brier score" = brier)
-  print(as.data.frame(tab))
 
   for (j in seq_along(x$prob)) {
     cat("\nPredicted probabilities for Class =", y.levels[j], "\n")
@@ -74,8 +80,8 @@ print.iprobit_predict_quant <- function(x, rows = 5, dp = 3, ...) {
   }
 }
 
+#' @export
 sample_prob_bin <- function(object, n.samp, Hl.new = NULL, y = NULL) {
-  # Initialise -----------------------------------------------------------------
   alpha.samp <- rnorm(n.samp, object$alpha, object$se.alpha)
   lambda.samp <- mvtnorm::rmvnorm(n.samp, object$lambda, diag(object$se.lambda ^ 2))
   w.samp <- mvtnorm::rmvnorm(n.samp, object$w, object$Varw)  # n.samp x n matrix
@@ -83,7 +89,6 @@ sample_prob_bin <- function(object, n.samp, Hl.new = NULL, y = NULL) {
   error.samp <- brier.samp <- rep(NA, n.samp)
   if (is.null(y)) y <- object$ipriorKernel$Y
 
-  # Sampling -------------------------------------------------------------------
   for (i in 1:n.samp) {
     alpha <- alpha.samp[i]
     lambda <- lambda.samp[i, ]
@@ -99,6 +104,43 @@ sample_prob_bin <- function(object, n.samp, Hl.new = NULL, y = NULL) {
   list(phat.samp = phat.samp, error.samp = error.samp, brier.samp = brier.samp)
 }
 
+#' @export
+sample_prob_mult <- function(object, n.samp, Hl.new = NULL, y = NULL) {
+  alpha.samp <- lambda.samp <- w.samp <- phat.samp <- list()
+  m <- object$ipriorKernel$m
+  for (j in seq_len(m)) {
+    alpha.samp[[j]] <- rnorm(n.samp, object$alpha[j], object$se.alpha)
+    lambda.samp[[j]] <- mvtnorm::rmvnorm(n.samp, object$lambda[, j],
+                                         diag(object$se.lambda[, j] ^ 2))
+    w.samp[[j]] <- mvtnorm::rmvnorm(n.samp, object$w[, j], object$Varw[[j]])
+  }
+  alpha.samp <- mapply(function(x) unlist(lapply(alpha.samp, `[`, x)),
+                       seq_len(n.samp), SIMPLIFY = FALSE)
+  lambda.samp <- mapply(function(x) matrix(unlist(lapply(lambda.samp, `[`, x, )), ncol = m),
+                        seq_len(n.samp), SIMPLIFY = FALSE)
+  w.samp <- mapply(function(x) matrix(unlist(lapply(w.samp, `[`, x, )), ncol = m),
+                   seq_len(n.samp), SIMPLIFY = FALSE)
+
+  phat.samp <- list()
+  error.samp <- brier.samp <- rep(NA, n.samp)
+  if (is.null(y)) y <- object$ipriorKernel$Y
+
+  for (i in 1:n.samp) {
+    alpha <- alpha.samp[[i]]
+    lambda <- lambda.samp[[i]]
+    w <- w.samp[[i]]
+    ystar.samp <- calc_ystar_mult(object, Hl.new = Hl.new, alpha.new = alpha,
+                                  lambda.new = lambda, w.new = w)
+    tmp <- predict_iprobit_mult(y, object$ipriorKernel$y.levels, ystar.samp)
+    phat.samp[[i]] <- tmp$prob
+    error.samp[i] <- tmp$train.error
+    brier.samp[i] <- tmp$brier.score
+  }
+
+  list(phat.samp = phat.samp, error.samp = error.samp, brier.samp = brier.samp)
+}
+
+#' @export
 calc_ystar_bin <- function(object, Hl.new = NULL, alpha.new = NULL,
                            lambda.new = NULL, w.new = NULL) {
   list2env(object, environment())
@@ -115,6 +157,25 @@ calc_ystar_bin <- function(object, Hl.new = NULL, alpha.new = NULL,
   as.vector(alpha + (Hlam.mat %*% w))
 }
 
+#' @export
+calc_ystar_mult <- function(object, Hl.new = NULL, alpha.new = NULL,
+                            lambda.new = NULL, w.new = NULL) {
+  list2env(object, environment())
+  list2env(ipriorKernel, environment())
+  list2env(model, environment())
+  environment(lambdaExpand_mult) <- environment()
+  environment(HlamFn_mult) <- environment()
+  if (!is.null(Hl.new)) Hl <- Hl.new
+  if (!is.null(alpha.new)) alpha <- alpha.new
+  if (!is.null(lambda.new)) lambda <- lambda.new
+  if (!is.null(w.new)) w <- w.new
+  lambdaExpand_mult(env = environment(), y = NULL)
+  HlamFn_mult(env = environment())
+  rep(alpha, each = nrow(Hlam.mat[[1]])) +
+    mapply("%*%", Hlam.mat, split(w, col(w)))
+}
+
+#' @export
 convert_prob <- function(phat, transform = function(x) x) {
   # Converts list of length n.samp containing random samples of the
   # probabilities. This function converts it into a list of length no.classes so
@@ -128,6 +189,7 @@ convert_prob <- function(phat, transform = function(x) x) {
   res
 }
 
+#' @export
 quantile_prob <- function(phats) {
   # Get quantiles for lists returned from convert_prob
   for (i in seq_along(phats)) {
@@ -139,7 +201,7 @@ quantile_prob <- function(phats) {
 
 #' @export
 predict.iprobitMod <- function(object, newdata = list(), y.test = NULL,
-                               quantiles = TRUE, n.samp = 100,
+                               quantiles = FALSE, n.samp = 100,
                                transform = function(x) x, ...) {
   list2env(object, environment())
   list2env(ipriorKernel, environment())
@@ -174,25 +236,19 @@ predict.iprobitMod <- function(object, newdata = list(), y.test = NULL,
                     rootkern = FALSE, xstar)
 
     # Pass to appropriate prediction function ----------------------------------
-    if (is.iprobitMod_bin(object)) {
-      if (isTRUE(quantiles)) {
-        1 + 1
-        return(predict_quant(object, n.samp, transform, Hl, y.test))
-      } else {
+    if (isTRUE(quantiles)) {
+      res <- predict_quant(object, n.samp, transform, Hl, y.test)
+    } else {
+      if (is.iprobitMod_bin(object)) {
         ystar.new <- calc_ystar_bin(object, Hl.new = Hl)
         names(ystar.new) <- xrownames
         res <- predict_iprobit_bin(y.test, y.levels, ystar.new)
       }
-    }
-    if (is.iprobitMod_mult(object)) {
-      environment(lambdaExpand_mult) <- environment()
-      environment(HlamFn_mult) <- environment()
-      lambdaExpand_mult(env = environment(), y = NULL)
-      HlamFn_mult(env = environment())
-      ystar.new <- rep(alpha, each = nrow(Hlam.mat[[1]])) +
-        mapply("%*%", Hlam.mat, split(w, col(w)))
-      names(ystar.new) <- xrownames
-      res <- predict_iprobit_mult(y.test, y.levels, ystar.new, sd.shift)
+      if (is.iprobitMod_mult(object)) {
+        ystar.new <- calc_ystar_mult(object, Hl.new = Hl)
+        names(ystar.new) <- xrownames
+        res <- predict_iprobit_mult(y.test, y.levels, ystar.new)
+      }
     }
   }
 
@@ -226,21 +282,20 @@ predict_iprobit_bin <- function(y, y.levels, ystar) {
             class = "iprobit_predict")
 }
 
-predict_iprobit_mult <- function(y, y.levels, ystar, shift = 0) {
+predict_iprobit_mult <- function(y, y.levels, ystar) {
   m <- length(y.levels)
 
   p.hat <- ystar
   for (i in seq_len(nrow(ystar))) {
     for (j in seq_along(y.levels)) {
-      p.hat[i, j] <- EprodPhiZ(ystar[i, j] - ystar[i, seq_along(y.levels)[-j]] + shift)
+      p.hat[i, j] <- EprodPhiZ(ystar[i, j] - ystar[i, seq_along(y.levels)[-j]])
     }
     # p.hat[i, m] <- 1 - sum(p.hat[i, 1:(m - 1)])
   }
   p.hat <- p.hat / matrix(rep(apply(p.hat, 1, sum), m), ncol = m)  # normalise
   colnames(p.hat) <- y.levels
 
-  if (shift == 0) tmp <- ystar
-  else tmp <- p.hat
+  tmp <- p.hat
   y.hat <- factor(
     apply(tmp, 1, function(x) which(x == max(x))),
     levels = seq_len(m)
@@ -256,27 +311,12 @@ predict_iprobit_mult <- function(y, y.levels, ystar, shift = 0) {
 }
 
 #' @export
-print.iprobitPredict <- function(x, ...) {
-  if (!is.null(x$test.error.rate))
-    cat("Test error rate:", x$test.error.rate, "%\n")
-  else
-    cat("Test data not provided.\n")
-
-  cat("\nPredicted classes:\n")
-  print(x$y)
-
-  cat("\nPredicted probabilities:\n")
-  print(head(x$p, 10), justify = "right")
-  if (nrow(x$p > 10)) cat("...")
-}
-
-#' @export
 print.iprobit_predict <- function(x, rows = 10, dp = 3, ...) {
   if (!is.null(x$train.error)) {
-    cat("Training error rate:", decimal_place(x$train.error, dp), "%\n")
-    cat("Brier score:", decimal_place(x$brier.score, dp), "\n")
+    cat("Training error:", decimal_place(x$train.error, dp), "%\n")
+    cat("Brier score   :", decimal_place(x$brier.score, dp), "\n")
   } else if (!is.nan(x$test.error)) {
-    cat("Test error rate:", decimal_place(x$test.error, dp), "%\n")
+    cat("Test error :", decimal_place(x$test.error, dp), "%\n")
     cat("Brier score:", decimal_place(x$brier.score, dp), "\n")
   } else {
     cat("Test data not provided.\n")
