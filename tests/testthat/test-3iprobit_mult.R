@@ -67,6 +67,17 @@ test_that("Fitted", {
 
 })
 
+test_that("Fitted quantiles", {
+
+  m <- 4
+  dat <- gen_mixture(n = 10, m = m)
+  mod <- iprobit(dat$y, dat$X, silent = TRUE, control = list(maxit = 5))
+  modf <- iprobit(y ~ ., dat, silent = TRUE, one.lam = TRUE, control = list(maxit = 5))
+  expect_that(fitted(mod, TRUE, n.samp = 3), is_a("iprobit_predict_quant"))
+  expect_that(fitted(modf, TRUE, n.samp = 3), is_a("iprobit_predict_quant"))
+
+})
+
 test_that("Predict (without test error rate)", {
 
   m <- 4
@@ -97,8 +108,8 @@ test_that("Predict (with test error rate)", {
   mod.predict <- predict(mod, newdata = list(dat.test$X), y = dat.test$y)
   modf.predict <- predict(modf, newdata = dat.test)
 
-  expect_that(print(mod.predict), prints_text("Test error rate"))
-  expect_that(print(modf.predict), prints_text("Test error rate"))
+  expect_that(print(mod.predict), prints_text("Test error"))
+  expect_that(print(modf.predict), prints_text("Test error"))
 
 })
 

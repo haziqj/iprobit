@@ -83,7 +83,11 @@ print.iprobit_predict_quant <- function(x, rows = 5, dp = 3, ...) {
 #' @export
 sample_prob_bin <- function(object, n.samp, Hl.new = NULL, y = NULL) {
   alpha.samp <- rnorm(n.samp, object$alpha, object$se.alpha)
-  lambda.samp <- mvtnorm::rmvnorm(n.samp, object$lambda, diag(object$se.lambda ^ 2))
+  if (length(object$lambda) > 1) {
+    lambda.samp <- mvtnorm::rmvnorm(n.samp, object$lambda, diag(object$se.lambda ^ 2))
+  } else {
+    lambda.samp <- matrix(rnorm(n.samp, object$lambda, object$se.lambda))
+  }
   w.samp <- mvtnorm::rmvnorm(n.samp, object$w, object$Varw)  # n.samp x n matrix
   phat.samp <- list()
   error.samp <- brier.samp <- rep(NA, n.samp)
@@ -110,8 +114,13 @@ sample_prob_mult <- function(object, n.samp, Hl.new = NULL, y = NULL) {
   m <- object$ipriorKernel$m
   for (j in seq_len(m)) {
     alpha.samp[[j]] <- rnorm(n.samp, object$alpha[j], object$se.alpha)
-    lambda.samp[[j]] <- mvtnorm::rmvnorm(n.samp, object$lambda[, j],
-                                         diag(object$se.lambda[, j] ^ 2))
+    if (nrow(object$lambda) > 1) {
+      lambda.samp[[j]] <- mvtnorm::rmvnorm(n.samp, object$lambda[, j],
+                                           diag(object$se.lambda[, j] ^ 2))
+    } else {
+      lambda.samp[[j]] <- matrix(rnorm(n.samp, object$lambda[, j],
+                                       object$se.lambda[, j]))
+    }
     w.samp[[j]] <- mvtnorm::rmvnorm(n.samp, object$w[, j], object$Varw[[j]])
   }
   alpha.samp <- mapply(function(x) unlist(lapply(alpha.samp, `[`, x)),

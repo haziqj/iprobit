@@ -44,16 +44,13 @@ test_that("Fitted", {
 
 })
 
-test_that("Fitted upper and lower", {
+test_that("Fitted quantiles", {
 
   dat <- gen_mixture(n = 10)
   mod <- iprobit(dat$y, dat$X, silent = TRUE, control = list(maxit = 5))
   modf <- iprobit(y ~ ., dat, silent = TRUE, one.lam = TRUE, control = list(maxit = 5))
-  expect_that(fitted(mod, "upper"), is_a("iprobit_predict"))
-  expect_that(fitted(modf, "upper"), is_a("iprobit_predict"))
-  expect_that(fitted(mod, "lower"), is_a("iprobit_predict"))
-  expect_that(fitted(modf, "lower"), is_a("iprobit_predict"))
-  expect_error(fitted(modf, "nope"))
+  expect_that(fitted(mod, TRUE, n.samp = 3), is_a("iprobit_predict_quant"))
+  expect_that(fitted(modf, TRUE, n.samp = 3), is_a("iprobit_predict_quant"))
 
 })
 
@@ -66,23 +63,16 @@ test_that("Predict (without test error rate)", {
                   control = list(maxit = 5))
 
   mod.predict <- predict(mod, newdata = list(dat.test$X))
-  modf.predict <- predict(modf, newdata = as.data.frame(dat.test)[, -3])
+  modf.predict <- predict(modf, newdata = dat.test)
 
-  mod.predict.u <- predict(mod, newdata = list(dat.test$X),
-                          upper.or.lower = "upper")
-  modf.predict.u <- predict(modf, newdata = as.data.frame(dat.test)[, -3],
-                           upper.or.lower = "upper")
-  mod.predict.l <- predict(mod, newdata = list(dat.test$X),
-                           upper.or.lower = "lower")
-  modf.predict.l <- predict(modf, newdata = as.data.frame(dat.test)[, -3],
-                            upper.or.lower = "lower")
+  mod.predict.q <- predict(mod, newdata = list(dat.test$X), quantiles = TRUE, n.samp = 3)
+  modf.predict.q <- predict(modf, newdata = dat.test, quantiles = TRUE, n.samp = 3)
 
   expect_s3_class(mod.predict, "iprobit_predict")
   expect_s3_class(modf.predict, "iprobit_predict")
-  expect_s3_class(mod.predict, "iprobit_predict")
-  expect_s3_class(modf.predict, "iprobit_predict")
+  expect_s3_class(mod.predict.q, "iprobit_predict_quant")
+  expect_s3_class(modf.predict.q, "iprobit_predict_quant")
   expect_that(print(mod.predict), prints_text("Test data not provided."))
-  expect_error(predict(mod, newdata = list(dat.test$X), upper.or.lower = "nope"))
 
 })
 
@@ -97,8 +87,8 @@ test_that("Predict (with test error rate)", {
   mod.predict <- predict(mod, newdata = list(dat.test$X), y = dat.test$y)
   modf.predict <- predict(modf, newdata = dat.test)
 
-  expect_that(print(mod.predict), prints_text("Test error rate"))
-  expect_that(print(modf.predict), prints_text("Test error rate"))
+  expect_that(print(mod.predict), prints_text("Test error"))
+  expect_that(print(modf.predict), prints_text("Test error"))
 
 })
 
