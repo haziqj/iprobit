@@ -19,33 +19,128 @@
 ################################################################################
 
 #' @export
-fitted.iprobitMod <- function(object, upper.or.lower = NULL, level = 0.05, ...) {
-  if (is.null(upper.or.lower)) return(object$fitted.values)
-  else {
-    type <- match.arg(upper.or.lower, c("upper", "lower"))
-    if (type == "upper") sd.shift <- qnorm(1 - level / 2)
-    if (type == "lower") sd.shift <- -qnorm(1 - level / 2)
+fitted.iprobitMod <- function(object, quantiles = TRUE, n.samp = 100,
+                              transform = function(x) x, ...) {
+  if (isTRUE(quantiles)) {
+    if (is.iprobitMod_bin(object)) {
+      return(predict_quant(object, n.samp, transform))
+    }
+    if (is.iprobitMod_mult(object)) {
+      return(1)
+    }
+  } else {
+    return(object$fitted.values)
   }
 
-  if (is.iprobitMod_bin(object)) {
-    res <- predict_iprobit_bin(y        = object$ipriorKernel$Y,
-                               y.levels = object$ipriorKernel$y.levels,
-                               ystar    = object$ystar + sd.shift)
-  }
-  if (is.iprobitMod_mult(object)) {
-    res <- predict_iprobit_mult(y        = object$ipriorKernel$Y,
-                                y.levels = object$ipriorKernel$y.levels,
-                                ystar    = object$ystar,
-                                shift = sd.shift)
-  }
+}
 
-  class(res) <- "iprobit_predict"
+predict_quant <- function(object, n.samp, transform, Hl = NULL, y = NULL) {
+  tmp <- sample_prob_bin(object, n.samp, Hl, y)
+  phats <- convert_prob(tmp$phat.samp, transform)
+  names(phats) <- object$ipriorKernel$y.levels
+  res <- list(
+    prob        = quantile_prob(phats),
+    train.error = stats::quantile(tmp$error.samp, probs = c(0.05, 0.25, 0.5, 0.75, 0.95)),
+    brier.score = stats::quantile(tmp$brier.samp, probs = c(0.05, 0.25, 0.5, 0.75, 0.95))
+  )
+  class(res) <- "iprobit_predict_quant"
   res
 }
 
 #' @export
+print.iprobit_predict_quant <- function(x, rows = 5, dp = 3, ...) {
+  rows.act <- nrow(x$prob[[1]])
+  rows <- min(rows.act, rows)
+  y.levels <- names(x$prob)
+
+  if (!is.null(x$train.error)) {
+    error <- decimal_place(x$train.error, dp)
+    brier <- decimal_place(x$brier.score, dp)
+  } else if (!is.nan(x$test.error)) {
+    # cat("Test error rate:", decimal_place(x$test.error, dp), "%\n")
+    # cat("Brier score:", decimal_place(x$brier.score, dp), "\n")
+  } else {
+    # cat("Test data not provided.\n")
+  }
+
+  tab <- rbind("Training error (%)" = error, "Brier score" = brier)
+  print(as.data.frame(tab))
+
+  for (j in seq_along(x$prob)) {
+    cat("\nPredicted probabilities for Class =", y.levels[j], "\n")
+    tab <- decimal_place(x$prob[[j]][seq_len(rows), ], dp)
+    print(tab)
+    if (rows.act > rows) cat("# ... with", rows.act - rows, "more rows\n")
+  }
+}
+
+sample_prob_bin <- function(object, n.samp, Hl.new = NULL, y = NULL) {
+  # Initialise -----------------------------------------------------------------
+  alpha.samp <- rnorm(n.samp, object$alpha, object$se.alpha)
+  lambda.samp <- mvtnorm::rmvnorm(n.samp, object$lambda, diag(object$se.lambda ^ 2))
+  w.samp <- mvtnorm::rmvnorm(n.samp, object$w, object$Varw)  # n.samp x n matrix
+  phat.samp <- list()
+  error.samp <- brier.samp <- rep(NA, n.samp)
+  if (is.null(y)) y <- object$ipriorKernel$Y
+
+  # Sampling -------------------------------------------------------------------
+  for (i in 1:n.samp) {
+    alpha <- alpha.samp[i]
+    lambda <- lambda.samp[i, ]
+    w <- w.samp[i, ]
+    ystar.samp <- calc_ystar_bin(object, Hl.new = Hl.new, alpha.new = alpha,
+                                 lambda.new = lambda, w.new = w)
+    tmp <- predict_iprobit_bin(y, object$ipriorKernel$y.levels, ystar.samp)
+    phat.samp[[i]] <- tmp$prob
+    error.samp[i] <- tmp$train.error
+    brier.samp[i] <- tmp$brier.score
+  }
+
+  list(phat.samp = phat.samp, error.samp = error.samp, brier.samp = brier.samp)
+}
+
+calc_ystar_bin <- function(object, Hl.new = NULL, alpha.new = NULL,
+                           lambda.new = NULL, w.new = NULL) {
+  list2env(object, environment())
+  list2env(ipriorKernel, environment())
+  list2env(model, environment())
+  environment(lambdaExpand_bin) <- environment()
+  environment(HlamFn) <- environment()
+  if (!is.null(Hl.new)) Hl <- Hl.new
+  if (!is.null(alpha.new)) alpha <- alpha.new
+  if (!is.null(lambda.new)) lambda <- lambda.new
+  if (!is.null(w.new)) w <- w.new
+  lambdaExpand_bin(env = environment(), y = NULL)
+  HlamFn(env = environment())
+  as.vector(alpha + (Hlam.mat %*% w))
+}
+
+convert_prob <- function(phat, transform = function(x) x) {
+  # Converts list of length n.samp containing random samples of the
+  # probabilities. This function converts it into a list of length no.classes so
+  # that each column is now the random sample of the probability of that data
+  # point. The transform option transform the probabilities, say to log odds.
+  no.classes <- ncol(phat[[1]])
+  res <- list()
+  for (i in seq_len(no.classes)) {
+    res[[i]] <- do.call(cbind, lapply(lapply(phat, `[`, i), transform))
+  }
+  res
+}
+
+quantile_prob <- function(phats) {
+  # Get quantiles for lists returned from convert_prob
+  for (i in seq_along(phats)) {
+    phats[[i]] <- t(apply(phats[[i]], 1, stats::quantile,
+                          probs = c(0.05, 0.25, 0.5, 0.75, 0.95)))
+  }
+  lapply(phats, as.data.frame)
+}
+
+#' @export
 predict.iprobitMod <- function(object, newdata = list(), y.test = NULL,
-                               upper.or.lower = NULL, level = 0.05, ...) {
+                               quantiles = TRUE, n.samp = 100,
+                               transform = function(x) x, ...) {
   list2env(object, environment())
   list2env(ipriorKernel, environment())
   list2env(model, environment())
@@ -78,23 +173,16 @@ predict.iprobitMod <- function(object, newdata = list(), y.test = NULL,
     Hl <- .hMatList(x, kernel, intr, no.int, Hurst, intr.3plus,
                     rootkern = FALSE, xstar)
 
-    # Upper or lower
-    if (is.null(upper.or.lower)) sd.shift <- 0
-    else {
-      type <- match.arg(upper.or.lower, c("upper", "lower"))
-      if (type == "upper") sd.shift <- qnorm(1 - level / 2)
-      if (type == "lower") sd.shift <- -qnorm(1 - level / 2)
-    }
-
     # Pass to appropriate prediction function ----------------------------------
     if (is.iprobitMod_bin(object)) {
-      environment(lambdaExpand_bin) <- environment()
-      environment(HlamFn) <- environment()
-      lambdaExpand_bin(env = environment(), y = NULL)
-      HlamFn(env = environment())
-      ystar.new <- as.vector(alpha + (Hlam.mat %*% w))
-      names(ystar.new) <- xrownames
-      res <- predict_iprobit_bin(y.test, y.levels, ystar.new + sd.shift)
+      if (isTRUE(quantiles)) {
+        1 + 1
+        return(predict_quant(object, n.samp, transform, Hl, y.test))
+      } else {
+        ystar.new <- calc_ystar_bin(object, Hl.new = Hl)
+        names(ystar.new) <- xrownames
+        res <- predict_iprobit_bin(y.test, y.levels, ystar.new)
+      }
     }
     if (is.iprobitMod_mult(object)) {
       environment(lambdaExpand_mult) <- environment()
@@ -211,10 +299,3 @@ print.iprobit_predict <- function(x, rows = 10, dp = 3, ...) {
   print(tab)
   if (nrow(x$p) > rows) cat("# ... with", nrow(x$p) - rows, "more rows")
 }
-
-# Note: Quantiles for truncated normal distribution are
-# qtruncnorm(0.025, a = 0)  # upper tail truncated at zero
-# qtruncnorm(0.975, a = 0)
-# ## 0.03133798
-# ## 2.241403
-# lower tail truncated at zero are symmetric opposites of the above.

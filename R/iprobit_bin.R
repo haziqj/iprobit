@@ -45,7 +45,7 @@ iprobit_bin <- function(ipriorKernel, maxit = 100, stop.crit = 1e-5,
   HlamFn(env = iprobit.env)
   HlamsqFn(env = iprobit.env)
   alpha <- alpha0
-  w <- w0
+  w <- w0; Varw <- NA
   niter <- 0
   lb <- error.rates <- brier.scores <- rep(NA, maxit)
   lb.const <- (n + 1 + l - log(n) + (l + 1) * log(2 * pi)) / 2
@@ -134,7 +134,6 @@ iprobit_bin <- function(ipriorKernel, maxit = 100, stop.crit = 1e-5,
   # Calculate standard errors from posterior variance --------------------------
   se.alpha <- sqrt(1 / n)
   se.lambda <- sqrt(1 / ct[1:l])
-  se.ystar <- NA #iprobitSE(y = y, eta = eta, thing1 = thing1, thing0 = thing0)
 
   # Clean up and close ---------------------------------------------------------
   if (!silent) {
@@ -145,7 +144,7 @@ iprobit_bin <- function(ipriorKernel, maxit = 100, stop.crit = 1e-5,
 
   res <- list(ystar = ystar, w = w, lambda = lambda[1:l], alpha = alpha,
               lower.bound = lb[!is.na(lb)], ipriorKernel = NULL,
-              se.alpha = se.alpha, se.lambda = se.lambda, se.ystar = se.ystar,
+              se.alpha = se.alpha, se.lambda = se.lambda, Varw = Varw,
               y.levels = y.levels, start.time = start.time, end.time = end.time,
               time = time.taken, stop.crit = stop.crit, niter = niter,
               maxit = maxit, fitted.values = fitted.values,
