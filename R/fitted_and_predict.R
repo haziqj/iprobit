@@ -53,7 +53,7 @@ fitted.iprobitMod <- function(object, quantiles = FALSE, n.samp = 100,
 #' @export
 predict.iprobitMod <- function(object, newdata = list(), y.test = NULL,
                                quantiles = FALSE, n.samp = 100,
-                               transform = function(x) x, ...) {
+                               transform = function(x) x, raw = FALSE, ...) {
   list2env(object, environment())
   list2env(ipriorKernel, environment())
   list2env(model, environment())
@@ -88,7 +88,7 @@ predict.iprobitMod <- function(object, newdata = list(), y.test = NULL,
 
     # Pass to appropriate prediction function ----------------------------------
     if (isTRUE(quantiles)) {
-      res <- predict_quant(object, n.samp, transform, Hl, y.test)
+      res <- predict_quant(object, n.samp, transform, Hl, y.test, raw)
     } else {
       if (is.iprobitMod_bin(object)) {
         ystar.new <- calc_ystar(object, Hl.new = Hl)
