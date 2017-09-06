@@ -77,8 +77,8 @@ iplot_lb <- function(x, niter.plot = NULL, lab.pos = c("up", "down")) {
     theme_bw()
 }
 
-#' @export
-iplot_predict <- function(object, test.data = NULL, X.var = c(1, 2)) {
+prepare_point_range <- function(object, test.data = NULL, X.var = c(1, 2)) {
+  # Helper function for iplot_predict() and iplot_dec_bound()
   X <- object$ipriorKernel$x
   class(X) <- NULL
   X <- as.data.frame(X)
@@ -123,12 +123,38 @@ iplot_predict <- function(object, test.data = NULL, X.var = c(1, 2)) {
   colnames(plot.df)[1:2] <- c("X1", "X2")
   colnames(plot.df)[-(1:p)] <- paste0("class", seq_along(object$y.levels))
   colnames(points.df) <- c("X1", "X2", "Class")
+  list(maxmin = maxmin, mm = mm, plot.df = plot.df, points.df = points.df,
+       prob = prob, X = X, classes = classes, j = j, p = p,
+       test.data = test.data, X.var = X.var, xname = xname, xx = xx)
+}
+
+#' @export
+iplot_dec_bound <- function(object, X.var = c(1, 2), col = "grey35", size = 0.8,
+                            ...) {
+  list2env(prepare_point_range(object, NULL, X.var), envir = environment())
+  m <- object$ipriorKernel$m
+  ggplot() +
+    geom_point(data = points.df, aes(X1, X2, col = Class)) +
+    geom_contour(data = plot.df, aes(X1, X2, z = class2, size = "Decision\nboundary"),
+                 binwidth = 0.5, col = col, ...) +
+    coord_cartesian(xlim = mm[1, ], ylim = mm[2, ]) +
+    scale_colour_manual(values = c(iprior::ggColPal(m), "grey30")) +
+    scale_size_manual(values = size, name = NULL) +
+    guides(col = guide_legend(order = 1)) +
+    # guides(col = guide_legend(override.aes = list(linetype = c(0, 0, 1),
+    #                                               shape = c(19, 19, NA)))) +
+    theme_bw()
+}
+
+#' @export
+iplot_predict <- function(object, test.data = NULL, X.var = c(1, 2)) {
+  list2env(prepare_point_range(object, test.data, X.var), envir = environment())
 
   if (is.iprobitMod_bin(object))
     p <- iplot_predict_bin(plot.df, points.df, mm[1, ], mm[2, ],
                            length(levels(classes)))
   if (is.iprobitMod_mult(object))
-    p <- iplot_predict_mult(plot.df, points.df, mm[1, ],mm[2, ],
+    p <- iplot_predict_mult(plot.df, points.df, mm[1, ], mm[2, ],
                             length(levels(classes)))
 
   if (isNystrom(object)) {
@@ -145,7 +171,6 @@ iplot_predict <- function(object, test.data = NULL, X.var = c(1, 2)) {
                   object$ipriorKernel$model$yname)
   p <- p +
     labs(x = xname[1], y = xname[2], col = yname)
-
   p
 }
 
