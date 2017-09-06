@@ -217,7 +217,7 @@ iplot_error <- function(x, niter.plot = NULL) {
   last.value.df$lab[1] <- decimal_place(last.value.df$value[1] * 100)
   last.value.df$lab[1] <- paste0(last.value.df$lab[1], "%")
   last.value.df$lab[2] <- decimal_place(last.value.df$value[2], 3)
-  
+
   ggplot(plot.df, aes(x = Iteration, y = value, col = variable)) +
     geom_line(alpha = 0.5) +
     directlabels::geom_dl(aes(label = variable), method = ("lines2")) +
@@ -235,6 +235,22 @@ iplot_error <- function(x, niter.plot = NULL) {
     ) +
     theme_bw() +
     theme(legend.position = "none")
+}
+
+iplot_lb_and_error <- function(x, niter.plot = 10, lab.pos = c("up", "down")) {
+  p1 <- iplot_lb(mod, niter.plot, lab.pos) +
+    scale_y_continuous(sec.axis = dup_axis())
+    # theme(axis.title.x=element_blank(),
+    #       axis.text.x=element_blank(),
+    #       axis.ticks.x=element_blank())
+  suppressMessages(
+    p2 <- iplot_error(mod, niter.plot) +
+      scale_x_continuous(
+        breaks = scales::pretty_breaks(n = min(5, ifelse(x$niter == 2, 1, x$niter)))
+      )
+  )
+
+  cowplot::plot_grid(p1, p2, nrow = 2)
 }
 
 # tmp <- cowplot::plot_grid(iplot_lb(mod), NULL, rel_widths = c(1, 0.06))
@@ -264,48 +280,4 @@ iplot_error <- function(x, niter.plot = NULL) {
 #     geom_ribbon(aes(x = x, ymin = low, ymax = high), fill = "grey70", alpha = 0.5) +
 #     labs(x = x.axis.lab, y = "Probability") +
 #     theme_bw()
-# }
-
-# iplot_decbound <- function(x, levels = NULL) {
-#   classes <- as.factor(x$y)
-#   if (!is.null(levels)) levels(classes) <- levels
-#   else levels(classes) <- x$y.levels
-#   xx <- c(min(x$X[, 1]), max(x$X[, 1]))
-#   yy <- c(min(x$X[, 2]), max(x$X[, 2]))
-#   decision.line <- boundarySolver(x$alpha, x$lambda, x$w, x$kernel, x$X,
-#                                   xmin = xx[1] - 10, xmax = xx[2] + 10,
-#                                   ymin = yy[1] - 100, ymax = yy[2] + 100)
-#   plot.df <- data.frame(X = x$X, Observation = 1:nrow(x$X), Class = classes)
-#   dec.df <- data.frame(x.dec = decision.line$x1,
-#                        y.dec = decision.line$x2)
-#
-#   ggplot(data = plot.df, aes(x = X[, 1], y = X[, 2])) +
-#     geom_point(aes(col = Class), size = 3) +
-#     # geom_text(aes(label = Observation)) +
-#     geom_line(data = dec.df, aes(x = x.dec, y = y.dec), col = "grey35", linetype = "longdash") +
-#     coord_cartesian(xlim = xx, ylim = yy) +
-#     labs(x = colnames(x$X)[1], y = colnames(x$X)[2]) +
-#     theme_bw()
-# }
-#
-# boundarySolver <- function(alpha, lambda, w, kernel, X, xmin, xmax,
-#                            ymin, ymax) {
-#   xlength <- 500
-#   x1plot <- seq(xmin, xmax, length = xlength)
-#   x2plot <- rep(NA, xlength)
-#
-#   objFn <- function(x2, x1) {
-#     H.tilde <- ikernL(list(X), list(matrix(c(x1, x2), nrow = 1)),
-#                       kernel = kernel)[[1]]
-#     alpha + lambda * as.numeric(H.tilde %*% w)
-#   }
-#   i <- 1
-#   while (i <= xlength) {
-#     tmp <- uniroot(objFn, c(ymin, ymax), x1 = x1plot[i])
-#     x2plot[i] <- tmp$root
-#     if (x2plot[i] > ymax) break
-#     i <- i + 1
-#   }
-#
-#   list(x1 = x1plot, x2 = x2plot)
 # }
