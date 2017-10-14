@@ -182,7 +182,7 @@ iprobit_mult <- function(ipriorKernel, maxit = 100, stop.crit = 1e-5,
   }
 
   end.time <- Sys.time()
-  time.taken <- as.time(end.time - start.time)
+  time.taken <- iprior::as.time(end.time - start.time)
 
   # Calculate standard errors from posterior variance --------------------------
   if (isTRUE(common.intercept)) se.alpha <- sqrt(1 / nm)

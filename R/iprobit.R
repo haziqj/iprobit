@@ -141,7 +141,7 @@ iprobit.iprobitMod <- function(object, maxit = NULL, stop.crit = NULL,
   # Update time, call, maxit, niter, lb, error, brier --------------------------
   new.time.diff <- res$end.time - res$start.time
   old.time.diff <- object$end.time - object$start.time
-  res$time <- as.time(new.time.diff + old.time.diff)
+  res$time <- iprior::as.time(new.time.diff + old.time.diff)
   res$end.time <- object$end.time + new.time.diff
   res$call <- object$call
   res$control$maxit <- res$maxit <- res$maxit + object$maxit

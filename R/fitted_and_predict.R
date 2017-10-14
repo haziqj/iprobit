@@ -42,18 +42,20 @@
 
 #' @export
 fitted.iprobitMod <- function(object, quantiles = FALSE, n.samp = 100,
-                              transform = function(x) x, raw = FALSE, ...) {
+                              transform = identity, raw = FALSE, ...) {
   if (isTRUE(quantiles)) {
     return(predict_quant(object, n.samp, transform, raw = raw))
   } else {
-    return(object$fitted.values)
+    res <- object$fitted.values
+    res$prob <- transform(res$prob)
+    return(res)
   }
 }
 
 #' @export
 predict.iprobitMod <- function(object, newdata = list(), y.test = NULL,
                                quantiles = FALSE, n.samp = 100,
-                               transform = function(x) x, raw = FALSE, ...) {
+                               transform = identity, raw = FALSE, ...) {
   list2env(object, environment())
   list2env(ipriorKernel, environment())
   list2env(model, environment())
@@ -295,7 +297,7 @@ calc_ystar <- function(object, Hl.new = NULL, alpha.new = NULL,
 }
 
 #' @export
-convert_prob <- function(phat, transform = function(x) x) {
+convert_prob <- function(phat, transform = identity) {
   # Converts list of length n.samp containing random samples of the
   # probabilities. This function converts it into a list of length no.classes so
   # that each column is now the random sample of the probability of that data

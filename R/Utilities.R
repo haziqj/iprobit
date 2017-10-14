@@ -18,7 +18,19 @@
 #
 ################################################################################
 
-decimal_place <- function(x, k = 2) format(round(x, k), nsmall = k)
+#' @export
+logit <- function(x, exp.logit = FALSE) {
+  res <- log(x) - log(1 - x)
+  if (isTRUE(exp.logit)) exp(res)
+  else res
+}
+
+#' @export
+expit <- function(x, log.expit = FALSE) {
+  res <- -log(1 + exp(-x))
+  if (isTRUE(log.expit)) res
+  else exp(res)
+}
 
 #' @export
 is.iprobitMod_bin <- function(x) inherits(x, "iprobitMod_bin")
@@ -181,19 +193,6 @@ get_brier_scores <- function(x) {
 all.same <- function(v) {
   # https://stackoverflow.com/questions/4752275/test-for-equality-among-all-elements-of-a-single-vector
   all(sapply(as.list(v[-1]), FUN = function(z) identical(z, v[1])))
-}
-
-#' @export
-as.time <- function(x) {
-  # For difftime objects
-  time <- as.numeric(x)
-  unit <- attr(x, "units")
-  structure(list(time = time, unit = unit), class = "iprobitTime")
-}
-
-#' @export
-print.iprobitTime <- function(x, ...) {
-  cat(x$time, x$unit)
 }
 
 # lambda expansion and Hlam.mat calculation for binary models ------------------

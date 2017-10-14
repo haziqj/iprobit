@@ -32,24 +32,24 @@ loop_logical <- function() {
   else return(crit1 & crit2)
 }
 
-iprobitSE <- function(y, eta, thing1 = NULL, thing0 = NULL) {
-  if (is.null(thing1) | is.null(thing0)) {
-    thing1 <- exp(  # phi(eta) / Phi(eta)
-      dnorm(eta[y == 1], log = TRUE) - pnorm(eta[y == 1], log.p = TRUE)
-    )
-    thing0 <- -exp(  # -1 * {phi(eta) / Phi(-eta)}
-      dnorm(eta[y == 0], log = TRUE) - pnorm(-eta[y == 0], log.p = TRUE)
-    )
-  }
-
-  # Posterior variance of ystar ------------------------------------------------
-  var.ystar <- rep(NA, length(y))
-  # 1 - eta * phi(eta) / Phi(eta) - (phi(eta) / Phi(eta)) ^ 2
-  var.ystar[y == 1] <- 1 - eta[y == 1] * thing1 + (thing1 ^ 2)
-  # 1 - eta * (-1) * {phi(eta) / Phi(-eta)} - (phi(eta) / Phi(-eta)) ^ 2
-  var.ystar[y == 0] <- 1 - eta[y == 0] * thing0 + (thing0 ^ 2)
-  sqrt(var.ystar)
-}
+# iprobitSE <- function(y, eta, thing1 = NULL, thing0 = NULL) {
+#   if (is.null(thing1) | is.null(thing0)) {
+#     thing1 <- exp(  # phi(eta) / Phi(eta)
+#       dnorm(eta[y == 1], log = TRUE) - pnorm(eta[y == 1], log.p = TRUE)
+#     )
+#     thing0 <- -exp(  # -1 * {phi(eta) / Phi(-eta)}
+#       dnorm(eta[y == 0], log = TRUE) - pnorm(-eta[y == 0], log.p = TRUE)
+#     )
+#   }
+#
+#   # Posterior variance of ystar ------------------------------------------------
+#   var.ystar <- rep(NA, length(y))
+#   # 1 - eta * phi(eta) / Phi(eta) - (phi(eta) / Phi(eta)) ^ 2
+#   var.ystar[y == 1] <- 1 - eta[y == 1] * thing1 + (thing1 ^ 2)
+#   # 1 - eta * (-1) * {phi(eta) / Phi(-eta)} - (phi(eta) / Phi(-eta)) ^ 2
+#   var.ystar[y == 0] <- 1 - eta[y == 0] * thing0 + (thing0 ^ 2)
+#   sqrt(var.ystar)
+# }
 
 # This is wrong
 # EprodPhiZ_1 <- function(mu, sigma) {
