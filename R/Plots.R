@@ -138,7 +138,7 @@ iplot_dec_bound <- function(object, X.var = c(1, 2), col = "grey35", size = 0.8,
     geom_contour(data = plot.df, aes(X1, X2, z = class2, size = "Decision\nboundary"),
                  binwidth = 0.5, col = col, ...) +
     coord_cartesian(xlim = mm[1, ], ylim = mm[2, ]) +
-    scale_colour_manual(values = c(iprior::ggColPal(m), "grey30")) +
+    scale_colour_manual(values = c(iprior::gg_col_hue(m), "grey30")) +
     scale_size_manual(values = size, name = NULL) +
     guides(col = guide_legend(order = 1)) +
     # guides(col = guide_legend(override.aes = list(linetype = c(0, 0, 1),
@@ -190,7 +190,7 @@ iplot_predict_bin <- function(plot.df, points.df, x, y, m) {
 }
 
 iplot_predict_mult <- function(plot.df, points.df, x, y, m) {
-  fill.col <- iprior::ggColPal(m)
+  fill.col <- iprior::gg_col_hue(m)
   alpha <- 0.6
   class.ind <- sort(seq(from = ncol(plot.df), by = -1, length = m))
 

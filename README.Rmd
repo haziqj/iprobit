@@ -12,7 +12,7 @@ library(iprobit)
 [![AppVeyor Build Status](https://ci.appveyor.com/api/projects/status/github/haziqj/iprobit?branch=master&svg=true)](https://ci.appveyor.com/project/haziqj/iprobit)
 [![Coverage Status](https://img.shields.io/codecov/c/github/haziqj/iprobit/master.svg)](https://codecov.io/gh/haziqj/iprobit)
 
-This is an `R` package which extends I-prior regression to unordered categorical responses via a probit link function. This allows the user to fit models for classification or inference using fitted probabilities. Estimation is performed using a variational EM algorithm.
+This is an `R` package which extends I-prior regression to unordered categorical responses via a probit link function. This allows the user to fit models for classification or inference using fitted probabilities. Estimation is performed using a variational EM algorithm. Visit [http://phd.haziqj.ml](http://phd.haziqj.ml) for details.
 
 ## Binary classification (toy example)
 
@@ -71,10 +71,22 @@ mod <- iprobit(Species ~ ., iris, kernel = "FBM", one.lam = TRUE,
 summary(mod)
 ```
 
+#### Obtain training error rates, predicted classes and probabilities with posterior quantiles
+
+```{r, cache = TRUE}
+fitted(mod, quantiles = TRUE)
+```
+
 #### Monitor convergence
 
 ```{r}
 iplot_lb(mod)
+```
+
+#### Plot of training error over time
+
+```{r}
+iplot_error(mod)
 ```
 
 #### Plot of fitted probabilities
