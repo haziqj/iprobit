@@ -1,7 +1,10 @@
+<!-- README.md is generated from README.Rmd. Please edit that file -->
 R/iprobit: Binary and multinomial probit regression using I-priors
 ================
 
-[![Build Status](https://travis-ci.org/haziqj/iprobit.svg?branch=master)](https://travis-ci.org/haziqj/iprobit) [![AppVeyor Build Status](https://ci.appveyor.com/api/projects/status/github/haziqj/iprobit?branch=master&svg=true)](https://ci.appveyor.com/project/haziqj/iprobit) [![Coverage Status](https://img.shields.io/codecov/c/github/haziqj/iprobit/master.svg)](https://codecov.io/gh/haziqj/iprobit)
+[![Build Status](https://travis-ci.org/haziqj/iprobit.svg?branch=master)](https://travis-ci.org/haziqj/iprobit)
+[![AppVeyor Build Status](https://ci.appveyor.com/api/projects/status/github/haziqj/iprobit?branch=master&svg=true)](https://ci.appveyor.com/project/haziqj/iprobit)
+[![Coverage Status](https://img.shields.io/codecov/c/github/haziqj/iprobit/master.svg)](https://codecov.io/gh/haziqj/iprobit)
 
 This is an `R` package which extends I-prior regression to unordered categorical responses via a probit link function. This allows the user to fit models for classification or inference using fitted probabilities. Estimation is performed using a variational EM algorithm. Visit <http://phd.haziqj.ml> for details.
 
@@ -13,8 +16,8 @@ Binary classification (toy example)
 ``` r
 dat <- gen_spiral(n = 300)  # generate binary toy example data set
 mod <- iprobit(y ~ X1 + X2, dat, one.lam = TRUE, kernel = "FBM")
-## ===
-## Converged after 4 iterations.
+## =========================================================================
+## Converged after 97 iterations.
 ```
 
 #### Model summary
@@ -32,12 +35,12 @@ summary(mod)
 ## 
 ## Parameter estimates:
 ##          Mean   S.D.    2.5%  97.5%
-## alpha  0.0015 0.0577 -0.1117 0.1147
-## lambda 0.0053 0.0156 -0.0254 0.0359
+## alpha  0.0000 0.0577 -0.1132 0.1132
+## lambda 5.6718 0.2320  5.2171 6.1266
 ## 
-## Converged to within 1e-05 tolerance. No. of iterations: 4
-## Variational lower bound: -212.1855 
-## Training error rate: 47.67 %. Brier score: 0.25
+## Converged to within 1e-05 tolerance. No. of iterations: 97
+## Variational lower bound: -140.7111 
+## Training error rate: 0.00 %. Brier score: 0.01
 ```
 
 #### Boundary plot for two-dimensional covariates
