@@ -11,7 +11,7 @@ warnings_are_errors: false
 r_check_args: '--as-cran'
 
 r_github_packages:
-  - haziqjamil/iprior
+  - haziqj/iprior
   - hadley/testthat
   - jimhester/covr
 
