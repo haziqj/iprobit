@@ -42,7 +42,7 @@ is.iprobitMod_mult <- function(x) inherits(x, "iprobitMod_mult")
 is.iprobitData <- function(x) inherits(x, "iprobitData")
 
 isNystrom <- function(x) {
-  if (iprior::is.ipriorKernel(x)) {
+  if (inherits(x, "ipriorKernel_old")) {
     if (!is.list(x$Nystrom)) res <- x$Nystrom
     else res <- TRUE
   } else {
@@ -224,7 +224,7 @@ HlamsqFn <- function(env = environment()) {
   # Hl, Hsql, (both lists) and lambda, lambda.sq (both vectors), all of which
   # must be the same length, should be defined in  environment. Further, ind1
   # and ind2 are indices of all possible two-way multiplications obtained from
-  # iprior::kernL$BlockBstuff
+  # iprior::.kernL$BlockBstuff
   environment(Hlam_two_way_index) <- env
   if (is.null(Hsql))
     square.terms <- Reduce("+", mapply("*", Psql[1:q], lambda.sq[1:q],
@@ -302,7 +302,7 @@ HlamsqFn_mult <- function(env = environment()) {
 }
 
 Hlam_two_way_index <- function(lam = c(1, 2, 3, 4), lamsq = c(4, 5, 6, 7)) {
-  # mod <- iprior::kernL(Species ~ . ^ 2, iris)
+  # mod <- iprior::.kernL(Species ~ . ^ 2, iris)
   # iprobit.env <- environment()
   # list2env(mod, iprobit.env)
   # list2env(BlockBstuff, iprobit.env)
@@ -340,7 +340,7 @@ Hlam_two_way_index <- function(lam = c(1, 2, 3, 4), lamsq = c(4, 5, 6, 7)) {
 #   # Function to test lambdaExpand_mult() and the Hlam*_mult functions
 #   set.seed(123)
 #   dat <- gen_mixture(n = 4, m = 3)
-#   mod <- iprior::kernL(y ~ . ^ 2, dat)
+#   mod <- iprior::.kernL(y ~ . ^ 2, dat)
 #   iprobit.env <- environment()
 #   list2env(mod, iprobit.env)
 #   list2env(BlockBstuff, iprobit.env)

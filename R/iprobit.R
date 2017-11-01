@@ -33,10 +33,10 @@ iprobit.default <- function(y, ..., kernel = "Canonical", silent = FALSE,
   con$silent <- silent <- any(isTRUE(silent), isTRUE(silent_))
 
   # Pass to kernel loader and then appropriate VB routine ----------------------
-  if (iprior::is.ipriorKernel(y)) {
+  if (inherits(y, "ipriorKernel_old")) {
     ipriorKernel <- y
   } else {
-    ipriorKernel <- iprior::kernL(y, ...,
+    ipriorKernel <- iprior::.kernL(y, ...,
                                   model = list(kernel = kernel, parsm = parsm,
                                                interactions = interactions,
                                                xname = xname))
@@ -99,7 +99,7 @@ iprobit.formula <- function(formula, data = parent.frame(), kernel = "Canonical"
                             silent = FALSE, one.lam = FALSE, parsm = TRUE,
                             control = list(), ...) {
   # Pass to iprobit default ----------------------------------------------------
-  ipriorKernel <- iprior::kernL(formula, data, model = list(kernel = kernel,
+  ipriorKernel <- iprior::.kernL(formula, data, model = list(kernel = kernel,
                                                             one.lam = one.lam,
                                                             parsm = parsm))
   est <- iprobit.default(y = ipriorKernel, control = control, silent = silent)

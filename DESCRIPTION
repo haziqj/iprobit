@@ -1,7 +1,7 @@
 Package: iprobit
 Type: Package
 Title: Binary and Multinomial Probit Regression with I-priors
-Version: 0.1.0.9003
+Version: 0.1.0.9004
 Authors@R: person("Haziq", "Jamil", email = "haziq.jamil@gmail.com",
                   role = c("aut", "cre"))
 Description: Fit I-prior probit models to binary and multinomial data for classification or inference using fitted probabilities.
@@ -15,7 +15,7 @@ Imports:
   doSNOW,
   foreach,
   ggplot2,
-  iprior (>= 0.6.5.9001),
+  iprior (>= 0.6.5.9005),
   mlbench,
   mvtnorm,
   parallel,
