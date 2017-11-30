@@ -213,11 +213,26 @@ lambdaExpand_bin <- function(x = lambda, y = lambda.sq, env = iprobit.env) {
   }
 }
 
+expand_lambda_bin <- function(x, intr, intr.3plus = NULL) {
+  # Helper function to expand lambda or lambda.sq (scale
+  # parameters) according to any interactions specification.
+  #
+  # Args: lambda
+  #
+  # Returns: Expanded lambda
+  iprior::.expand_Hl_and_lambda(x, x, intr, intr.3plus)$lambda
+}
+
+
 HlamFn <- function(env = environment()) {
   # Hl (list) and lambda (vector), both must be of same length, should be
   # defined in  environment.
   res.Hlam.mat <- Reduce("+", mapply("*", Hl, lambda, SIMPLIFY = FALSE))
   assign("Hlam.mat", res.Hlam.mat, envir = env)
+}
+
+calc_Hlam <- function(Hl, lambda) {
+  Reduce("+", mapply("*", Hl, lambda, SIMPLIFY = FALSE))
 }
 
 HlamsqFn <- function(env = environment()) {
@@ -243,6 +258,30 @@ HlamsqFn <- function(env = environment()) {
 
   res.Hlam.matsq <- square.terms + two.way.terms
   assign("Hlam.matsq", res.Hlam.matsq, envir = env)
+}
+
+calc_Hlamsq <- function() {
+  # Args: mod is an ipriorKernel object. Needs lambda, lambdasq, Psql, Hsql,
+  # H2l, ind1, ind2, p, and no.int defined in the parent environment.
+  environment(Hlam_two_way_index) <- environment()
+  q <- p + no.int
+
+  # Calculate square terms of Hlamsq -------------------------------------------
+  if (is.null(Hsql)) {
+    square.terms <- calc_Hlam(Psql[seq_len(q)], lambdasq[seq_len(q)])
+  } else {
+    square.terms <- calc_Hlam(Hsql[seq_len(q)], lambdasq[seq_len(q)])
+  }
+
+  # Calculate two-way terms of Hlamsq ------------------------------------------
+  if (is.null(ind1) && is.null(ind2)) {
+    two.way.terms <- 0
+  } else {
+    lambda.two.way <- Hlam_two_way_index(lambda, lambda.sq)
+    two.way.terms <- calc_Hlam(H2l, lambda.two.way)
+  }
+
+  square.terms + two.way.terms
 }
 
 # lambda expansion and Hlam.mat calculation for multinomial IIA models ---------
@@ -301,7 +340,7 @@ HlamsqFn_mult <- function(env = environment()) {
   assign("Hlam.matsq", res.Hlam.matsq, envir = env)
 }
 
-Hlam_two_way_index <- function(lam = c(1, 2, 3, 4), lamsq = c(4, 5, 6, 7)) {
+Hlam_two_way_index <- function(lam, lamsq) {
   # mod <- iprior::.kernL(Species ~ . ^ 2, iris)
   # iprobit.env <- environment()
   # list2env(mod, iprobit.env)
@@ -312,9 +351,9 @@ Hlam_two_way_index <- function(lam = c(1, 2, 3, 4), lamsq = c(4, 5, 6, 7)) {
   comb.ind12 <- split(comb.ind12, row(comb.ind12))
 
   replace_ind <- function(x) {
-    if (any(x > l)) {
-      here <- which(x > l)
-      what <- x[here] - l
+    if (any(x > p)) {
+      here <- which(x > p)
+      what <- x[here] - p
       res <- c(x[-here], intr[, what])
       sort(res)
     } else {

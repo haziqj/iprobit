@@ -1,95 +1,93 @@
-#' @export
-iprobit <- function(...) {
-  UseMethod("iprobit")
-}
+################################################################################
+#
+#   iprobit: Binary and Multinomial Probit Regression with I-priors
+#   Copyright (C) 2017  Haziq Jamil
+#
+#   This program is free software: you can redistribute it and/or modify
+#   it under the terms of the GNU General Public License as published by
+#   the Free Software Foundation, either version 3 of the License, or
+#   (at your option) any later version.
+#
+#   This program is distributed in the hope that it will be useful,
+#   but WITHOUT ANY WARRANTY; without even the implied warranty of
+#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+#   GNU General Public License for more details.
+#
+#   You should have received a copy of the GNU General Public License
+#   along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+################################################################################
 
 #' @export
-iprobit.default <- function(y, ..., kernel = "Canonical", silent = FALSE,
-                            interactions = NULL, parsm = TRUE, control = list()) {
+iprobit <- function(...) UseMethod("iprobit")
+
+#' @export
+iprobit.default <- function(y, ..., kernel = "linear",  interactions = NULL,
+                            common.intercept  = FALSE,
+                            common.RKHS.scale = FALSE,
+                            # nystrom = FALSE, nys.seed = NULL,
+                            train.samp, control = list()) {
   # Set up controls ------------------------------------------------------------
   xname <- as.character(as.list(match.call(expand.dots = FALSE))$...)
-  con <- list(
-    maxit             = 100,
-    stop.crit         = 1e-5,
-    silent            = FALSE,
-    alpha0            = NULL,  # if NULL, parameters are initialised in VB
-    lambda0           = NULL,  # routine
-    w0                = NULL,
-    common.intercept  = FALSE,
-    common.RKHS.scale = FALSE,
-    Nystrom           = FALSE,
-    Nys.seed          = NULL,
-    restarts          = 0,
-    restart.method    = c("lb", "error", "brier")
+  control_ <- list(
+    maxit          = 100,
+    stop.crit      = 1e-5,
+    silent         = FALSE,
+    alpha0         = NULL,  # if NULL, parameters are initialised in VB
+    lambda0        = NULL,  # routine
+    w0             = NULL,
+    restarts       = 0,
+    restart.method = c("lb", "error", "brier")
   )
-  con_names <- names(con)
-  con[(control_names <- names(control))] <- control
-  if (length(noNms <- control_names[!control_names %in% con_names])) {
-    warning("Unknown names in control options: ", paste(noNms, collapse = ", "),
-            call. = FALSE)
-  }
-  silent_ <- silent
-  list2env(con, environment())
-  con$silent <- silent <- any(isTRUE(silent), isTRUE(silent_))
+  control <- iprior::.update_control(control, control_)
+  list2env(control, environment())
 
-  # Pass to kernel loader and then appropriate VB routine ----------------------
-  if (inherits(y, "ipriorKernel_old")) {
-    ipriorKernel <- y
+  # Load the I-prior model -----------------------------------------------------
+  if (iprior::is.ipriorKernel(y)) {
+    mod <- y
   } else {
-    ipriorKernel <- iprior::.kernL(y, ...,
-                                  model = list(kernel = kernel, parsm = parsm,
-                                               interactions = interactions,
-                                               xname = xname))
-  }
-
-  # Take samples and re-order for Nystrom --------------------------------------
-  n <- ipriorKernel$n
-  if (as.numeric(Nystrom) == n) Nystrom <- FALSE
-  if (as.numeric(Nystrom) > 0) {
-    if (!is.null(Nys.seed)) set.seed(Nys.seed)
-    Nys.samp <- sample(seq_len(n), size = n, replace = FALSE)
-    # in the future, should replace this simple sampling with a more
-    # sophisticated procedure, preferably sampling based on each category
-    ipriorKernel <- .reorder_ipriorKernel(ipriorKernel, Nys.samp)
-    ipriorKernel$Nystrom <- list(m = Nystrom, Nys.samp = Nys.samp, Nys.seed = Nys.seed)
+    mod <- iprior::kernL(y, ..., kernel = kernel, interactions = interactions,
+                         # nystrom = nystrom, nys.seed = nys.seed,
+                         train.samp = train.samp)
   }
 
   # Checks ---------------------------------------------------------------------
-  if (!isTRUE(ipriorKernel$model$probit)) stop("y values must be factors.")
-  if (ipriorKernel$r > 0) stop("Can't fit higher order terms yet.")
-  if (ipriorKernel$no.int.3plus > 0)
+  if (!iprior::is.iprobit(mod)) stop("y values must be factors.")
+  if (mod$no.int.3plus > 0)
     stop("Can't fit more than three-way interactions yet.")
 
   # Pass to the correct VB routine ---------------------------------------------
-  ipriorKernel$m <- m <- length(ipriorKernel$y.levels)
-  if (con$restarts > 1) {
-    res <- iprobit_parallel(ipriorKernel, con$restarts, con$restart.method, con)
+  mod$m <- m <- length(mod$y.levels)
+  if (control$restarts > 1) {
+    # res <- iprobit_parallel(ipriorKernel, con$restarts, con$restart.method, con)
+    stop("Not implemented yet.")
   } else {
     if (m == 2) {
-      res <- iprobit_bin(ipriorKernel, maxit, stop.crit, silent, alpha0,
-                         lambda0, w0)
+      res <- iprobit_bin(mod, maxit, stop.crit, silent, alpha0, lambda0, w0)
+      class(res) <- c("iprobitMod", "iprobitMod_bin")
       res$coefficients <- c(get_alpha(res), get_lambda(res))
     } else {
-      res <- iprobit_mult(ipriorKernel, maxit, stop.crit, silent, alpha0,
-                          lambda0, w0, common.intercept, common.RKHS.scale)
-      res$coefficients <- rbind(get_alpha(res), get_lambda(res))
+      # res <- iprobit_mult(ipriorKernel, maxit, stop.crit, silent, alpha0,
+      #                     lambda0, w0, common.intercept, common.RKHS.scale)
+      # res$coefficients <- rbind(get_alpha(res), get_lambda(res))
+      stop("Not implemented yet.")
     }
-    res$ipriorKernel <- ipriorKernel
+    res$ipriorKernel <- mod
   }
 
   # Change the call to "iprobit" -----------------------------------------------
   res$fullcall <- cl <- match.call()
-  ynamefromcall <- as.character(cl[2])
-  check.yname <- is.null(ipriorKernel$model$yname)
-  if (check.yname) model$yname <- ynamefromcall
-  cl[[1L]] <- as.name("iprobit")
-  m <- match(c("control"), names(cl), 0L)
-  if (any(m > 0)) cl <- cl[-m]
+  # ynamefromcall <- as.character(cl[2])
+  # check.yname <- is.null(ipriorKernel$model$yname)
+  # if (check.yname) model$yname <- ynamefromcall
+  # cl[[1L]] <- as.name("iprobit")
+  # m <- match(c("control"), names(cl), 0L)
+  # if (any(m > 0)) cl <- cl[-m]
   res$call <- cl
-  res$formula <- ipriorKernel$formula
+  res$formula <- mod$formula
 
-  # Include these also in the ipriorMod object ---------------------------------
-  res$control <- con
+  # Include these also in the iprobitMod object --------------------------------
+  res$control <- control
 
   res
 }

@@ -20,14 +20,14 @@
 
 #' @export
 print.iprobitMod <- function(x, dp = 2, ...) {
-  theta <- coef(x)
+  param <- coef(x)
 
   cat("Training error rate:", decimal_place(x$fitted.values$train.error, dp), "%\n")
   # cat("Brier score:", decimal_place(x$brier.score, dp), "\n")
   cat("Lower bound value:", x$lower.bound[x$niter], "\n")
   # cat("Iterations = ", x$niter, "\n")
   cat("\n")
-  print(round(theta, 5))
+  print(round(param, 5))
 }
 
 #' @export
