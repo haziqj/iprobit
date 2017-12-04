@@ -20,7 +20,9 @@
 
 #' @export
 gen_mixture <- function(n = 500, m = 2, mu = m / 2 + 1, sd = 1,
-                        proportion = rep(0.5, m)) {
+                        proportion = rep(0.5, m), seed = NULL) {
+  if (!is.null(seed)) set.seed(seed)
+
   # Angles
   angles <- seq(from = 0, by = 360 / m, length = m) * pi / 180
 
@@ -48,7 +50,9 @@ gen_mixture <- function(n = 500, m = 2, mu = m / 2 + 1, sd = 1,
 }
 
 #' @export
-gen_spiral <- function(n = 300, m = 2, cycles = 2, sd = 0) {
+gen_spiral <- function(n = 300, m = 2, cycles = 2, sd = 0, seed = NULL) {
+  if (!is.null(seed)) set.seed(seed)
+
   angles <- seq(from = 0, by = 360 / m, length = m) * pi / 180
 
   y <- factor(c(rep(1, round(n / m) + n %% m), rep(2:m, each = round(n / m))))
@@ -76,7 +80,9 @@ gen_spiral <- function(n = 300, m = 2, cycles = 2, sd = 0) {
 }
 
 #' @export
-gen_circle <- function(n = 100, m = 2, sd = 0.1 / sqrt(m)) {
+gen_circle <- function(n = 100, m = 2, sd = 0.1 / sqrt(m), seed = NULL) {
+  if (!is.null(seed)) set.seed(seed)
+
   n.sim <- rep(n %/% m, m)
   n.sim[seq_len(n %% m)] <- n.sim[seq_len(n %% m)] + 1
 

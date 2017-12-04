@@ -19,15 +19,15 @@
 ################################################################################
 
 #' @export
-iprobit_bin <- function(ipriorKernel, maxit = 100, stop.crit = 1e-5,
-                        silent = FALSE, alpha0 = NULL, lambda0 = NULL,
-                        w0 = NULL) {
+iprobit_bin <- function(mod, maxit = 100, stop.crit = 1e-5, silent = FALSE,
+                        alpha0 = NULL, lambda0 = NULL, w0 = NULL) {
   # Declare all variables and functions to be used into environment ------------
   iprobit.env <- environment()
-  list2env(ipriorKernel, iprobit.env)
+  mod$estl$est.psi <- FALSE
+  list2env(mod, iprobit.env)
   list2env(BlockBStuff, iprobit.env)
   environment(BlockB) <- iprobit.env
-  environment(calc_Hlamsq) <- iprobit.env
+  environment(get_Hlamsq) <- iprobit.env
   environment(loop_logical) <- iprobit.env
   maxit <- max(1, maxit)  # cannot have maxit <= 0
   y <- as.numeric(factor(y))  # as.factor then as.numeric to get y = 1, 2, ...
@@ -39,15 +39,16 @@ iprobit_bin <- function(ipriorKernel, maxit = 100, stop.crit = 1e-5,
   lambda <- ct <- lambda0
   lambdasq <- lambda0 ^ 2
   Hl <- iprior::.expand_Hl_and_lambda(Hl, rep(1, p), intr, intr.3plus)$Hl  # expand Hl
-  lambda <- expand_lambda_bin(lambda[1:p], intr, intr.3plus)
-  lambdasq <- expand_lambda_bin(lambdasq[1:p], intr, intr.3plus)
-  Hlam <- calc_Hlam(Hl, lambda)
-  Hlamsq <- calc_Hlamsq()
+  lambda <- expand_lambda(lambda[1:p], intr, intr.3plus)
+  lambdasq <- expand_lambda(lambdasq[1:p], intr, intr.3plus)
+  Hlam   <- get_Hlam(mod, lambda, theta.is.lambda = TRUE)
+  Hlamsq <- get_Hlamsq()
   alpha <- alpha0
   w <- w0
   Varw <- NA
+  eta <- as.numeric(alpha + Hlam %*% w)
   niter <- 0
-  lb <- error.rates <- brier.scores <- rep(NA, maxit)
+  lb <- train.error <- train.brier <- test.error <- test.brier <- rep(NA, maxit)
   lb.const <- (n + 1 + p - log(n) + (p + 1) * log(2 * pi)) / 2
 
   # The variational EM loop ----------------------------------------------------
@@ -56,7 +57,6 @@ iprobit_bin <- function(ipriorKernel, maxit = 100, stop.crit = 1e-5,
 
   while (loop_logical()) {  # see loop_logical() function in iprobit_helper.R
     # Update ystar -------------------------------------------------------------
-    eta <- as.numeric(alpha + Hlam %*% w)
     thing <- rep(NA, n)
     thing1 <- exp(  # phi(eta) / Phi(eta)
       dnorm(eta[y == 2], log = TRUE) - pnorm(eta[y == 2], log.p = TRUE)
@@ -81,8 +81,8 @@ iprobit_bin <- function(ipriorKernel, maxit = 100, stop.crit = 1e-5,
 
     # Update lambda ------------------------------------------------------------
     for (k in 1:p) {
-      lambda <- expand_lambda_bin(lambda[1:p], intr)
-      lambdasq <- expand_lambda_bin(lambdasq[1:p], intr)
+      lambda   <- expand_lambda(lambda[1:p], intr)
+      lambdasq <- expand_lambda(lambdasq[1:p], intr)
       BlockB(k)  # Updates Pl, Psql, and Sl in environment
       ct[k] <- sum(Psql[[k]] * W)
       dt <- as.numeric(
@@ -91,10 +91,10 @@ iprobit_bin <- function(ipriorKernel, maxit = 100, stop.crit = 1e-5,
       lambda[k] <- dt / ct[k]
       lambdasq[k] <- 1 / ct[k] + (dt / ct[k]) ^ 2
     }
-    lambda <- expand_lambda_bin(lambda[1:p], intr, intr.3plus)
-    lambdasq <- expand_lambda_bin(lambdasq[1:p], intr, intr.3plus)
-    Hlam <- calc_Hlam(Hl, lambda)
-    Hlamsq <- calc_Hlamsq()
+    lambda   <- expand_lambda(lambda[1:p], intr, intr.3plus)
+    lambdasq <- expand_lambda(lambdasq[1:p], intr, intr.3plus)
+    Hlam     <- get_Hlam(mod, lambda, theta.is.lambda = TRUE)
+    Hlamsq   <- get_Hlamsq()
 
     # Update alpha -------------------------------------------------------------
     alpha <- mean(ystar - Hlam %*% w)
@@ -105,11 +105,21 @@ iprobit_bin <- function(ipriorKernel, maxit = 100, stop.crit = 1e-5,
       sum(pnorm(-eta[y == 1], log.p = TRUE)) -
       (sum(diag(W)) + determinant(A)$modulus + sum(log(ct))) / 2
 
-    # Calculate fitted values and error rate -----------------------------------
-    ystar <- as.numeric(alpha + Hlam %*% w)
-    fitted.values <- predict_iprobit_bin(y, y.levels, ystar)
-    error.rates[niter + 1] <- fitted.values$train.error
-    brier.scores[niter + 1] <- fitted.values$brier.score
+    # theta --------------------------------------------------------------------
+    theta <- hyperparam_to_theta(lambda = lambda)
+
+    # Calculate fitted values and error rates ----------------------------------
+    eta <- as.numeric(alpha + Hlam %*% w)
+    fitted.values <- probs_yhat_error(y, y.levels, eta)
+    train.error[niter + 1] <- fitted.values$error
+    train.brier[niter + 1] <- fitted.values$brier
+    fitted.test <- NULL
+    if (iprior::.is.ipriorKernel_cv(mod)) {
+      ystar.test <- calc_ystar(mod, mod$Xl.test, alpha, theta, w)
+      fitted.test <- probs_yhat_error(y.test, y.levels, ystar.test)
+      test.error[niter + 1] <- fitted.test$error
+      test.brier[niter + 1] <- fitted.test$brier
+    }
 
     niter <- niter + 1
     if (!silent) setTxtProgressBar(pb, niter)
@@ -118,29 +128,41 @@ iprobit_bin <- function(ipriorKernel, maxit = 100, stop.crit = 1e-5,
   end.time <- Sys.time()
   time.taken <- iprior::as.time(end.time - start.time)
 
-  # Calculate standard errors from posterior variance --------------------------
-  se.alpha <- sqrt(1 / n)
-  se.lambda <- sqrt(1 / ct[1:p])
+  # Calculate posterior s.d. and prepare param table ---------------------------
+  hyperparam <- c(alpha, lambda[1:p])
+  se <- sqrt(c(1 / n, 1 / ct[1:p]))  # c(alpha, lambda)
+  param.summ <- data.frame(
+    Mean    = hyperparam,
+    S.D.    = se,
+    `2.5%`  = hyperparam - qnorm(0.975) * se,
+    `97.5%` = hyperparam + qnorm(0.975) * se
+  )
+  colnames(param.summ) <- c("Mean", "S.D.", "2.5%", "97.5%")
+  if (length(lambda) > 1) {
+    rownames(param.summ) <- c("alpha", paste0("lambda[", seq_along(lambda), "]"))
+  } else {
+    rownames(param.summ) <- c("alpha", "lambda")
+  }
 
   # Clean up and close ---------------------------------------------------------
+  convergence <- niter == maxit
   if (!silent) {
     close(pb)
-    if (niter == maxit) cat("Convergence criterion not met.\n")
+    if (convergence) cat("Convergence criterion not met.\n")
     else cat("Converged after", niter, "iterations.\n")
   }
 
-  list(ystar = ystar, w = w, lambda = lambda[1:p], alpha = alpha,
-       lower.bound = lb[!is.na(lb)], ipriorKernel = NULL, se.alpha = se.alpha,
-       se.lambda = se.lambda, Varw = Varw, y.levels = y.levels,
+  list(theta = theta, param.summ = param.summ, w = w, Varw = Varw,
+       lower.bound = as.numeric(na.omit(lb)), niter = niter,
        start.time = start.time, end.time = end.time, time = time.taken,
-       stop.crit = stop.crit, niter = niter, maxit = maxit,
-       fitted.values = fitted.values, error = error.rates[!is.na(error.rates)],
-       brier = brier.scores[!is.na(brier.scores)])
-  # class(res) <- c("iprobitMod", "iprobitMod_bin")
-  # res
+       fitted.values = fitted.values, test = fitted.test,
+       train.error = as.numeric(na.omit(train.error)),
+       train.brier = as.numeric(na.omit(train.brier)),
+       test.error = as.numeric(na.omit(test.error)),
+       test.brier = as.numeric(na.omit(test.brier)), convergence = convergence)
 }
 
-# if (!isNystrom(ipriorKernel)) {
+# if (!isNystrom(mod)) {
 # } else {
 #   # Nystrom approximation
 #   K.mm <- Hlamsq[1:Nystrom$m, 1:Nystrom$m]

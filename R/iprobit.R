@@ -23,68 +23,83 @@ iprobit <- function(...) UseMethod("iprobit")
 
 #' @export
 iprobit.default <- function(y, ..., kernel = "linear",  interactions = NULL,
+                            est.hurst = FALSE, est.lengthscale = FALSE,
+                            est.offset = FALSE,
                             common.intercept  = FALSE,
                             common.RKHS.scale = FALSE,
                             # nystrom = FALSE, nys.seed = NULL,
                             train.samp, control = list()) {
+  # Load the I-prior model -----------------------------------------------------
+  if (iprior::is.ipriorKernel(y)) {
+    mod <- y
+  } else {
+    mod <- iprior::kernL(y, ..., kernel = kernel, interactions = interactions,
+                         est.lambda = TRUE, lambda = lambda, est.psi = TRUE,
+                         psi = 1, est.hurst = est.hurst,
+                         est.lengthscale = est.lengthscale,
+                         est.offset = est.offset,
+                         # nystrom = nystrom, nys.seed = nys.seed,
+                         train.samp = train.samp)
+  }
+
   # Set up controls ------------------------------------------------------------
-  xname <- as.character(as.list(match.call(expand.dots = FALSE))$...)
   control_ <- list(
     maxit          = 100,
     stop.crit      = 1e-5,
     silent         = FALSE,
-    alpha0         = NULL,  # if NULL, parameters are initialised in VB
-    lambda0        = NULL,  # routine
-    w0             = NULL,
+    alpha0         = NULL,  # if NULL, parameters are
+    lambda0        = NULL,  # initialised in VB
+    w0             = NULL,  # routine
     restarts       = 0,
     restart.method = c("lb", "error", "brier")
   )
   control <- iprior::.update_control(control, control_)
   list2env(control, environment())
 
-  # Load the I-prior model -----------------------------------------------------
-  if (iprior::is.ipriorKernel(y)) {
-    mod <- y
-  } else {
-    mod <- iprior::kernL(y, ..., kernel = kernel, interactions = interactions,
-                         # nystrom = nystrom, nys.seed = nys.seed,
-                         train.samp = train.samp)
-  }
-
   # Checks ---------------------------------------------------------------------
-  if (!iprior::is.iprobit(mod)) stop("y values must be factors.")
+  if (!iprior::.is.categorical(mod)) stop("y values must be factors.")
   if (mod$no.int.3plus > 0)
     stop("Can't fit more than three-way interactions yet.")
+  mod$m <- m <- length(mod$y.levels)  # no. of classes
+  est.method <- iprior::.iprior_method_checker(mod, "em")
+  # >>> CHECK IF PSI = 1 <<<
 
   # Pass to the correct VB routine ---------------------------------------------
-  mod$m <- m <- length(mod$y.levels)
   if (control$restarts > 1) {
     # res <- iprobit_parallel(ipriorKernel, con$restarts, con$restart.method, con)
     stop("Not implemented yet.")
   } else {
     if (m == 2) {
-      res <- iprobit_bin(mod, maxit, stop.crit, silent, alpha0, lambda0, w0)
+      if (est.method["em.closed"]) {  # VB CLOSED-FORM
+        res <- iprobit_bin(mod, maxit, stop.crit, silent, alpha0, lambda0, w0)
+        res$est.method <- "Closed-form VB-EM algorithm."
+      } else {
+        stop("Not implemented yet.")
+      }
       class(res) <- c("iprobitMod", "iprobitMod_bin")
-      res$coefficients <- c(get_alpha(res), get_lambda(res))
+      res$coefficients <- iprior::.reduce_theta(
+        param.summ_to_param.full(res$param.summ), mod$estl
+      )$theta.reduced
     } else {
       # res <- iprobit_mult(ipriorKernel, maxit, stop.crit, silent, alpha0,
       #                     lambda0, w0, common.intercept, common.RKHS.scale)
       # res$coefficients <- rbind(get_alpha(res), get_lambda(res))
       stop("Not implemented yet.")
     }
+    if (res$conv == 0)
+      res$est.conv <- paste0("Converged to within ", control$stop.crit,
+                             " tolerance.")
+    else if (res$conv == 1)
+      res$est.conv <- "Convergence criterion not met."
+    else
+      res$est.conv <- res$message
+    mod$estl$est.psi <- FALSE # <<<<<<<<<<<<<<<<<<<<<<<<<<<
     res$ipriorKernel <- mod
   }
 
   # Change the call to "iprobit" -----------------------------------------------
-  res$fullcall <- cl <- match.call()
-  # ynamefromcall <- as.character(cl[2])
-  # check.yname <- is.null(ipriorKernel$model$yname)
-  # if (check.yname) model$yname <- ynamefromcall
-  # cl[[1L]] <- as.name("iprobit")
-  # m <- match(c("control"), names(cl), 0L)
-  # if (any(m > 0)) cl <- cl[-m]
-  res$call <- cl
-  res$formula <- mod$formula
+  res$call <- iprior::.fix_call_default(match.call(), "iprobit")
+  res$ipriorKernel$call <- iprior::.fix_call_default(match.call(), "kernL")
 
   # Include these also in the iprobitMod object --------------------------------
   res$control <- control
@@ -93,27 +108,24 @@ iprobit.default <- function(y, ..., kernel = "linear",  interactions = NULL,
 }
 
 #' @export
-iprobit.formula <- function(formula, data = parent.frame(), kernel = "Canonical",
-                            silent = FALSE, one.lam = FALSE, parsm = TRUE,
-                            control = list(), ...) {
-  # Pass to iprobit default ----------------------------------------------------
-  ipriorKernel <- iprior::.kernL(formula, data, model = list(kernel = kernel,
-                                                            one.lam = one.lam,
-                                                            parsm = parsm))
-  est <- iprobit.default(y = ipriorKernel, control = control, silent = silent)
-
-  # Changing the call to simply iprobit ----------------------------------------
-  cl <- match.call()
-  est$fullcall <- cl
-  cl[[1L]] <- as.name("iprobit")
-  m <- match(c("formula", "data"), names(cl), 0L)
-  cl <- cl[c(1L, m)]
-  est$call <- cl
-  names(est$call)[2] <- "formula"
-  est$formula <- formula
-  # est$terms <- class(est) <- "ipriorMod"
-
-  est
+iprobit.formula <- function(formula, data, kernel = "linear", one.lam = FALSE,
+                            est.hurst = FALSE, est.lengthscale = FALSE,
+                            est.offset = FALSE, common.intercept  = FALSE,
+                            common.RKHS.scale = FALSE, lambda = 1,
+                            # nystrom = FALSE, nys.seed = NULL,
+                            train.samp, control = list(), ...) {
+  # Simply load the kernel and pass to iprobit.default() ------------------------
+  mod <- iprior::kernL(formula, data, kernel = kernel, one.lam = one.lam,
+                       est.lambda = TRUE, est.hurst = est.hurst,
+                       est.lengthscale = est.lengthscale,
+                       est.offset = est.offset, est.psi = FALSE,
+                       lambda = lambda, psi = 1,
+                       # nystrom = nystrom, nys.seed = nys.seed,
+                       train.samp = train.samp, ...)
+  res <- iprobit.default(y = mod, control = control)
+  res$call <- iprior::.fix_call_formula(match.call(), "iprobit")
+  res$ipriorKernel$call <- iprior::.fix_call_formula(match.call(), "kernL")
+  res
 }
 
 #' @export

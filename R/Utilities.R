@@ -32,6 +32,19 @@ expit <- function(x, log.expit = FALSE) {
   else exp(res)
 }
 
+is.iprobit <- function(x) {
+  if (iprior::is.ipriorKernel(x)) return(x$iprobit)
+  else stop("Not an ipriorKernel object.")
+}
+
+is.iprobit_bin <- function(x) {
+  if (iprior::.is.categorical(x)) {
+    length(x$y.levels) == 2
+  } else {
+    FALSE
+  }
+}
+
 #' @export
 is.iprobitMod_bin <- function(x) inherits(x, "iprobitMod_bin")
 
@@ -74,10 +87,16 @@ print.iprobitLowerBound <- function(x, ...) {
   cat("Lower bound =", x)
 }
 
-#' @export
-get_Hurst <- function(object) {
-  object$ipriorKernel$model$Hurst
+get_theta <- function(object) object$theta
+
+get_w <- function(object) object$w
+
+get_y <- function(object) {
+  res <- factor(object$ipriorKernel$y)
+  levels(res) <- object$ipriorKernel$y.levels
+  res
 }
+
 
 #' @export
 get_one.lam <- function(object) {
@@ -95,43 +114,66 @@ get_kernel <- function(object, collapse = TRUE) {
   kernel.used
 }
 
-#' @export
-get_lambda <- function(object) {
-  lambda <- object$lambda
-  if (is.iprobitMod_bin(object)) {
-    if (length(lambda) > 1)
-      names(lambda) <- paste0("lambda[", seq_along(lambda), "]")
-    else
-      names(lambda) <- "lambda"
-  } else if (is.iprobitMod_mult(object)) {
-    if (nrow(lambda) > 1)
-      rownames(lambda) <- paste0("lambda[", seq_along(lambda[, 1]), ",]")
-    else
-      rownames(lambda) <- "lambda"
-    colnames(lambda) <- paste0("Class = ", seq_along(object$y.levels))
-  } else {
-    stop("Input iprobitMod objects only.")
-  }
+#' get_lambda <- function(object) {
+#'   lambda <- object$lambda
+#'   if (is.iprobitMod_bin(object)) {
+#'     if (length(lambda) > 1)
+#'       names(lambda) <- paste0("lambda[", seq_along(lambda), "]")
+#'     else
+#'       names(lambda) <- "lambda"
+#'   } else if (is.iprobitMod_mult(object)) {
+#'     if (nrow(lambda) > 1)
+#'       rownames(lambda) <- paste0("lambda[", seq_along(lambda[, 1]), ",]")
+#'     else
+#'       rownames(lambda) <- "lambda"
+#'     colnames(lambda) <- paste0("Class = ", seq_along(object$y.levels))
+#'   } else {
+#'     stop("Input iprobitMod objects only.")
+#'   }
+#'
+#'   lambda
+#' }
 
-  lambda
+
+# get_alpha <- function(object) {
+#   alpha <- object$alpha
+#   if (is.iprobitMod_bin(object)) {
+#     # if (length(alpha) > 1)
+#     #   names(alpha) <- paste0("alpha[", seq_along(alpha), "]")
+#     # else
+#     names(alpha) <- "alpha"
+#   } else if (is.iprobitMod_mult(object)) {
+#     alpha <- matrix(alpha, nrow = 1)
+#     rownames(alpha) <- "alpha"
+#     colnames(alpha) <- paste0("Class = ", seq_along(object$y.levels))
+#   } else {
+#     stop("Input iprobitMod objects only.")
+#   }
+#   alpha
+# }
+
+get_alpha <- function(object) {
+  param.full <- param.summ_to_param.full(object$param.summ)
+  param.full[grep("alpha", names(param.full))]
 }
 
-#' @export
-get_alpha <- function(object) {
-  alpha <- object$alpha
-  if (is.iprobitMod_bin(object)) {
-    # if (length(alpha) > 1)
-    #   names(alpha) <- paste0("alpha[", seq_along(alpha), "]")
-    # else
-    names(alpha) <- "alpha"
-  } else if (is.iprobitMod_mult(object)) {
-    alpha <- matrix(alpha, nrow = 1)
-    rownames(alpha) <- "alpha"
-    colnames(alpha) <- paste0("Class = ", seq_along(object$y.levels))
-  } else {
-    stop("Input iprobitMod objects only.")
-  }
-  alpha
+get_lambda <- function(object) {
+  param.full <- param.summ_to_param.full(object$param.summ)
+  param.full[grep("lambda", names(param.full))]
+}
+
+get_sd <- function(object) {
+  setNames(object$param.summ$S.D., rownames(object$param.summ))
+}
+
+get_sd_alpha <- function(object) {
+  res <- get_sd(object)
+  res[grep("alpha", names(res))]
+}
+
+get_sd_lambda <- function(object) {
+  res <- get_sd(object)
+  res[grep("lambda", names(res))]
 }
 
 #' @export
@@ -213,14 +255,18 @@ lambdaExpand_bin <- function(x = lambda, y = lambda.sq, env = iprobit.env) {
   }
 }
 
-expand_lambda_bin <- function(x, intr, intr.3plus = NULL) {
+expand_lambda <- function(x, intr, intr.3plus = NULL) {
   # Helper function to expand lambda or lambda.sq (scale
   # parameters) according to any interactions specification.
   #
   # Args: lambda
   #
   # Returns: Expanded lambda
+
+
+  # if lambda is vector then it is binary
   iprior::.expand_Hl_and_lambda(x, x, intr, intr.3plus)$lambda
+  # else if lambda is matrix then it is multinomial
 }
 
 
@@ -231,58 +277,72 @@ HlamFn <- function(env = environment()) {
   assign("Hlam.mat", res.Hlam.mat, envir = env)
 }
 
-calc_Hlam <- function(Hl, lambda) {
-  Reduce("+", mapply("*", Hl, lambda, SIMPLIFY = FALSE))
-}
-
-HlamsqFn <- function(env = environment()) {
-  # Hl, Hsql, (both lists) and lambda, lambda.sq (both vectors), all of which
-  # must be the same length, should be defined in  environment. Further, ind1
-  # and ind2 are indices of all possible two-way multiplications obtained from
-  # iprior::.kernL$BlockBstuff
-  environment(Hlam_two_way_index) <- env
-  if (is.null(Hsql))
-    square.terms <- Reduce("+", mapply("*", Psql[1:q], lambda.sq[1:q],
-                                       SIMPLIFY = FALSE))
-  else
-    square.terms <- Reduce("+", mapply("*", Hsql[1:q], lambda.sq[1:q],
-                                       SIMPLIFY = FALSE))
-
-  if (is.null(ind1) && is.null(ind2))
-    two.way.terms <- 0
-  else {
-    lambda.two.way <- Hlam_two_way_index(lambda, lambda.sq)
-    two.way.terms <-
-      Reduce("+", mapply("*", H2l, lambda.two.way, SIMPLIFY = FALSE))
+get_Hlam <- function(object, theta, theta.is.lambda = FALSE) {
+  if (is.iprobit_bin(object)) {
+    return(iprior::.get_Hlam(object = object, theta = theta,
+                             theta.is.lambda = theta.is.lambda))
+  } else {
+    stop("Not implemented yet.")
   }
-
-  res.Hlam.matsq <- square.terms + two.way.terms
-  assign("Hlam.matsq", res.Hlam.matsq, envir = env)
 }
 
-calc_Hlamsq <- function() {
+get_Hlamsq <- function() {
   # Args: mod is an ipriorKernel object. Needs lambda, lambdasq, Psql, Hsql,
   # H2l, ind1, ind2, p, and no.int defined in the parent environment.
   environment(Hlam_two_way_index) <- environment()
   q <- p + no.int
 
-  # Calculate square terms of Hlamsq -------------------------------------------
-  if (is.null(Hsql)) {
-    square.terms <- calc_Hlam(Psql[seq_len(q)], lambdasq[seq_len(q)])
-  } else {
-    square.terms <- calc_Hlam(Hsql[seq_len(q)], lambdasq[seq_len(q)])
-  }
+  if (is.iprobit_bin(mod)) {
+    # Calculate square terms of Hlamsq -----------------------------------------
+    if (is.null(Hsql))
+      square.terms <- Reduce("+", mapply("*", Psql[1:q], lambda.sq[1:q],
+                                         SIMPLIFY = FALSE))
+    else
+      square.terms <- Reduce("+", mapply("*", Hsql[1:q], lambda.sq[1:q],
+                                         SIMPLIFY = FALSE))
 
-  # Calculate two-way terms of Hlamsq ------------------------------------------
-  if (is.null(ind1) && is.null(ind2)) {
-    two.way.terms <- 0
-  } else {
-    lambda.two.way <- Hlam_two_way_index(lambda, lambda.sq)
-    two.way.terms <- calc_Hlam(H2l, lambda.two.way)
-  }
+    # Calculate two-way terms of Hlamsq ----------------------------------------
+    if (is.null(ind1) && is.null(ind2)) {
+      two.way.terms <- 0
+    } else {
+      lambda.two.way <- Hlam_two_way_index(lambda, lambda.sq)
+      two.way.terms <- Reduce("+", mapply("*", H2l, lambda.two.way,
+                                          SIMPLIFY = FALSE))
+    }
 
-  square.terms + two.way.terms
+    return(square.terms + two.way.terms)
+  } else {
+    stop("Not implemented yet.")
+  }
 }
+
+
+# HlamsqFn <- function(env = environment()) {
+#   # Hl, Hsql, (both lists) and lambda, lambda.sq (both vectors), all of which
+#   # must be the same length, should be defined in  environment. Further, ind1
+#   # and ind2 are indices of all possible two-way multiplications obtained from
+#   # iprior::.kernL$BlockBstuff
+#   environment(Hlam_two_way_index) <- env
+#   if (is.null(Hsql))
+#     square.terms <- Reduce("+", mapply("*", Psql[1:q], lambda.sq[1:q],
+#                                        SIMPLIFY = FALSE))
+#   else
+#     square.terms <- Reduce("+", mapply("*", Hsql[1:q], lambda.sq[1:q],
+#                                        SIMPLIFY = FALSE))
+#
+#   if (is.null(ind1) && is.null(ind2))
+#     two.way.terms <- 0
+#   else {
+#     lambda.two.way <- Hlam_two_way_index(lambda, lambda.sq)
+#     two.way.terms <-
+#       Reduce("+", mapply("*", H2l, lambda.two.way, SIMPLIFY = FALSE))
+#   }
+#
+#   res.Hlam.matsq <- square.terms + two.way.terms
+#   assign("Hlam.matsq", res.Hlam.matsq, envir = env)
+# }
+
+
 
 # lambda expansion and Hlam.mat calculation for multinomial IIA models ---------
 
@@ -410,3 +470,58 @@ Hlam_two_way_index <- function(lam, lamsq) {
 #   #
 #   # 4 * H1sq + 9 * H2sq + 36 * H12sq + 2 * 3 * (H1 %*% H2 + H2 %*% H1) + 4 * 3 * (H1 %*% H12 + H12 %*% H1) + 9 * 2 * (H2 %*% H12 + H12 %*% H2)
 # }
+
+hyperparam_to_theta <- function(lambda, hurst, lengthscale, offset) {
+  # In order to be compatible with the iprior helper functions, need theta (the
+  # unconstrained versions of the hyperparameters, excluding alpha).
+  res <- NULL
+  if (!missing(lambda)) {
+    # if (length(lambda == 1)) res <- c(res, log(lambda))
+    res <- c(res, lambda)
+  }
+  if (!missing(hurst)) {
+    res <- c(res, qnorm(hurst))
+  }
+  if (!missing(lengthscale)) {
+    res <- c(res, log(lengthscale))
+  }
+  if (!missing(offset)) {
+    res <- c(res, log(offset))
+  }
+  res
+}
+
+theta_to_hyperparam <- function(theta, alpha, object) {
+  # Convert theta to hyperparam = c(alpha, lambda, etc.)
+  res <- iprior::.theta_to_collapsed_param(theta, object)
+  res <- iprior::.reduce_theta(res, object$estl)$theta.reduced
+  if (length(alpha) == 1) names(alpha) <- "alpha"
+  # res <- res[-grep("psi", names(res))]
+  c(alpha, res)
+}
+
+param.summ_to_param.full <- function(param.summ) {
+  setNames(param.summ$Mean, rownames(param.summ))
+}
+
+expand_param.summ <- function(object, param.summ, theta) {
+  # Args: An ipriorKernel object and param.summ table.
+  #
+  # Returns: An expanded param.summ table.
+  alpha.ind <- grep("alpha", rownames(param.summ))
+  res1 <- param.summ[alpha.ind, , drop = FALSE]
+  res2 <- as.list(param.summ[-alpha.ind, , drop = FALSE])
+  tmp1 <- iprior::.theta_to_collapsed_param(theta, object)
+  tmp2 <- lapply(res2[-1], iprior::.expand_theta, theta.omitted = NA,
+                 theta.drop = object$thetal$theta.drop)
+  res2 <- as.data.frame(c(list(Mean = tmp1), tmp2))
+  colnames(res2) <- colnames(res1)
+  rbind(res1, res2)
+}
+
+
+
+
+
+
+
