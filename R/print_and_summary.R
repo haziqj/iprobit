@@ -74,7 +74,9 @@ print.iprobitMod_summary <- function(x, wrap = FALSE, ...) {
   cat("Hyperparameters:\n")
   tmp <- capture.output(print(round(x$tab, 4)))
   cat(paste(gsub("NA", "  ", tmp), collapse = "\n"))
-  cat("\n\n")
+  cat("\n")
+  cat("---\n")
+  cat("\n")
   cat(x$est.method)
   cat(" Iterations:", paste0(x$niter, "/", x$maxit), "\n")
   cat(x$est.conv)
@@ -82,22 +84,8 @@ print.iprobitMod_summary <- function(x, wrap = FALSE, ...) {
   print(x$time)
   cat("\n")
   cat("Variational lower bound:", x$lb, "\n")
-  cat("Training error:", x$train.error, "%. Brier score:", x$train.brier, "\n")
+  cat("Training error:", paste0(x$train.error, "%. Brier score:"), x$train.brier, "\n")
   if (!is.null(x$test.error) & !is.null(x$test.brier)) {
-    cat("Test error:", x$test.error, "%. Brier score:", x$test.brier, "\n")
+    cat("Test error:", paste0(x$test.error, "%. Brier score:"), x$test.brier, "\n")
   }
-  # if (x$niter == x$maxit) {
-  #   cat("\nConvergence criterion not met. ")
-  # } else {
-  #   cat("\nConverged to within", x$stop.crit, "tolerance. ")
-  # }
-  # cat("No. of iterations:", x$niter)
-  #
-  # # if (isTRUE(x$Nystrom.check)) {
-  # #   cat("\nNystrom approximation used (with", x$Nystrom$m, "random subsamples)")
-  # # }
-  #
-  # cat("\nVariational lower bound:", x$lb[x$niter], "\n")
-  # cat("Training error rate:", decimal_place(x$train.error),
-  #     "%. Brier score:", decimal_place(x$train.brier), "\n")
 }

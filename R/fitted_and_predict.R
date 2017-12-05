@@ -201,8 +201,8 @@ predict_quant <- function(object, n.samp, transform = identity, raw = FALSE,
   } else {
     return(structure(list(
       prob        = quantile_prob(phats),
-      error.rate  = stats::quantile(tmp$error.samp, probs = c(0.05, 0.25, 0.5, 0.75, 0.95)),
-      brier.score = stats::quantile(tmp$brier.samp, probs = c(0.05, 0.25, 0.5, 0.75, 0.95)),
+      error.rate  = stats::quantile(tmp$error.samp, probs = c(0.025, 0.25, 0.5, 0.75, 0.975)),
+      brier.score = stats::quantile(tmp$brier.samp, probs = c(0.025, 0.25, 0.5, 0.75, 0.975)),
       type        = match.arg(type, c("train", "test"))
     ), class = "iprobitPredict_quant"))
   }
@@ -389,7 +389,7 @@ quantile_prob <- function(phats) {
   # Get quantiles for lists returned from convert_prob()
   for (i in seq_along(phats)) {
     phats[[i]] <- t(apply(phats[[i]], 1, stats::quantile,
-                          probs = c(0.05, 0.25, 0.5, 0.75, 0.95)))
+                          probs = c(0.025, 0.25, 0.5, 0.75, 0.975)))
   }
   lapply(phats, as.data.frame)
 }
@@ -397,10 +397,10 @@ quantile_prob <- function(phats) {
 #' @export
 print.iprobitPredict <- function(x, rows = 10, digits = 3, ...) {
   if (x$type == "train") {
-    cat("Training error:", decimal_place(x$error.rate, digits), "%\n")
+    cat("Training error:", paste0(decimal_place(x$error.rate, digits), "%\n"))
     cat("Brier score   :", decimal_place(x$brier.score, digits), "\n")
   } else if (!is.nan(x$error.rate)) {
-    cat("Test error :", decimal_place(x$error.rate, digits), "%\n")
+    cat("Test error :", paste0(decimal_place(x$error.rate, digits), "%\n"))
     cat("Brier score:", decimal_place(x$brier.score, digits), "\n")
   } else {
     cat("Test data not provided.\n")

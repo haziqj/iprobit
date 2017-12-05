@@ -519,6 +519,13 @@ expand_param.summ <- function(object, param.summ, theta) {
   rbind(res1, res2)
 }
 
+theta_to_coef <- function(theta, object) {
+  # Args: An ipriorKernel object.
+  #
+  # Returns: Hyperparameters of the kernel, excluding psi usually.
+  param.full <- iprior::.theta_to_collapsed_param(theta, object)
+  iprior::.reduce_theta(param.full, object$estl)$theta.reduced
+}
 
 
 

@@ -34,7 +34,7 @@ iprobit.default <- function(y, ..., kernel = "linear",  interactions = NULL,
     mod <- y
   } else {
     mod <- iprior::kernL(y, ..., kernel = kernel, interactions = interactions,
-                         est.lambda = TRUE, lambda = lambda, est.psi = TRUE,
+                         est.lambda = TRUE, lambda = lambda, est.psi = FALSE,
                          psi = 1, est.hurst = est.hurst,
                          est.lengthscale = est.lengthscale,
                          est.offset = est.offset,
@@ -50,6 +50,10 @@ iprobit.default <- function(y, ..., kernel = "linear",  interactions = NULL,
     alpha0         = NULL,  # if NULL, parameters are
     lambda0        = NULL,  # initialised in VB
     w0             = NULL,  # routine
+    theta0         = NULL,
+    n.samp         = 100,  # settings for
+    sd.samp        = 0.15,   # the metropolis
+    thin.samp      = 2,    # sampler
     restarts       = 0,
     restart.method = c("lb", "error", "brier")
   )
@@ -74,7 +78,11 @@ iprobit.default <- function(y, ..., kernel = "linear",  interactions = NULL,
         res <- iprobit_bin(mod, maxit, stop.crit, silent, alpha0, lambda0, w0)
         res$est.method <- "Closed-form VB-EM algorithm."
       } else {
-        stop("Not implemented yet.")
+        res <- iprobit_bin_metr(mod, maxit, stop.crit, silent, alpha0, theta0,
+                                w0, n.samp, sd.samp, thin.samp)
+        res$est.method <- paste0("VB-EM with Metropolis sampler (",
+                                 iprior::dec_plac(mean(res$acc.rate) * 100, 1),
+                                 "% acc.).")
       }
       class(res) <- c("iprobitMod", "iprobitMod_bin")
       res$coefficients <- iprior::.reduce_theta(
@@ -93,7 +101,6 @@ iprobit.default <- function(y, ..., kernel = "linear",  interactions = NULL,
       res$est.conv <- "Convergence criterion not met."
     else
       res$est.conv <- res$message
-    mod$estl$est.psi <- FALSE # <<<<<<<<<<<<<<<<<<<<<<<<<<<
     res$ipriorKernel <- mod
   }
 
