@@ -77,62 +77,116 @@ iplot_lb <- function(x, niter.plot = NULL, lab.pos = c("up", "down")) {
     theme_bw()
 }
 
-prepare_point_range <- function(object, test.data = NULL, X.var = c(1, 2)) {
+prepare_point_range <- function(object, test.data = NULL, X.var = c(1, 2),
+                                grid.len = 100) {
   # Helper function for iplot_predict() and iplot_dec_bound()
-  X <- object$ipriorKernel$x
-  class(X) <- NULL
-  X <- as.data.frame(X)
-  p <- ncol(X)
-  xname <- object$ipriorKernel$model$xname[X.var]
+  X <- lapply(object$ipriorKernel$Xl, as.matrix)  # make all X a matrix
+  col.info <- sapply(X, ncol)  # no. of cols of each matrix in the list
+  p <- sum(col.info)  # How many X columns in total?
+  Xl.min <- lapply(X, function(x) apply(x, 2, min))  # get min X values
+  Xl.max <- lapply(X, function(x) apply(x, 2, max))  # get max X values
+  Xl.minmax <- mapply(rbind, Xl.min, Xl.max, SIMPLIFY = FALSE)  # put together
 
-  maxmin <- cbind(apply(X, 2, min), apply(X, 2, max))
+  # Create grid for X values ---------------------------------------------------
   xx <- list(NULL)
-  for (j in 1:2) {
-    mm <- maxmin[X.var[j], ]
-    xx[[j]] <- seq(from = mm[1] - 1, to = mm[2] + 1, length.out = 100)
+  for (i in seq_along(Xl.minmax)) {
+    tmp <- matrix(0, nrow = grid.len, ncol = ncol(Xl.minmax[[i]]))
+    for (j in seq_len(ncol(Xl.minmax[[i]]))) {
+      mm <- as.numeric(Xl.minmax[[i]][, j])
+      tmp[, j] <- seq(from = mm[1] - 1, to = mm[2] + 1, length.out = grid.len)
+    }
+    xx[[i]] <- tmp
   }
-  mm <- maxmin[X.var, ]
-  plot.df <- expand.grid(xx[[1]], xx[[2]])
-  if (p > 2) {
-    X.avg <- X[, -X.var]
-    xx.avg <- apply(X.avg, 2, mean)
-    plot.df <- cbind(plot.df, lapply(xx.avg, function(x) x))
+  xx.all <- do.call(cbind, xx)  # combine into one big matrix
+  xx.all.l <- split(xx.all, rep(1:ncol(xx.all), each = nrow(xx.all)))  # split into list
+  xx.all <- expand.grid(xx.all.l)  # expand the grid
+
+  col.ind2 <- cumsum(col.info)
+  col.ind1 <- col.ind2 - col.info + 1
+  for (i in seq_along(xx)) {
+    xx[[i]] <- xx.all[, col.ind1[i]:col.ind2[i]]
   }
 
-  classes <- factor(object$ipriorKernel$Y)
+  # Build the plotting data frame (predicted probabilities) --------------------
+  prob <- predict_iprobit(object, xx, test.data)$prob  # predicted probabilities
+  plot.df <- xx.all[, X.var]
+  plot.df <- data.frame(plot.df, prob)
+  colnames(plot.df)[1:2] <- c("X1", "X2")
+  colnames(plot.df)[-(1:p)] <- paste0("class",
+                                      seq_along(object$ipriorKernel$y.levels))
+
+  # Build the plotting data frame (observed data points) -----------------------
+  classes <- factor(object$ipriorKernel$y)
   levels(classes) <- object$ipriorKernel$y.levels
-  points.df <- data.frame(X[, X.var], classes)
+  XX <- do.call(cbind, X)
+  points.df <- data.frame(XX[, X.var], classes)
+  if (!is.null(test.data)) {
+    if (is.iprobitData(test.data)) test.data <- as.data.frame(test.data)
+    points.df <- test.data  # replace with test.data if supplied
+  }
+  colnames(points.df) <- c("X1", "X2", "Class")
 
-  if (!is.null(object$formula)) {
+  # Others ---------------------------------------------------------------------
+  mm <- t(do.call(cbind, Xl.minmax))  # max and min for each variable (rows)
+  if (!is.null(object$ipriorKernel$formula)) {
     # Fitted using formula
     xname <- colnames(plot.df)[1:2] <-
       attr(object$ipriorKernel$terms, "term.labels")[X.var]
-    prob <- predict(object, newdata = plot.df)$prob
-    if (!is.null(test.data)) {
-      if (is.iprobitData(test.data)) test.data <- as.data.frame(test.data)
-      points.df <- test.data
-    }
   } else {
-    prob <- predict(object, newdata = list(plot.df))$prob
-    if (!is.null(test.data)) {
-      if (is.iprobitData(test.data)) test.data <- as.data.frame(test.data)
-      points.df <- test.data
-    }
+    xname <- object$ipriorKernel$xname
   }
-  plot.df <- cbind(plot.df, prob)
-  colnames(plot.df)[1:2] <- c("X1", "X2")
-  colnames(plot.df)[-(1:p)] <- paste0("class", seq_along(object$y.levels))
-  colnames(points.df) <- c("X1", "X2", "Class")
-  list(maxmin = maxmin, mm = mm, plot.df = plot.df, points.df = points.df,
-       prob = prob, X = X, classes = classes, j = j, p = p,
-       test.data = test.data, X.var = X.var, xname = xname, xx = xx)
+
+
+#
+#   maxmin <- cbind(apply(X, 2, min), apply(X, 2, max))
+#   xx <- list(NULL)
+#   for (j in 1:2) {
+#     mm <- maxmin[X.var[j], ]
+#     xx[[j]] <- seq(from = mm[1] - 1, to = mm[2] + 1, length.out = 10)
+#   }
+#   mm <- maxmin[X.var, ]
+#   plot.df <- expand.grid(xx[[1]], xx[[2]])
+#   if (p > 2) {
+#     X.avg <- X[, -X.var]
+#     xx.avg <- apply(X.avg, 2, mean)
+#     plot.df <- cbind(plot.df, lapply(xx.avg, function(x) x))
+#   }
+#
+#   classes <- factor(object$ipriorKernel$y)
+#   levels(classes) <- object$ipriorKernel$y.levels
+#   points.df <- data.frame(X[, X.var], classes)
+#
+#   if (!is.null(object$formula)) {
+#     # Fitted using formula
+#     xname <- colnames(plot.df)[1:2] <-
+#       attr(object$ipriorKernel$terms, "term.labels")[X.var]
+#     prob <- predict(object, newdata = plot.df)$prob
+#     if (!is.null(test.data)) {
+#       if (is.iprobitData(test.data)) test.data <- as.data.frame(test.data)
+#       points.df <- test.data
+#     }
+#   } else {
+#     prob <- predict(object, newdata = list(plot.df))$prob
+#     if (!is.null(test.data)) {
+#       if (is.iprobitData(test.data)) test.data <- as.data.frame(test.data)
+#       points.df <- test.data
+#     }
+#   }
+  # plot.df <- cbind(plot.df, prob)
+  # colnames(plot.df)[1:2] <- c("X1", "X2")
+  # colnames(plot.df)[-(1:p)] <- paste0("class", seq_along(object$y.levels))
+  # colnames(points.df) <- c("X1", "X2", "Class")
+  # list(maxmin = maxmin, mm = mm, plot.df = plot.df, points.df = points.df,
+  #      prob = prob, X = X, classes = classes, j = j, p = p,
+  #      test.data = test.data, X.var = X.var, xname = xname, xx = xx)
+  list(plot.df = plot.df, points.df = points.df, mm = mm, xname = xname[X.var])
 }
 
 #' @export
 iplot_dec_bound <- function(object, X.var = c(1, 2), col = "grey35", size = 0.8,
                             ...) {
   list2env(prepare_point_range(object, NULL, X.var), envir = environment())
-  m <- object$ipriorKernel$m
+  m <- length(object$ipriorKernel$y.levels)
   ggplot() +
     geom_point(data = points.df, aes(X1, X2, col = Class)) +
     geom_contour(data = plot.df, aes(X1, X2, z = class2, size = "Decision\nboundary"),
@@ -147,28 +201,28 @@ iplot_dec_bound <- function(object, X.var = c(1, 2), col = "grey35", size = 0.8,
 }
 
 #' @export
-iplot_predict <- function(object, test.data = NULL, X.var = c(1, 2)) {
-  list2env(prepare_point_range(object, test.data, X.var), envir = environment())
+iplot_predict <- function(object, test.data = NULL, X.var = c(1, 2),
+                          grid.len = 100) {
+  list2env(prepare_point_range(object, test.data, X.var, grid.len),
+           envir = environment())
 
   if (is.iprobitMod_bin(object))
-    p <- iplot_predict_bin(plot.df, points.df, mm[1, ], mm[2, ],
-                           length(levels(classes)))
+    p <- iplot_predict_bin(plot.df, points.df, mm[1, ], mm[2, ], 2)
   if (is.iprobitMod_mult(object))
-    p <- iplot_predict_mult(plot.df, points.df, mm[1, ], mm[2, ],
-                            length(levels(classes)))
+    p <- iplot_predict_mult(plot.df, points.df, mm[1, ], mm[2, ], get_m(object))
 
-  if (isNystrom(object)) {
-    Nys.m <- object$ipriorKernel$Nystrom$m
-    Nys.lab <- object$ipriorKernel$Nystrom$Nys.samp[1:Nys.m]
-    Nys.df <- points.df[seq_len(Nys.m), ]
-    Nys.df <- cbind(Nys.df, Nys.lab)
-    p <- p +
-      geom_point(data = Nys.df, aes(X1, X2), size = 1.8) +
-      geom_point(data = Nys.df, aes(X1, X2, col = Class), size = 1)
-  }
+  # if (isNystrom(object)) {
+  #   Nys.m <- object$ipriorKernel$Nystrom$m
+  #   Nys.lab <- object$ipriorKernel$Nystrom$Nys.samp[1:Nys.m]
+  #   Nys.df <- points.df[seq_len(Nys.m), ]
+  #   Nys.df <- cbind(Nys.df, Nys.lab)
+  #   p <- p +
+  #     geom_point(data = Nys.df, aes(X1, X2), size = 1.8) +
+  #     geom_point(data = Nys.df, aes(X1, X2, col = Class), size = 1)
+  # }
 
-  yname <- ifelse(object$ipriorKernel$model$yname == "y", "Class",
-                  object$ipriorKernel$model$yname)
+  yname <- ifelse(object$ipriorKernel$yname == "y", "Class",
+                  object$ipriorKernel$yname)
   p <- p +
     labs(x = xname[1], y = xname[2], col = yname)
   p

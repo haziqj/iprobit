@@ -34,7 +34,7 @@ iprobit.default <- function(y, ..., kernel = "linear",  interactions = NULL,
     mod <- y
   } else {
     mod <- iprior::kernL(y, ..., kernel = kernel, interactions = interactions,
-                         est.lambda = TRUE, lambda = lambda, est.psi = FALSE,
+                         est.lambda = TRUE, est.psi = FALSE,
                          psi = 1, est.hurst = est.hurst,
                          est.lengthscale = est.lengthscale,
                          est.offset = est.offset,

@@ -61,12 +61,10 @@ predict.iprobitMod <- function(object, newdata = list(), y.test = NULL,
   }
   if (!is.null(object$ipriorKernel$formula)) {
     if (is.iprobitData(newdata)) newdata <- as.data.frame(newdata)
-    tt <- object$ipriorKernel$terms
-    Terms <- delete.response(tt)
-    xstar <- model.frame(Terms, newdata)
-    if (any(colnames(newdata) == object$ipriorKernel$yname))
-      y.test <- model.extract(model.frame(tt, newdata), "response")
-    xrownames <- rownames(xstar)
+    tmp <- iprior::.terms_to_xy(object$ipriorKernel, newdata)
+    y.test <- tmp$y
+    xstar <- tmp$Xl
+    xrownames <- rownames(newdata)
   } else {
     if (any(sapply(newdata, is.vector))) {
       newdata <- lapply(newdata, as.matrix)

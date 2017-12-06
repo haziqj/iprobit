@@ -18,6 +18,27 @@
 #
 ################################################################################
 
+remove_psi <- function(object) {
+  # In iprobit fitting, the model error precision psi is fixed at 1. This sets
+  # psi = 1 if it was not. Most relevant for fitting through
+  # iprobit.ipriorKernel().
+  #
+  # Args: An ipriorKernel object.
+  #
+  # Returns: An updated ipriorKernel object. A warning message if psi was set to
+  # be estimated.
+  if (isTRUE(object$estl$est.psi)) {
+    warning("iprobit does not estimate model error precision. Setting psi = 1.",
+            call. = FALSE, immediate. = TRUE)
+    object$estl$est.psi <- FALSE
+    object$thetal$theta <- object$thetal$theta[!grepl("psi", names(object$thetal$theta))]
+    object$thetal$theta.omitted <- c(object$thetal$theta.omitted, "psi" = 0)
+    object$thetal$theta.drop["psi"] <- TRUE
+    object$thetal$n.theta <- object$thetal$n.theta - 1
+  }
+  object
+}
+
 #' @export
 logit <- function(x, exp.logit = FALSE) {
   res <- log(x) - log(1 - x)
@@ -232,6 +253,8 @@ get_brier_scores <- function(x) {
   res
 }
 
+get_m <- function(object) length(object$ipriorKernel$y.levels)
+
 all.same <- function(v) {
   # https://stackoverflow.com/questions/4752275/test-for-equality-among-all-elements-of-a-single-vector
   all(sapply(as.list(v[-1]), FUN = function(z) identical(z, v[1])))
@@ -295,17 +318,17 @@ get_Hlamsq <- function() {
   if (is.iprobit_bin(mod)) {
     # Calculate square terms of Hlamsq -----------------------------------------
     if (is.null(Hsql))
-      square.terms <- Reduce("+", mapply("*", Psql[1:q], lambda.sq[1:q],
+      square.terms <- Reduce("+", mapply("*", Psql[1:q], lambdasq[1:q],
                                          SIMPLIFY = FALSE))
     else
-      square.terms <- Reduce("+", mapply("*", Hsql[1:q], lambda.sq[1:q],
+      square.terms <- Reduce("+", mapply("*", Hsql[1:q], lambdasq[1:q],
                                          SIMPLIFY = FALSE))
 
     # Calculate two-way terms of Hlamsq ----------------------------------------
     if (is.null(ind1) && is.null(ind2)) {
       two.way.terms <- 0
     } else {
-      lambda.two.way <- Hlam_two_way_index(lambda, lambda.sq)
+      lambda.two.way <- Hlam_two_way_index(lambda, lambdasq)
       two.way.terms <- Reduce("+", mapply("*", H2l, lambda.two.way,
                                           SIMPLIFY = FALSE))
     }

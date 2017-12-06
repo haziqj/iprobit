@@ -1,142 +1,142 @@
-context("Multinomial models")
-
-test_that("Fitting multinomial models (IIA)", {
-
-  m <- 4
-	dat <- gen_mixture(n = 10, m = m)
-	mod1 <- iprobit(dat$y, dat$X, silent = TRUE, control = list(maxit = 5))
-	modf <- iprobit(y ~ ., dat, silent = TRUE, one.lam = TRUE,
-	                control = list(maxit = 5))
-	expect_s3_class(mod1, "iprobitMod")
-	expect_s3_class(mod1, "iprobitMod_mult")
-	expect_s3_class(modf, "iprobitMod")
-	expect_s3_class(modf, "iprobitMod_mult")
-
-	# Common intercept
-	mod2 <- iprobit(dat$y, dat$X, silent = TRUE,
-	                control = list(maxit = 5, common.intercept = TRUE))
-	expect_true(all.same(get_alpha(mod2)))
-
-	# Common RKHS scale parameter
-	mod3 <- iprobit(dat$y, dat$X, silent = TRUE,
-	                control = list(maxit = 5, common.RKHS.scale = TRUE))
-	expect_true(all.same(get_lambda(mod3)))
-
-	# Common intercept and RKHS scale parameter
-	mod4 <- iprobit(dat$y, dat$X, silent = TRUE,
-	                control = list(maxit = 5,
-	                               common.intercept = TRUE,
-	                               common.RKHS.scale = TRUE))
-	expect_true(all.same(get_alpha(mod4)))
-	expect_true(all.same(get_lambda(mod4)))
-
-})
-
-test_that("Print (IIA)", {
-
-  m <- 4
-  dat <- gen_mixture(n = 10, m = m)
-  mod <- iprobit(dat$y, dat$X, silent = TRUE, control = list(maxit = 5))
-  modf <- iprobit(y ~ ., dat, silent = TRUE, one.lam = TRUE, control = list(maxit = 5))
-  expect_that(print(mod), prints_text("Training error rate"))
-  expect_that(print(modf), prints_text("Training error rate"))
-
-})
-
-test_that("Summary", {
-
-  m <- 4
-  dat <- gen_mixture(n = 10, m = m)
-  mod <- iprobit(dat$y, dat$X, silent = TRUE, control = list(maxit = 5))
-  modf <- iprobit(y ~ ., dat, silent = TRUE, one.lam = TRUE, control = list(maxit = 5))
-  mod.summary <- summary(mod)
-  modf.summary <- summary(modf)
-  expect_s3_class(mod.summary, "iprobitSummary")
-  expect_s3_class(modf.summary, "iprobitSummary")
-
-})
-
-test_that("Fitted", {
-
-  m <- 4
-  dat <- gen_mixture(n = 10, m = m)
-  mod <- iprobit(dat$y, dat$X, silent = TRUE, control = list(maxit = 5))
-  modf <- iprobit(y ~ ., dat, silent = TRUE, one.lam = TRUE, control = list(maxit = 5))
-  expect_that(fitted(mod), is_a("iprobit_predict"))
-  expect_that(fitted(modf), is_a("iprobit_predict"))
-
-})
-
-test_that("Fitted quantiles", {
-
-  m <- 4
-  dat <- gen_mixture(n = 10, m = m)
-  mod <- iprobit(dat$y, dat$X, silent = TRUE, control = list(maxit = 5))
-  modf <- iprobit(y ~ ., dat, silent = TRUE, one.lam = TRUE, control = list(maxit = 5))
-  expect_that(fitted(mod, TRUE, n.samp = 3), is_a("iprobit_predict_quant"))
-  expect_that(fitted(modf, TRUE, n.samp = 3), is_a("iprobit_predict_quant"))
-
-})
-
-test_that("Predict (without test error rate)", {
-
-  m <- 4
-  dat <- gen_mixture(n = 10, m = m)
-  dat.test <- gen_mixture(n = 5, m = m)
-  mod <- iprobit(dat$y, dat$X, silent = TRUE, control = list(maxit = 5))
-  modf <- iprobit(y ~ ., dat, silent = TRUE, one.lam = TRUE,
-                  control = list(maxit = 5))
-
-  mod.predict <- predict(mod, newdata = list(dat.test$X))
-  modf.predict <- predict(modf, newdata = dat.test)
-
-  expect_s3_class(mod.predict, "iprobit_predict")
-  expect_s3_class(modf.predict, "iprobit_predict")
-  expect_that(print(mod.predict), prints_text("Test data not provided."))
-
-})
-
-test_that("Predict (with test error rate)", {
-
-  m <- 4
-  dat <- gen_mixture(n = 10, m = m)
-  dat.test <- gen_mixture(n = 5, m = m)
-  mod <- iprobit(dat$y, dat$X, silent = TRUE, control = list(maxit = 5))
-  modf <- iprobit(y ~ ., dat, silent = TRUE, one.lam = TRUE,
-                  control = list(maxit = 5))
-
-  mod.predict <- predict(mod, newdata = list(dat.test$X), y = dat.test$y)
-  modf.predict <- predict(modf, newdata = dat.test)
-
-  expect_that(print(mod.predict), prints_text("Test error"))
-  expect_that(print(modf.predict), prints_text("Test error"))
-
-})
-
-test_that("Convergence", {
-
-  set.seed(123)
-  m <- 3
-  dat <- gen_mixture(n = 10, m = m)
-  mod <- iprobit(dat$y, dat$X,
-                 control = list(maxit = 500, silent = TRUE,
-                                alpha0 = rep(1, m),
-                                lambda0 = rep(1, m)))
-  modf <- iprobit(y ~ ., dat, one.lam = TRUE,
-                  control = list(maxit = 500, silent = TRUE,
-                                 alpha0 = rep(1, m),
-                                 lambda0 = rep(1, m)))
-  expect_equal(get_lambda(mod)[2], 0.1743832, tolerance = 1e-3)
-  expect_equal(get_lambda(modf)[2], 0.1743832, tolerance = 1e-3)
-
-  # Single lambda
-  # > modf
-  # Training error rate: 20.00 %
-  # Lower bound value: -12.87285
-  #
-  # Class = 1 Class = 2 Class = 3
-  # alpha    0.60748   1.76979   0.62274
-  # lambda   0.00000   0.17438   0.00000
-
-})
-
+# context("Multinomial models")
+#
+# test_that("Fitting multinomial models (IIA)", {
+#
+#   m <- 4
+# 	dat <- gen_mixture(n = 10, m = m)
+# 	mod1 <- iprobit(dat$y, dat$X, silent = TRUE, control = list(maxit = 5))
+# 	modf <- iprobit(y ~ ., dat, silent = TRUE, one.lam = TRUE,
+# 	                control = list(maxit = 5))
+# 	expect_s3_class(mod1, "iprobitMod")
+# 	expect_s3_class(mod1, "iprobitMod_mult")
+# 	expect_s3_class(modf, "iprobitMod")
+# 	expect_s3_class(modf, "iprobitMod_mult")
+#
+# 	# Common intercept
+# 	mod2 <- iprobit(dat$y, dat$X, silent = TRUE,
+# 	                control = list(maxit = 5, common.intercept = TRUE))
+# 	expect_true(all.same(get_alpha(mod2)))
+#
+# 	# Common RKHS scale parameter
+# 	mod3 <- iprobit(dat$y, dat$X, silent = TRUE,
+# 	                control = list(maxit = 5, common.RKHS.scale = TRUE))
+# 	expect_true(all.same(get_lambda(mod3)))
+#
+# 	# Common intercept and RKHS scale parameter
+# 	mod4 <- iprobit(dat$y, dat$X, silent = TRUE,
+# 	                control = list(maxit = 5,
+# 	                               common.intercept = TRUE,
+# 	                               common.RKHS.scale = TRUE))
+# 	expect_true(all.same(get_alpha(mod4)))
+# 	expect_true(all.same(get_lambda(mod4)))
+#
+# })
+#
+# test_that("Print (IIA)", {
+#
+#   m <- 4
+#   dat <- gen_mixture(n = 10, m = m)
+#   mod <- iprobit(dat$y, dat$X, silent = TRUE, control = list(maxit = 5))
+#   modf <- iprobit(y ~ ., dat, silent = TRUE, one.lam = TRUE, control = list(maxit = 5))
+#   expect_that(print(mod), prints_text("Training error rate"))
+#   expect_that(print(modf), prints_text("Training error rate"))
+#
+# })
+#
+# test_that("Summary", {
+#
+#   m <- 4
+#   dat <- gen_mixture(n = 10, m = m)
+#   mod <- iprobit(dat$y, dat$X, silent = TRUE, control = list(maxit = 5))
+#   modf <- iprobit(y ~ ., dat, silent = TRUE, one.lam = TRUE, control = list(maxit = 5))
+#   mod.summary <- summary(mod)
+#   modf.summary <- summary(modf)
+#   expect_s3_class(mod.summary, "iprobitSummary")
+#   expect_s3_class(modf.summary, "iprobitSummary")
+#
+# })
+#
+# test_that("Fitted", {
+#
+#   m <- 4
+#   dat <- gen_mixture(n = 10, m = m)
+#   mod <- iprobit(dat$y, dat$X, silent = TRUE, control = list(maxit = 5))
+#   modf <- iprobit(y ~ ., dat, silent = TRUE, one.lam = TRUE, control = list(maxit = 5))
+#   expect_that(fitted(mod), is_a("iprobit_predict"))
+#   expect_that(fitted(modf), is_a("iprobit_predict"))
+#
+# })
+#
+# test_that("Fitted quantiles", {
+#
+#   m <- 4
+#   dat <- gen_mixture(n = 10, m = m)
+#   mod <- iprobit(dat$y, dat$X, silent = TRUE, control = list(maxit = 5))
+#   modf <- iprobit(y ~ ., dat, silent = TRUE, one.lam = TRUE, control = list(maxit = 5))
+#   expect_that(fitted(mod, TRUE, n.samp = 3), is_a("iprobit_predict_quant"))
+#   expect_that(fitted(modf, TRUE, n.samp = 3), is_a("iprobit_predict_quant"))
+#
+# })
+#
+# test_that("Predict (without test error rate)", {
+#
+#   m <- 4
+#   dat <- gen_mixture(n = 10, m = m)
+#   dat.test <- gen_mixture(n = 5, m = m)
+#   mod <- iprobit(dat$y, dat$X, silent = TRUE, control = list(maxit = 5))
+#   modf <- iprobit(y ~ ., dat, silent = TRUE, one.lam = TRUE,
+#                   control = list(maxit = 5))
+#
+#   mod.predict <- predict(mod, newdata = list(dat.test$X))
+#   modf.predict <- predict(modf, newdata = dat.test)
+#
+#   expect_s3_class(mod.predict, "iprobit_predict")
+#   expect_s3_class(modf.predict, "iprobit_predict")
+#   expect_that(print(mod.predict), prints_text("Test data not provided."))
+#
+# })
+#
+# test_that("Predict (with test error rate)", {
+#
+#   m <- 4
+#   dat <- gen_mixture(n = 10, m = m)
+#   dat.test <- gen_mixture(n = 5, m = m)
+#   mod <- iprobit(dat$y, dat$X, silent = TRUE, control = list(maxit = 5))
+#   modf <- iprobit(y ~ ., dat, silent = TRUE, one.lam = TRUE,
+#                   control = list(maxit = 5))
+#
+#   mod.predict <- predict(mod, newdata = list(dat.test$X), y = dat.test$y)
+#   modf.predict <- predict(modf, newdata = dat.test)
+#
+#   expect_that(print(mod.predict), prints_text("Test error"))
+#   expect_that(print(modf.predict), prints_text("Test error"))
+#
+# })
+#
+# test_that("Convergence", {
+#
+#   set.seed(123)
+#   m <- 3
+#   dat <- gen_mixture(n = 10, m = m)
+#   mod <- iprobit(dat$y, dat$X,
+#                  control = list(maxit = 500, silent = TRUE,
+#                                 alpha0 = rep(1, m),
+#                                 lambda0 = rep(1, m)))
+#   modf <- iprobit(y ~ ., dat, one.lam = TRUE,
+#                   control = list(maxit = 500, silent = TRUE,
+#                                  alpha0 = rep(1, m),
+#                                  lambda0 = rep(1, m)))
+#   expect_equal(get_lambda(mod)[2], 0.1743832, tolerance = 1e-3)
+#   expect_equal(get_lambda(modf)[2], 0.1743832, tolerance = 1e-3)
+#
+#   # Single lambda
+#   # > modf
+#   # Training error rate: 20.00 %
+#   # Lower bound value: -12.87285
+#   #
+#   # Class = 1 Class = 2 Class = 3
+#   # alpha    0.60748   1.76979   0.62274
+#   # lambda   0.00000   0.17438   0.00000
+#
+# })
+#
