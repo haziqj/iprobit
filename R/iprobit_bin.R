@@ -11,7 +11,7 @@
 #   This program is distributed in the hope that it will be useful,
 #   but WITHOUT ANY WARRANTY; without even the implied warranty of
 #   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-#   GNU General Public License for more details.
+#   GNU General Public License for more df.tmpils.
 #
 #   You should have received a copy of the GNU General Public License
 #   along with this program. If not, see <http://www.gnu.org/licenses/>.
@@ -23,14 +23,13 @@ iprobit_bin <- function(mod, maxit = 100, stop.crit = 1e-5, silent = FALSE,
                         alpha0 = NULL, lambda0 = NULL, w0 = NULL) {
   # Declare all variables and functions to be used into environment ------------
   iprobit.env <- environment()
-  mod$estl$est.psi <- FALSE
   list2env(mod, iprobit.env)
   list2env(BlockBStuff, iprobit.env)
   environment(BlockB) <- iprobit.env
   environment(get_Hlamsq) <- iprobit.env
   environment(loop_logical) <- iprobit.env
-  maxit <- max(1, maxit)  # cannot have maxit <= 0
   y <- as.numeric(factor(y))  # as.factor then as.numeric to get y = 1, 2, ...
+  maxit <- max(1, maxit)  # cannot have maxit <= 0
 
   # Initialise -----------------------------------------------------------------
   if (is.null(alpha0)) alpha0 <- rnorm(1)
@@ -46,7 +45,7 @@ iprobit_bin <- function(mod, maxit = 100, stop.crit = 1e-5, silent = FALSE,
   alpha <- alpha0
   w <- w0
   Varw <- NA
-  eta <- as.numeric(alpha + Hlam %*% w)
+  f.tmp <- as.numeric(alpha + Hlam %*% w)
   niter <- 0
   lb <- train.error <- train.brier <- test.error <- test.brier <- rep(NA, maxit)
   lb.const <- (n + 1 + p - log(n) + (p + 1) * log(2 * pi)) / 2
@@ -58,15 +57,15 @@ iprobit_bin <- function(mod, maxit = 100, stop.crit = 1e-5, silent = FALSE,
   while (loop_logical()) {  # see loop_logical() function in iprobit_helper.R
     # Update ystar -------------------------------------------------------------
     thing <- rep(NA, n)
-    thing1 <- exp(  # phi(eta) / Phi(eta)
-      dnorm(eta[y == 2], log = TRUE) - pnorm(eta[y == 2], log.p = TRUE)
+    thing1 <- exp(  # phi(f.tmp) / Phi(f.tmp)
+      dnorm(f.tmp[y == 2], log = TRUE) - pnorm(f.tmp[y == 2], log.p = TRUE)
     )
-    thing0 <- -exp(  # -1 * {phi(eta) / Phi(-eta)}
-      dnorm(eta[y == 1], log = TRUE) - pnorm(-eta[y == 1], log.p = TRUE)
+    thing0 <- -exp(  # -1 * {phi(f.tmp) / Phi(-f.tmp)}
+      dnorm(f.tmp[y == 1], log = TRUE) - pnorm(-f.tmp[y == 1], log.p = TRUE)
     )
     thing[y == 2] <- thing1
     thing[y == 1] <- thing0
-    ystar <- eta + thing
+    ystar <- f.tmp + thing
 
     # Update w -----------------------------------------------------------------
     A <- Hlamsq + diag(1, n)
@@ -101,16 +100,16 @@ iprobit_bin <- function(mod, maxit = 100, stop.crit = 1e-5, silent = FALSE,
 
     # Calculate lower bound ----------------------------------------------------
     lb[niter + 1] <- lb.const +
-      sum(pnorm(eta[y == 2], log.p = TRUE)) +
-      sum(pnorm(-eta[y == 1], log.p = TRUE)) -
+      sum(pnorm(f.tmp[y == 2], log.p = TRUE)) +
+      sum(pnorm(-f.tmp[y == 1], log.p = TRUE)) -
       (sum(diag(W)) + determinant(A)$modulus + sum(log(ct))) / 2
 
     # theta --------------------------------------------------------------------
-    theta <- hyperparam_to_theta(lambda = lambda)
+    theta <- hyperparam_to_theta(lambda = lambda[1:p])
 
     # Calculate fitted values and error rates ----------------------------------
-    eta <- as.numeric(alpha + Hlam %*% w)
-    fitted.values <- probs_yhat_error(y, y.levels, eta)
+    f.tmp <- as.numeric(alpha + Hlam %*% w)
+    fitted.values <- probs_yhat_error(y, y.levels, f.tmp)
     train.error[niter + 1] <- fitted.values$error
     train.brier[niter + 1] <- fitted.values$brier
     fitted.test <- NULL

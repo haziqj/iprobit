@@ -125,14 +125,31 @@ predict_iprobit <- function(object, xstar, y.test, quantiles = FALSE,
   res
 }
 
+#'   }
+#'   if (is.iprobitMod_mult(object)) {
+#'     # environment(lambdaExpand_mult) <- environment()
+#'     # environment(HlamFn_mult) <- environment()
+#'     # lambdaExpand_mult(env = environment(), y = NULL)
+#'     # HlamFn_mult(env = environment())
+#'     # return(rep(alpha, each = nrow(Hlam.mat[[1]])) +
+#'     #          mapply("%*%", Hlam.mat, split(w, col(w))))
+#'   }
+
 calc_ystar <- function(object, xstar, alpha, theta, w) {
-  # Args: An ipriorKernel object
-  if (is.null(xstar)) Hlam.new <- iprior::.get_Hlam(object, theta)
-  else Hlam.new <- iprior::.get_Htildelam(object, theta, xstar)
+  # Args: An ipriorKernel object.
+  #
+  # Returns: For binary models, a vector of ystar. For multinomial models, this
+  # is a matrix with columns representing the number of classes.
+  if (is.null(xstar)) Hlam.new <- get_Hlam(object, theta)
+  else Hlam.new <- get_Htildelam(object, theta, xstar)
   if (is.iprobit_bin(object)) {
     return(as.numeric(alpha + Hlam.new %*% w))
   } else {
-    # Multinomial case
+    res <- NULL
+    m <- get_m(object)
+    if (length(alpha) == 1) alpha <- rep(alpha, m)
+    return(rep(alpha, each = nrow(Hlam.new[[1]])) +
+             mapply("%*%", Hlam.new, split(w, col(w))))
   }
 }
 
@@ -140,7 +157,7 @@ probs_yhat_error <- function(y, y.levels, ystar, type = c("train", "test")) {
   m <- length(y.levels)
 
   if (m == 2) {
-    # Binary model
+    # Binary model -------------------------------------------------------------
     p.hat <- pnorm(ystar)
     p.hat <- data.frame(1 - p.hat, p.hat)
 
@@ -148,7 +165,7 @@ probs_yhat_error <- function(y, y.levels, ystar, type = c("train", "test")) {
     y.hat[ystar >= 0] <- 2
     y.hat <- factor(y.hat, levels = 1:2)
   } else {
-    # Multinomial model
+    # Multinomial model --------------------------------------------------------
     p.hat <- ystar
     for (i in seq_len(nrow(ystar))) {
       for (j in seq_along(y.levels)) {

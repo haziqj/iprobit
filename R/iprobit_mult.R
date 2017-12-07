@@ -19,21 +19,17 @@
 ################################################################################
 
 #' @export
-iprobit_mult <- function(ipriorKernel, maxit = 100, stop.crit = 1e-5,
-                         silent = FALSE, alpha0 = NULL, lambda0 = NULL,
-                         w0 = NULL, common.intercept = FALSE,
-                         common.RKHS.scale = FALSE) {
+iprobit_mult <- function(mod, maxit = 1, stop.crit = 1e-5, silent = FALSE,
+                         alpha0 = NULL, lambda0 = NULL, w0 = NULL,
+                         common.intercept = FALSE, common.RKHS.scale = FALSE) {
   # Declare all variables and functions to be used into environment ------------
   iprobit.env <- environment()
-  list2env(ipriorKernel, iprobit.env)
-  list2env(BlockBstuff, iprobit.env)
-  list2env(model, iprobit.env)
+  list2env(mod, iprobit.env)
+  list2env(BlockBStuff, iprobit.env)
   environment(BlockB) <- iprobit.env
-  environment(lambdaExpand_mult) <- iprobit.env
-  environment(HlamFn_mult) <- iprobit.env
-  environment(HlamsqFn_mult) <- iprobit.env
+  environment(get_Hlamsq) <- iprobit.env
   environment(loop_logical) <- iprobit.env
-  y <- Y
+  y <- as.numeric(factor(y))  # as.factor then as.numeric to get y = 1, 2, ...
   m <- length(y.levels)
   nm <- n * m
   maxit <- max(1, maxit)
@@ -44,24 +40,27 @@ iprobit_mult <- function(ipriorKernel, maxit = 100, stop.crit = 1e-5,
     else alpha0 <- rnorm(m)
   }
   if (is.null(lambda0)) {
-    if (isTRUE(common.RKHS.scale)) lambda0 <- rep(abs(rnorm(l)), m)
-    else lambda0 <- abs(rnorm(l * m))
+    if (isTRUE(common.RKHS.scale)) lambda0 <- rep(abs(rnorm(p)), m)
+    else lambda0 <- abs(rnorm(p * m))
   }
   if (is.null(w0)) w0 <- matrix(0, ncol = m, nrow = n)
-  alpha <- rep(1,m); alpha[1:m] <- alpha0
-  lambda <- ct <- dt <- matrix(lambda0, ncol = m, nrow = l)
-  lambda.sq <- lambda ^ 2
-  lambdaExpand_mult(env = iprobit.env)
-  HlamFn_mult(env = iprobit.env)
-  HlamsqFn_mult(env = iprobit.env)
+  alpha <- rep(1, m); alpha[1:m] <- alpha0
+  theta <- lambda <- ct <- dt <- matrix(lambda0, ncol = m, nrow = p)
+  lambdasq <- lambda ^ 2
+  Hl <- iprior::.expand_Hl_and_lambda(Hl, rep(1, p), intr, intr.3plus)$Hl  # expand Hl
+  lambda <- expand_lambda(lambda[1:p, ], intr, intr.3plus)
+  lambdasq <- expand_lambda(lambdasq[1:p, ], intr, intr.3plus)
+  Hlam   <- get_Hlam(mod, lambda, theta.is.lambda = TRUE)
+  Hlamsq <- get_Hlamsq()
   w <- f.tmp <- ystar <- w0
   Varw <- W <- list(NULL)
+  f.tmp <- rep(alpha, each = n) + mapply("%*%", Hlam, split(w, col(w)))
   logdetA <- rep(NA, m)
   w.ind <- seq_len(
     ifelse(isTRUE(common.intercept) && isTRUE(common.RKHS.scale), 1, m)
   )
   niter <- 0
-  lb <- error.rates <- brier.scores <- rep(NA, maxit)
+  lb <- train.error <- train.brier <- test.error <- test.brier <- rep(NA, maxit)
   logClb <- rep(NA, n)
 
   # The variational EM loop ----------------------------------------------------
@@ -69,9 +68,6 @@ iprobit_mult <- function(ipriorKernel, maxit = 100, stop.crit = 1e-5,
   start.time <- Sys.time()
 
   while (loop_logical()) {  # see loop_logical() function in iprobit_helper.R
-    # Update f -----------------------------------------------------------------
-    f.tmp <- rep(alpha, each = n) + mapply("%*%", Hlam.mat, split(w, col(w)))
-
     # Update ystar -------------------------------------------------------------
     for (i in 1:n) {
       j <- as.numeric(y[i])
@@ -96,32 +92,16 @@ iprobit_mult <- function(ipriorKernel, maxit = 100, stop.crit = 1e-5,
 
     # Update w -----------------------------------------------------------------
     for (j in w.ind) {
-      A <- Hlam.matsq[[j]] + diag(1, n)
-      a <- as.numeric(crossprod(Hlam.mat[[j]], ystar[, j] - alpha[j]))
-      if (!isNystrom(ipriorKernel)) {
-        eigenA <- iprior::eigenCpp(A)
-        V <- eigenA$vec
-        u <- eigenA$val + 1e-8  # ensure positive eigenvalues
-        uinv.Vt <- t(V) / u
-        w[, j] <- as.numeric(crossprod(a, V) %*% uinv.Vt)
-        Varw[[j]] <- iprior::fastVDiag(V, 1 / u)  # V %*% uinv.Vt
-        W[[j]] <- Varw[[j]] + tcrossprod(w[, j])
-        logdetA[j] <- determinant(A)$mod
-      } else {
-        # Nystrom approximation
-        K.mm <- Hlam.matsq[[j]][1:Nystrom$m, 1:Nystrom$m]
-        eigenK.mm <- iprior::eigenCpp(K.mm)
-        V <- Hlam.matsq[[j]][, 1:Nystrom$m] %*% eigenK.mm$vec
-        u <- eigenK.mm$val
-        u.Vt <- t(V) * u
-        D <- u.Vt %*% V + diag(1, Nystrom$m)
-        E <- solve(D, u.Vt, tol = 1e-18)
-        # see https://stackoverflow.com/questions/22134398/mahalonobis-distance-in-r-error-system-is-computationally-singular
-        # see https://stackoverflow.com/questions/21451664/system-is-computationally-singular-error
-        w[, j] <- as.numeric(a - V %*% (E %*% a))
-        W[[j]] <- (diag(1, n) - V %*% E) + tcrossprod(w[, j])
-        logdetA[j] <- determinant(A)$mod
-      }
+      A <- Hlamsq[[j]] + diag(1, n)
+      a <- as.numeric(crossprod(Hlam[[j]], ystar[, j] - alpha[j]))
+      eigenA <- iprior::eigenCpp(A)
+      V <- eigenA$vec
+      u <- eigenA$val + 1e-8  # ensure positive eigenvalues
+      uinv.Vt <- t(V) / u
+      w[, j] <- as.numeric(crossprod(a, V) %*% uinv.Vt)
+      Varw[[j]] <- iprior::fastVDiag(V, 1 / u)  # V %*% uinv.Vt
+      W[[j]] <- Varw[[j]] + tcrossprod(w[, j])
+      logdetA[j] <- determinant(A)$mod
     }
     if (isTRUE(common.intercept) && isTRUE(common.RKHS.scale)) {
       w <- matrix(w[, 1], nrow = n, ncol = m)
@@ -130,9 +110,10 @@ iprobit_mult <- function(ipriorKernel, maxit = 100, stop.crit = 1e-5,
     }
 
     # Update lambda ------------------------------------------------------------
-    for (k in 1:l) {
+    for (k in 1:p) {
       for (j in 1:m) {
-        lambdaExpand_mult(env = iprobit.env)
+        lambda   <- expand_lambda(lambda[1:p, ], intr)
+        lambdasq <- expand_lambda(lambdasq[1:p, ], intr)
         BlockB(k, lambda[, j])
         ct[k, j] <- sum(Psql[[k]] * W[[j]])
         dt[k, j] <- as.numeric(
@@ -142,29 +123,33 @@ iprobit_mult <- function(ipriorKernel, maxit = 100, stop.crit = 1e-5,
       }
       if (isTRUE(common.RKHS.scale)) {
         lambda[k, ] <- rep(sum(dt[k, ]) / sum(ct[k, ]), m)
-        lambda.sq[k, ] <- rep(1 / sum(ct[k, ]) + lambda[k, 1] ^ 2, m)
+        lambdasq[k, ] <- rep(1 / sum(ct[k, ]) + lambda[k, 1] ^ 2, m)
       } else {
         lambda[k, ] <- dt[k, ] / ct[k, ]
-        lambda.sq[k, ] <- 1 / ct[k, ] + lambda[k, ] ^ 2
+        lambdasq[k, ] <- 1 / ct[k, ] + lambda[k, ] ^ 2
       }
     }
 
     # Update H.lam and H.lam.sq ------------------------------------------------
-    lambdaExpand_mult(env = iprobit.env)
-    HlamFn_mult(env = iprobit.env)
-    HlamsqFn_mult(env = iprobit.env)
+    lambda   <- expand_lambda(lambda[1:p, ], intr)
+    lambdasq <- expand_lambda(lambdasq[1:p, ], intr)
+    Hlam     <- get_Hlam(mod, lambda, theta.is.lambda = TRUE)
+    Hlamsq   <- get_Hlamsq()
 
     # Update alpha -------------------------------------------------------------
-    alpha <- apply(ystar - mapply("%*%", Hlam.mat, split(w, col(w))), 2, mean)
+    alpha <- apply(ystar - mapply("%*%", Hlam, split(w, col(w))), 2, mean)
     if (isTRUE(common.intercept)) alpha <- rep(mean(alpha), m)
+
+    # theta --------------------------------------------------------------------
+    theta <- apply(lambda[1:p, ], 2, hyperparam_to_theta)
 
     # Calculate lower bound ----------------------------------------------------
     lb.ystar <- sum(logClb)
     lb.w <- 0.5 * (nm - sum(sapply(W, function(x) sum(diag(x)))) - sum(logdetA))
     if (isTRUE(common.RKHS.scale))
-      lb.lambda <- (l / 2) * (1 + log(2 * pi)) - sum(log(apply(ct, 1, sum))) / 2
+      lb.lambda <- (p / 2) * (1 + log(2 * pi)) - sum(log(apply(ct, 1, sum))) / 2
     else
-      lb.lambda <- (m / 2) * (l * (1 + log(2 * pi)) - sum(log(ct)) / m)
+      lb.lambda <- (m / 2) * (p * (1 + log(2 * pi)) - sum(log(ct)) / m)
     if (isTRUE(common.intercept))
       lb.alpha <- 0.5 * (1 + log(2 * pi) - log(nm))
     else
@@ -172,10 +157,17 @@ iprobit_mult <- function(ipriorKernel, maxit = 100, stop.crit = 1e-5,
     lb[niter + 1] <- lb.ystar + lb.w + lb.lambda + lb.alpha
 
     # Calculate fitted values and error rate -----------------------------------
-    ystar <- rep(alpha, each = n) + mapply("%*%", Hlam.mat, split(w, col(w)))
-    fitted.values <- predict_iprobit_mult(y, y.levels, ystar)
-    error.rates[niter + 1] <- fitted.values$train.error
-    brier.scores[niter + 1] <- fitted.values$brier.score
+    f.tmp <- rep(alpha, each = n) + mapply("%*%", Hlam, split(w, col(w)))
+    fitted.values <- probs_yhat_error(y, y.levels, f.tmp)
+    train.error[niter + 1] <- fitted.values$error
+    train.brier[niter + 1] <- fitted.values$brier
+    fitted.test <- NULL
+    if (iprior::.is.ipriorKernel_cv(mod)) {
+      ystar.test <- calc_ystar(mod, mod$Xl.test, alpha, theta, w)
+      fitted.test <- probs_yhat_error(y.test, y.levels, ystar.test)
+      test.error[niter + 1] <- fitted.test$error
+      test.brier[niter + 1] <- fitted.test$brier
+    }
 
     niter <- niter + 1
     if (!silent) setTxtProgressBar(pb, niter)
@@ -184,31 +176,67 @@ iprobit_mult <- function(ipriorKernel, maxit = 100, stop.crit = 1e-5,
   end.time <- Sys.time()
   time.taken <- iprior::as.time(end.time - start.time)
 
-  # Calculate standard errors from posterior variance --------------------------
-  if (isTRUE(common.intercept)) se.alpha <- sqrt(1 / nm)
-  else se.alpha <- sqrt(1 / n)
-  if (isTRUE(common.RKHS.scale))
-    se.lambda <- matrix(sqrt(1 / apply(ct, 1, sum)), ncol = m, nrow = l)
-  else
-    se.lambda <- matrix(sqrt(1 / ct[1:l, ]), ncol = m, nrow = l)
-  se.ystar <- NA #iprobitSE(y = y, eta = eta, thing1 = thing1, thing0 = thing0)
+  # Calculate posterior s.d. and prepare param table ---------------------------
+  param.full <- theta_to_param.full(theta, alpha, mod)
+  if (isTRUE(common.intercept)) {
+    alpha <- unique(alpha)  # since they're all the same
+    se.alpha <- sqrt(1 / nm)
+  } else {
+    se.alpha <- rep(sqrt(1 / n), m)
+  }
+  lambda <- lambda[1:p, ]
+  if (isTRUE(common.RKHS.scale)) {
+    lambda <- apply(lambda, 1, unique)  # since they're all the same
+    se.lambda <- matrix(sqrt(1 / apply(ct, 1, sum)), ncol = m, nrow = p)[, 1]
+  } else {
+    lambda <- c(t(lambda))
+    se.lambda <- c(t(matrix(sqrt(1 / ct[1:p, ]), ncol = m, nrow = p)))
+  }
+  param.summ <- data.frame(
+    Mean    = c(alpha, lambda),
+    S.D.    = c(se.alpha, se.lambda),
+    `2.5%`  = c(alpha, lambda) - qnorm(0.975) * c(se.alpha, se.lambda),
+    `97.5%` = c(alpha, lambda) + qnorm(0.975) * c(se.alpha, se.lambda)
+  )
+  colnames(param.summ) <- c("Mean", "S.D.", "2.5%", "97.5%")
+  rownames(param.summ) <- c(get_names(mod, "intercept", !common.intercept),
+                            get_names(mod, "lambda", !common.RKHS.scale))
 
   # Clean up and close ---------------------------------------------------------
-  lambda <- matrix(lambda[1:l, ], ncol = m, nrow = l)
+  convergence <- niter == maxit
   if (!silent) {
     close(pb)
-    if (niter == maxit) cat("Convergence criterion not met.\n")
+    if (convergence) cat("Convergence criterion not met.\n")
     else cat("Converged after", niter, "iterations.\n")
   }
 
-  res <- list(ystar = ystar, w = w, lambda = lambda, alpha = alpha,
-              lower.bound = lb[!is.na(lb)], ipriorKernel = NULL,
-              se.alpha = se.alpha, se.lambda = se.lambda, Varw = Varw,
-              y.levels = y.levels, start.time = start.time, end.time = end.time,
-              time = time.taken, stop.crit = stop.crit, niter = niter,
-              maxit = maxit, fitted.values = fitted.values,
-              error = error.rates[!is.na(error.rates)],
-              brier = brier.scores[!is.na(brier.scores)])
-  class(res) <- c("iprobitMod", "iprobitMod_mult")
-  res
+  list(theta = theta, param.full = param.full, param.summ = param.summ, w = w,
+       Varw = Varw, lower.bound = as.numeric(na.omit(lb)), niter = niter,
+       start.time = start.time, end.time = end.time, time = time.taken,
+       fitted.values = fitted.values, test = fitted.test,
+       train.error = as.numeric(na.omit(train.error)),
+       train.brier = as.numeric(na.omit(train.brier)),
+       test.error = as.numeric(na.omit(test.error)),
+       test.brier = as.numeric(na.omit(test.brier)), convergence = convergence)
 }
+
+# set.seed(123)
+# dat <- gen_mixture(n = 400, m = 4)
+# mod <- kernL(y ~ ., dat, est.psi = FALSE)
+# set.seed(123); tmp <- iprobit_mult(mod)
+
+# else {
+#   # Nystrom approximation
+#   K.mm <- Hlamsq[[j]][1:Nystrom$m, 1:Nystrom$m]
+#   eigenK.mm <- iprior::eigenCpp(K.mm)
+#   V <- Hlamsq[[j]][, 1:Nystrom$m] %*% eigenK.mm$vec
+#   u <- eigenK.mm$val
+#   u.Vt <- t(V) * u
+#   D <- u.Vt %*% V + diag(1, Nystrom$m)
+#   E <- solve(D, u.Vt, tol = 1e-18)
+#   # see https://stackoverflow.com/questions/22134398/mahalonobis-distance-in-r-error-system-is-computationally-singular
+#   # see https://stackoverflow.com/questions/21451664/system-is-computationally-singular-error
+#   w[, j] <- as.numeric(a - V %*% (E %*% a))
+#   W[[j]] <- (diag(1, n) - V %*% E) + tcrossprod(w[, j])
+#   logdetA[j] <- determinant(A)$mod
+# }

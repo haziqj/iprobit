@@ -67,6 +67,9 @@ is.iprobit_bin <- function(x) {
 }
 
 #' @export
+is.iprobitMod <- function(x) inherits(x, "iprobitMod")
+
+#' @export
 is.iprobitMod_bin <- function(x) inherits(x, "iprobitMod_bin")
 
 #' @export
@@ -156,7 +159,7 @@ get_kernel <- function(object, collapse = TRUE) {
 #' }
 
 
-# get_alpha <- function(object) {
+# get_psi <- function(object) {
 #   alpha <- object$alpha
 #   if (is.iprobitMod_bin(object)) {
 #     # if (length(alpha) > 1)
@@ -253,69 +256,112 @@ get_brier_scores <- function(x) {
   res
 }
 
-get_m <- function(object) length(object$ipriorKernel$y.levels)
+get_m <- function(object) {
+  if (is.iprobitMod(object)) object <- object$ipriorKernel
+  length(object$y.levels)
+}
 
 all.same <- function(v) {
   # https://stackoverflow.com/questions/4752275/test-for-equality-among-all-elements-of-a-single-vector
   all(sapply(as.list(v[-1]), FUN = function(z) identical(z, v[1])))
 }
 
-# lambda expansion and Hlam.mat calculation for binary models ------------------
-
-lambdaExpand_bin <- function(x = lambda, y = lambda.sq, env = iprobit.env) {
-  environment(.lambdaExpand) <- environment()
-  original.lambda <- x
-  .lambdaExpand(x = original.lambda, env = environment())
-  lambda.tmp <- lambda
-  assign("lambda", lambda.tmp, envir = env)
-
-  if (!is.null(y)) {
-    original.lambda.sq <- y
-    lambda.sq.tmp <- NULL
-    .lambdaExpand(x = original.lambda.sq, env = environment())
-    lambda.sq.tmp <- lambda
-    assign("lambda.sq", lambda.sq.tmp, envir = env)
-  }
-}
+# lambda expansion and Hlam calculation for binary models ----------------------
 
 expand_lambda <- function(x, intr, intr.3plus = NULL) {
-  # Helper function to expand lambda or lambda.sq (scale
-  # parameters) according to any interactions specification.
+  # Helper function to expand lambda or lambda.sq (scale parameters) according
+  # to any interactions specification.
   #
   # Args: lambda
   #
-  # Returns: Expanded lambda
-
-
-  # if lambda is vector then it is binary
-  iprior::.expand_Hl_and_lambda(x, x, intr, intr.3plus)$lambda
-  # else if lambda is matrix then it is multinomial
-}
-
-
-HlamFn <- function(env = environment()) {
-  # Hl (list) and lambda (vector), both must be of same length, should be
-  # defined in  environment.
-  res.Hlam.mat <- Reduce("+", mapply("*", Hl, lambda, SIMPLIFY = FALSE))
-  assign("Hlam.mat", res.Hlam.mat, envir = env)
+  # Returns: Expanded lambda.
+  if (is.vector(x)) {
+    # Binary models ------------------------------------------------------------
+    return(iprior::.expand_Hl_and_lambda(x, x, intr, intr.3plus)$lambda)
+  } else {
+    # Multinomial models -------------------------------------------------------
+    res <- NULL
+    m <- ncol(x)
+    for (j in seq_len(m)) {
+      res[[j]] <- iprior::.expand_Hl_and_lambda(x[, j], x[, j], intr,
+                                                intr.3plus)$lambda
+    }
+    return(matrix(unlist(res), ncol = m))
+  }
 }
 
 get_Hlam <- function(object, theta, theta.is.lambda = FALSE) {
+  # Obtains the kernel matrix Hlam.
+  #
+  # Args:
+  #
+  # Returns: For binary models, this calculate Hlam. For multinomial models,
+  # this calculates Hlam for every class---so a list is returned.
   if (is.iprobit_bin(object)) {
     return(iprior::.get_Hlam(object = object, theta = theta,
                              theta.is.lambda = theta.is.lambda))
   } else {
-    stop("Not implemented yet.")
+    res <- NULL
+    m <- get_m(object)
+    for (j in seq_len(m)) {
+      res[[j]] <- iprior::.get_Hlam(object = object, theta = theta[, j],
+                                    theta.is.lambda = theta.is.lambda)
+    }
+    return(res)
   }
 }
 
+get_Htildelam <- function(object, theta, xstar) {
+  if (is.iprobit_bin(object)) {
+    return(iprior::.get_Htildelam(object, theta, xstar))
+  } else {
+    res <- NULL
+    m <- get_m(object)
+    for (j in seq_len(m)) {
+      res[[j]] <- iprior::.get_Htildelam(object, theta[, j], xstar)
+    }
+    return(res)
+  }
+}
+
+HlamsqFn_mult <- function(env = environment()) {
+  environment(Hlam_two_way_index) <- env
+  res.Hlam.matsq <- NULL
+  for (j in 1:m) {
+    if (is.null(Hsql))
+      square.terms <- Reduce("+", mapply("*", Psql, lambda.sq[, j],
+                                         SIMPLIFY = FALSE))
+    else
+      square.terms <- Reduce("+", mapply("*", Hsql, lambda.sq[, j],
+                                         SIMPLIFY = FALSE))
+
+    if (is.null(ind1) && is.null(ind2))
+      two.way.terms <- 0
+    else {
+      lambda.two.way <- Hlam_two_way_index(lambda[, j], lambda.sq[, j])
+      two.way.terms <-
+        Reduce("+", mapply("*", H2l, lambda.two.way, SIMPLIFY = FALSE))
+    }
+
+    res.Hlam.matsq[[j]] <- square.terms + two.way.terms
+  }
+
+  assign("Hlam.matsq", res.Hlam.matsq, envir = env)
+}
+
 get_Hlamsq <- function() {
-  # Args: mod is an ipriorKernel object. Needs lambda, lambdasq, Psql, Hsql,
-  # H2l, ind1, ind2, p, and no.int defined in the parent environment.
+  # Calculate Hlamsq for closed-form VB.
+  #
+  # Args: mod is an ipriorKernel object defined in parent environment, along
+  # with lambda, lambdasq, Psql, Hsql, H2l, ind1, ind2, p, and no.int.
+  #
+  # Returns: Hlamsq mat for binary models, and list of Hlamsq matrices for
+  # multinomial models.
   environment(Hlam_two_way_index) <- environment()
   q <- p + no.int
+  m <- get_m(mod)
 
-  if (is.iprobit_bin(mod)) {
+  if (is.iprobit_bin(mod)) { # BINARY MODEL
     # Calculate square terms of Hlamsq -----------------------------------------
     if (is.null(Hsql))
       square.terms <- Reduce("+", mapply("*", Psql[1:q], lambdasq[1:q],
@@ -335,35 +381,30 @@ get_Hlamsq <- function() {
 
     return(square.terms + two.way.terms)
   } else {
-    stop("Not implemented yet.")
+    res <- NULL
+    for (j in seq_len(m)) { # MULTINOMIAL MODEL
+      # Calculate square terms of Hlamsq -----------------------------------------
+      if (is.null(Hsql))
+        square.terms <- Reduce("+", mapply("*", Psql[1:q], lambdasq[1:q, j],
+                                           SIMPLIFY = FALSE))
+      else
+        square.terms <- Reduce("+", mapply("*", Hsql[1:q], lambdasq[1:q, j],
+                                           SIMPLIFY = FALSE))
+
+      # Calculate two-way terms of Hlamsq ----------------------------------------
+      if (is.null(ind1) && is.null(ind2))
+        two.way.terms <- 0
+      else {
+        lambda.two.way <- Hlam_two_way_index(lambda[1:q, j], lambdasq[1:q, j])
+        two.way.terms <-
+          Reduce("+", mapply("*", H2l, lambda.two.way, SIMPLIFY = FALSE))
+      }
+
+      res[[j]] <- square.terms + two.way.terms
+    }
+    return(res)
   }
 }
-
-
-# HlamsqFn <- function(env = environment()) {
-#   # Hl, Hsql, (both lists) and lambda, lambda.sq (both vectors), all of which
-#   # must be the same length, should be defined in  environment. Further, ind1
-#   # and ind2 are indices of all possible two-way multiplications obtained from
-#   # iprior::.kernL$BlockBstuff
-#   environment(Hlam_two_way_index) <- env
-#   if (is.null(Hsql))
-#     square.terms <- Reduce("+", mapply("*", Psql[1:q], lambda.sq[1:q],
-#                                        SIMPLIFY = FALSE))
-#   else
-#     square.terms <- Reduce("+", mapply("*", Hsql[1:q], lambda.sq[1:q],
-#                                        SIMPLIFY = FALSE))
-#
-#   if (is.null(ind1) && is.null(ind2))
-#     two.way.terms <- 0
-#   else {
-#     lambda.two.way <- Hlam_two_way_index(lambda, lambda.sq)
-#     two.way.terms <-
-#       Reduce("+", mapply("*", H2l, lambda.two.way, SIMPLIFY = FALSE))
-#   }
-#
-#   res.Hlam.matsq <- square.terms + two.way.terms
-#   assign("Hlam.matsq", res.Hlam.matsq, envir = env)
-# }
 
 
 
@@ -390,13 +431,7 @@ lambdaExpand_mult <- function(x = lambda, y = lambda.sq, env = iprobit.env) {
   }
 }
 
-HlamFn_mult <- function(env = environment()) {
-  res.Hlam.mat <- NULL
-  for (j in 1:m) {
-    res.Hlam.mat[[j]] <- Reduce("+", mapply("*", Hl, lambda[, j], SIMPLIFY = FALSE))
-  }
-  assign("Hlam.mat", res.Hlam.mat, envir = env)
-}
+
 
 HlamsqFn_mult <- function(env = environment()) {
   environment(Hlam_two_way_index) <- env
@@ -550,8 +585,135 @@ theta_to_coef <- function(theta, object) {
   iprior::.reduce_theta(param.full, object$estl)$theta.reduced
 }
 
+theta_to_param.full <- function(theta, alpha, object) {
+  # Convert theta into param full.
+  #
+  # Args: theta is in a table form, each column representing each class. alpha
+  # is a vector of length m (no. of classes) and object is an ipriorKernel
+  # object.
+  #
+  # Returns: "Collapsed param" but in tabular form, with each column
+  # representing each class.
+  res <- apply(theta, 2, iprior::.theta_to_collapsed_param, object = object)
+  rownames(res) <- gsub("]", ",]", rownames(res))
+  res <- rbind("Intercept" = alpha, res)
+  colnames(res) <- paste0("Class = ", seq_len(ncol(res)))
+  res
+}
 
+param.full_to_coef <- function(param.full, object) {
+  # Convert param.full (tabular form) to coefficients (tabular form).
+  #
+  # Args: param.full (tabular form) and ipriorKernel object.
+  #
+  # Returns: Coefficients in tabular form.
+  res <- apply(param.full[-1, ], 2, function(x) {
+    iprior::.reduce_theta(x, est.list = object$estl)$theta.reduced
+  })
+  rbind("Intercept" = param.full[1, ], res)
+}
 
+get_names <- function(object, names = c("intercept", "lambda", "hurst",
+                                        "lengthscale", "offset"),
+                      expand = TRUE) {
+  m <- get_m(object)
+  full.names <- names(object$thetal$theta.drop)
+  lambda.count <- sum(grepl("lambda", full.names))
+  hurst.count <- sum(grepl("hurst", full.names))
+  lengthscale.count <- sum(grepl("lengthscale", full.names))
+  offset.count <- sum(grepl("offset", full.names))
+  psi.count <- sum(grepl("psi", full.names))
 
+  if (isTRUE(expand)) {
+    alpha.names <- paste0("Intercept[", 1:m, "]")
+  } else {
+    alpha.names <- "Intercept"
+  }
+
+  if (isTRUE(expand)) {
+    if (lambda.count > 1) {
+      lambda.ind <- expand.grid(seq_len(m), seq_len(lambda.count))
+      lambda.names <- paste0("lambda[", lambda.ind[, 2], ",", lambda.ind[, 1], "]")
+    } else {
+      lambda.names <- paste0("lambda[", 1:m, "]")
+    }
+  } else {
+    if (lambda.count > 1) {
+      lambda.names <- paste0("lambda[", seq_len(lambda.count), ",]")
+    } else {
+      lambda.names <- paste0("lambda")
+    }
+  }
+
+  if (hurst.count > 0) {
+    if (isTRUE(expand)) {
+      if (hurst.count > 1) {
+        hurst.ind <- expand.grid(seq_len(m), seq_len(hurst.count))
+        hurst.names <- paste0("hurst[", hurst.ind[, 2], ",", hurst.ind[, 1], "]")
+      } else {
+        hurst.names <- paste0("hurst[", 1:m, "]")
+      }
+    } else {
+      if (hurst.count > 1) {
+        hurst.names <- paste0("hurst[", seq_len(hurst.count), ",]")
+      } else {
+        hurst.names <- paste0("hurst")
+      }
+    }
+  } else {
+    hurst.names <- NULL
+  }
+
+  if (lengthscale.count > 0) {
+    if (isTRUE(expand)) {
+      if (lengthscale.count > 1) {
+        lengthscale.ind <- expand.grid(seq_len(m), seq_len(lengthscale.count))
+        lengthscale.names <- paste0("lengthscale[", lengthscale.ind[, 2], ",",
+                                    lengthscale.ind[, 1], "]")
+      } else {
+        lengthscale.names <- paste0("lengthscale[", 1:m, "]")
+      }
+    } else {
+      if (lengthscale.count > 1) {
+        lengthscale.names <- paste0("lengthscale[", seq_len(lengthscale.count), ",]")
+      } else {
+        lengthscale.names <- paste0("lengthscale")
+      }
+    }
+  } else {
+    lengthscale.names <- NULL
+  }
+
+  if (offset.count > 0) {
+    if (isTRUE(expand)) {
+      if (offset.count > 1) {
+        offset.ind <- expand.grid(seq_len(m), seq_len(offset.count))
+        offset.names <- paste0("offset[", offset.ind[, 2], ",", offset.ind[, 1], "]")
+      } else {
+        offset.names <- paste0("offset[", 1:m, "]")
+      }
+    } else {
+      if (offset.count > 1) {
+        offset.names <- paste0("offset[", seq_len(offset.count), ",]")
+      } else {
+        offset.names <- paste0("offset")
+      }
+    }
+  } else {
+    offset.names <- NULL
+  }
+
+  if (isTRUE(expand)) {
+    psi.names <- paste0("psi[", 1:m, "]")
+  } else {
+    psi.names <- "psi"
+  }
+
+  res.names <- c("intercept", "lambda", "hurst", "lengthscale", "offset", "psi")
+  res <- list(alpha.names, lambda.names, hurst.names, lengthscale.names,
+              offset.names, psi.names)
+  res.ind <- res.names %in% names
+  unlist(res[res.ind])
+}
 
 

@@ -22,10 +22,9 @@
 iprobit <- function(...) UseMethod("iprobit")
 
 #' @export
-iprobit.default <- function(y, ..., kernel = "linear",  interactions = NULL,
+iprobit.default <- function(y, ..., kernel = "linear", interactions = NULL,
                             est.hurst = FALSE, est.lengthscale = FALSE,
-                            est.offset = FALSE,
-                            common.intercept  = FALSE,
+                            est.offset = FALSE, common.intercept = FALSE,
                             common.RKHS.scale = FALSE,
                             # nystrom = FALSE, nys.seed = NULL,
                             train.samp, control = list()) {
@@ -34,17 +33,16 @@ iprobit.default <- function(y, ..., kernel = "linear",  interactions = NULL,
     mod <- y
   } else {
     mod <- iprior::kernL(y, ..., kernel = kernel, interactions = interactions,
-                         est.lambda = TRUE, est.psi = FALSE,
-                         psi = 1, est.hurst = est.hurst,
+                         est.lambda = TRUE, est.psi = FALSE, psi = 1,
+                         est.hurst = est.hurst,  est.offset = est.offset,
                          est.lengthscale = est.lengthscale,
-                         est.offset = est.offset,
                          # nystrom = nystrom, nys.seed = nys.seed,
                          train.samp = train.samp)
   }
 
   # Set up controls ------------------------------------------------------------
   control_ <- list(
-    maxit          = 100,
+    maxit          = 1,
     stop.crit      = 1e-5,
     silent         = FALSE,
     alpha0         = NULL,  # if NULL, parameters are
@@ -74,6 +72,7 @@ iprobit.default <- function(y, ..., kernel = "linear",  interactions = NULL,
     stop("Not implemented yet.")
   } else {
     if (m == 2) {
+      # Binary models ----------------------------------------------------------
       if (est.method["em.closed"]) {  # VB CLOSED-FORM
         res <- iprobit_bin(mod, maxit, stop.crit, silent, alpha0, lambda0, w0)
         res$est.method <- "Closed-form VB-EM algorithm."
@@ -89,14 +88,21 @@ iprobit.default <- function(y, ..., kernel = "linear",  interactions = NULL,
         param.summ_to_param.full(res$param.summ), mod$estl
       )$theta.reduced
     } else {
-      # res <- iprobit_mult(ipriorKernel, maxit, stop.crit, silent, alpha0,
-      #                     lambda0, w0, common.intercept, common.RKHS.scale)
-      # res$coefficients <- rbind(get_alpha(res), get_lambda(res))
-      stop("Not implemented yet.")
+      # Multinomial models -----------------------------------------------------
+      if (est.method["em.closed"]) {  # VB CLOSED-FORM
+        res <- iprobit_mult(mod, maxit, stop.crit, silent, alpha0, lambda0, w0,
+                            common.intercept, common.RKHS.scale)
+        res$est.method <- "Closed-form VB-EM algorithm."
+        # res$coefficients <- rbind(get_alpha(res), get_lambda(res))
+      } else {
+        stop("Not implemented yet.")
+      }
+      class(res) <- c("iprobitMod", "iprobitMod_bin")
+      res$coefficients <- param.full_to_coef(res$param.full, mod)
     }
     if (res$conv == 0)
-      res$est.conv <- paste0("Converged to within ", control$stop.crit,
-                             " tolerance.")
+      res$est.conv <- paste("Converged to within", control$stop.crit,
+                            "tolerance.")
     else if (res$conv == 1)
       res$est.conv <- "Convergence criterion not met."
     else
@@ -110,6 +116,8 @@ iprobit.default <- function(y, ..., kernel = "linear",  interactions = NULL,
 
   # Include these also in the iprobitMod object --------------------------------
   res$control <- control
+  res$common <- list(intercept  = ifelse(m == 2, TRUE, common.intercept),
+                     RKHS.param = ifelse(m == 2, TRUE, common.RKHS.scale))
 
   res
 }
@@ -117,7 +125,7 @@ iprobit.default <- function(y, ..., kernel = "linear",  interactions = NULL,
 #' @export
 iprobit.formula <- function(formula, data, kernel = "linear", one.lam = FALSE,
                             est.hurst = FALSE, est.lengthscale = FALSE,
-                            est.offset = FALSE, common.intercept  = FALSE,
+                            est.offset = FALSE, common.intercept = FALSE,
                             common.RKHS.scale = FALSE, lambda = 1,
                             # nystrom = FALSE, nys.seed = NULL,
                             train.samp, control = list(), ...) {
@@ -129,15 +137,38 @@ iprobit.formula <- function(formula, data, kernel = "linear", one.lam = FALSE,
                        lambda = lambda, psi = 1,
                        # nystrom = nystrom, nys.seed = nys.seed,
                        train.samp = train.samp, ...)
-  res <- iprobit.default(y = mod, control = control)
+  res <- iprobit.default(y = mod, control = control,
+                         common.intercept = common.intercept,
+                         common.RKHS.scale = common.RKHS.scale)
   res$call <- iprior::.fix_call_formula(match.call(), "iprobit")
   res$ipriorKernel$call <- iprior::.fix_call_formula(match.call(), "kernL")
   res
 }
 
 #' @export
+iprobit.ipriorKernel <- function(object, control = list(),
+                                 common.intercept = FALSE,
+                                 common.RKHS.scale = FALSE, ...) {
+  object <- remove_psi(object)
+  res <- iprobit.default(y = object, method = method, control = control,
+                         common.intercept = common.intercept,
+                         common.RKHS.scale = common.RKHS.scale)
+
+  # Fix call -------------------------------------------------------------------
+  res$object$call <- ipriorKernel.call <- object$call
+  if (is.null(object$formula)) {
+    res$call <- iprior::.fix_call_default(ipriorKernel.call, "iprobit")
+  } else {
+    res$call <- iprior::.fix_call_formula(ipriorKernel.call, "iprobit")
+  }
+
+  res
+}
+
+#' @export
 iprobit.iprobitMod <- function(object, maxit = NULL, stop.crit = NULL,
-                               silent = NULL, ...) {
+                               silent = NULL, common.intercept = FALSE,
+                               common.RKHS.scale = FALSE, ...) {
   ipriorKernel <- object$ipriorKernel
   con          <- object$control
   con$w0       <- object$w

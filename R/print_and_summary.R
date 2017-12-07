@@ -32,7 +32,9 @@ print.iprobitMod <- function(x, digits = 5, ...) {
 summary.iprobitMod <- function(object, ...) {
   tab <- object$param.summ
 
-  kernel.used <-  iprior::.kernels_for_summary(object)
+  suppressWarnings(
+    kernel.used <- iprior::.kernels_for_summary(object)
+  )
 
   train.error <- object$fitted.values$error
   train.brier <- object$fitted.values$brier
@@ -43,6 +45,7 @@ summary.iprobitMod <- function(object, ...) {
   }
 
   res <- list(tab = tab, lb = as.numeric(logLik(object)),
+              classes = object$ipriorKernel$y.levels,
               train.error = train.error, train.brier = train.brier,
               test.error = test.error, test.brier = test.brier,
               call = object$call, x.kern = kernel.used,
@@ -68,6 +71,7 @@ print.iprobitMod_summary <- function(x, wrap = FALSE, ...) {
   }
   cat("Classes: ")
   cat(paste0(x$classes, collapse = ", "), "\n")
+  cat("\n")
   cat("RKHS used:\n")
   cat(x$x.kern)
   cat("\n")
