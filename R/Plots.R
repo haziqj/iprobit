@@ -182,15 +182,20 @@ prepare_point_range <- function(object, test.data = NULL, X.var = c(1, 2),
   list(plot.df = plot.df, points.df = points.df, mm = mm, xname = xname[X.var])
 }
 
+# set.seed(123)
+# dat <- gen_circle(200)
+# mod <- iprobit(y ~ X1 + X2, dat, one.lam = TRUE, kernel = "FBM")
+
 #' @export
 iplot_dec_bound <- function(object, X.var = c(1, 2), col = "grey35", size = 0.8,
-                            ...) {
-  list2env(prepare_point_range(object, NULL, X.var), envir = environment())
-  m <- length(object$ipriorKernel$y.levels)
+                            grid.len = 100, ...) {
+  list2env(prepare_point_range(object, NULL, X.var, grid.len),
+           envir = environment())
+  m <- get_m(object)
   ggplot() +
     geom_point(data = points.df, aes(X1, X2, col = Class)) +
-    geom_contour(data = plot.df, aes(X1, X2, z = class2, size = "Decision\nboundary"),
-                 binwidth = 0.5, col = col, ...) +
+    geom_contour(data = plot.df, aes(X1, X2, z = class1, size = "Decision\nboundary"),
+                 binwidth = 0.5 + 1e-12, col = col, ...) +
     coord_cartesian(xlim = mm[1, ], ylim = mm[2, ]) +
     scale_colour_manual(values = c(iprior::gg_col_hue(m), "grey30")) +
     scale_size_manual(values = size, name = NULL) +
@@ -281,13 +286,12 @@ iplot_predict_mult <- function(plot.df, points.df, x, y, m) {
 #' @export
 iplot_error <- function(x, niter.plot = NULL) {
   if (x$niter < 2) stop("Nothing to plot.")
-
-  if (is.null(niter.plot)) niter.plot <- c(1, length(x$error))
+  if (is.null(niter.plot)) niter.plot <- c(1, length(x$train.error))
   else if (length(niter.plot) == 1) niter.plot <- c(1, niter.plot)
   niter.plot <- niter.plot[1]:niter.plot[2]
   plot.df <- data.frame(Iteration = niter.plot,
-                        error     = x$error[niter.plot] / 100,
-                        brier     = x$brier[niter.plot])
+                        error     = x$train.error[niter.plot] / 100,
+                        brier     = x$train.brier[niter.plot])
   time.per.iter <- x$time$time / x$niter
   if (time.per.iter < 0.001) time.per.iter <- 0.001
   plot.df <- reshape2::melt(plot.df, id = "Iteration")
