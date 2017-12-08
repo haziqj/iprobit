@@ -178,7 +178,7 @@ get_kernel <- function(object, collapse = TRUE) {
 
 get_alpha <- function(object) {
   param.full <- param.summ_to_param.full(object$param.summ)
-  param.full[grep("alpha", names(param.full))]
+  param.full[grep("Intercept", names(param.full))]
 }
 
 get_lambda <- function(object) {
@@ -304,7 +304,7 @@ get_Hlam <- function(object, theta, theta.is.lambda = FALSE) {
     res <- NULL
     m <- get_m(object)
     for (j in seq_len(m)) {
-      res[[j]] <- iprior::.get_Hlam(object = object, theta = theta[, j],
+      res[[j]] <- iprior::.get_Hlam(object = object, theta = as.numeric(theta[, j]),
                                     theta.is.lambda = theta.is.lambda)
     }
     return(res)
@@ -318,7 +318,7 @@ get_Htildelam <- function(object, theta, xstar) {
     res <- NULL
     m <- get_m(object)
     for (j in seq_len(m)) {
-      res[[j]] <- iprior::.get_Htildelam(object, theta[, j], xstar)
+      res[[j]] <- iprior::.get_Htildelam(object, as.numeric(theta[, j]), xstar)
     }
     return(res)
   }
@@ -610,7 +610,9 @@ param.full_to_coef <- function(param.full, object) {
   res <- apply(param.full[-1, ], 2, function(x) {
     iprior::.reduce_theta(x, est.list = object$estl)$theta.reduced
   })
-  rbind("Intercept" = param.full[1, ], res)
+  res <- rbind("Intercept" = param.full[1, ], res)
+  rownames(res) <- get_names(object, expand = FALSE)
+  res
 }
 
 get_names <- function(object, names = c("intercept", "lambda", "hurst",
@@ -622,7 +624,6 @@ get_names <- function(object, names = c("intercept", "lambda", "hurst",
   hurst.count <- sum(grepl("hurst", full.names))
   lengthscale.count <- sum(grepl("lengthscale", full.names))
   offset.count <- sum(grepl("offset", full.names))
-  psi.count <- sum(grepl("psi", full.names))
 
   if (isTRUE(expand)) {
     alpha.names <- paste0("Intercept[", 1:m, "]")

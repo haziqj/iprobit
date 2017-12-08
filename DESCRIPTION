@@ -15,6 +15,7 @@ Imports:
   doSNOW,
   foreach,
   ggplot2,
+  ggrepel,
   iprior (>= 0.6.5.9005),
   mlbench,
   mvtnorm,

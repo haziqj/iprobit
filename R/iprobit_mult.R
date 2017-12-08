@@ -19,7 +19,7 @@
 ################################################################################
 
 #' @export
-iprobit_mult <- function(mod, maxit = 1, stop.crit = 1e-5, silent = FALSE,
+iprobit_mult <- function(mod, maxit = 10, stop.crit = 1e-5, silent = FALSE,
                          alpha0 = NULL, lambda0 = NULL, w0 = NULL,
                          common.intercept = FALSE, common.RKHS.scale = FALSE) {
   # Declare all variables and functions to be used into environment ------------
@@ -48,9 +48,9 @@ iprobit_mult <- function(mod, maxit = 1, stop.crit = 1e-5, silent = FALSE,
   theta <- lambda <- ct <- dt <- matrix(lambda0, ncol = m, nrow = p)
   lambdasq <- lambda ^ 2
   Hl <- iprior::.expand_Hl_and_lambda(Hl, rep(1, p), intr, intr.3plus)$Hl  # expand Hl
-  lambda <- expand_lambda(lambda[1:p, ], intr, intr.3plus)
-  lambdasq <- expand_lambda(lambdasq[1:p, ], intr, intr.3plus)
-  Hlam   <- get_Hlam(mod, lambda, theta.is.lambda = TRUE)
+  lambda <- expand_lambda(lambda[1:p, , drop = FALSE], intr, intr.3plus)
+  lambdasq <- expand_lambda(lambdasq[1:p, , drop = FALSE], intr, intr.3plus)
+  Hlam   <- get_Hlam(mod, lambda[1:p, , drop = FALSE], theta.is.lambda = TRUE)
   Hlamsq <- get_Hlamsq()
   w <- f.tmp <- ystar <- w0
   Varw <- W <- list(NULL)
@@ -112,8 +112,8 @@ iprobit_mult <- function(mod, maxit = 1, stop.crit = 1e-5, silent = FALSE,
     # Update lambda ------------------------------------------------------------
     for (k in 1:p) {
       for (j in 1:m) {
-        lambda   <- expand_lambda(lambda[1:p, ], intr)
-        lambdasq <- expand_lambda(lambdasq[1:p, ], intr)
+        lambda   <- expand_lambda(lambda[1:p, , drop = FALSE], intr)
+        lambdasq <- expand_lambda(lambdasq[1:p, , drop = FALSE], intr)
         BlockB(k, lambda[, j])
         ct[k, j] <- sum(Psql[[k]] * W[[j]])
         dt[k, j] <- as.numeric(
@@ -131,8 +131,8 @@ iprobit_mult <- function(mod, maxit = 1, stop.crit = 1e-5, silent = FALSE,
     }
 
     # Update H.lam and H.lam.sq ------------------------------------------------
-    lambda   <- expand_lambda(lambda[1:p, ], intr)
-    lambdasq <- expand_lambda(lambdasq[1:p, ], intr)
+    lambda   <- expand_lambda(lambda[1:p, , drop = FALSE], intr)
+    lambdasq <- expand_lambda(lambdasq[1:p, , drop = FALSE], intr)
     Hlam     <- get_Hlam(mod, lambda, theta.is.lambda = TRUE)
     Hlamsq   <- get_Hlamsq()
 
@@ -141,7 +141,8 @@ iprobit_mult <- function(mod, maxit = 1, stop.crit = 1e-5, silent = FALSE,
     if (isTRUE(common.intercept)) alpha <- rep(mean(alpha), m)
 
     # theta --------------------------------------------------------------------
-    theta <- apply(lambda[1:p, ], 2, hyperparam_to_theta)
+    if (nrow(lambda) == 1) theta <- log(lambda)
+    else theta <- lambda
 
     # Calculate lower bound ----------------------------------------------------
     lb.ystar <- sum(logClb)
@@ -184,7 +185,7 @@ iprobit_mult <- function(mod, maxit = 1, stop.crit = 1e-5, silent = FALSE,
   } else {
     se.alpha <- rep(sqrt(1 / n), m)
   }
-  lambda <- lambda[1:p, ]
+  lambda <- lambda[1:p, , drop = FALSE]
   if (isTRUE(common.RKHS.scale)) {
     lambda <- apply(lambda, 1, unique)  # since they're all the same
     se.lambda <- matrix(sqrt(1 / apply(ct, 1, sum)), ncol = m, nrow = p)[, 1]

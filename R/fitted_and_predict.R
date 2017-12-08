@@ -73,34 +73,12 @@ predict.iprobitMod <- function(object, newdata = list(), y.test = NULL,
     xrownames <- rownames(do.call(cbind, newdata))
   }
 
+  if (isTRUE(list(...)$return.xstar)) return(xstar)
+
   res <- predict_iprobit(object, xstar, y.test, quantiles = quantiles,
                          n.samp = n.samp, transform = transform, raw = raw)
   # names(res$y) <- xrownames
   res
-
-
-
-  #
-  # # Pass to appropriate prediction function ----------------------------------
-  # if (isTRUE(quantiles)) {
-  #   res <- predict_quant(object, n.samp, transform, Hl, y.test, raw)
-  # } else {
-  #   if (is.iprobitMod_bin(object)) {
-  #     ystar.new <- calc_ystar(object, Hl.new = Hl)
-  #     names(ystar.new) <- xrownames
-  #     res <- predict_iprobit_bin(y.test, y.levels, ystar.new)
-  #   }
-  #   if (is.iprobitMod_mult(object)) {
-  #     ystar.new <- calc_ystar(object, Hl.new = Hl)
-  #     names(ystar.new) <- xrownames
-  #     res <- predict_iprobit_mult(y.test, y.levels, ystar.new)
-  #   }
-  # }
-  #
-  #
-  # res$test.error <- res$train.error
-  # res$train.error <- NULL
-  # res
 }
 
 brier_score <- function(y, y.hat, prob) {

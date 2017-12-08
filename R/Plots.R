@@ -77,8 +77,8 @@ iplot_lb <- function(x, niter.plot = NULL, lab.pos = c("up", "down")) {
     theme_bw()
 }
 
-prepare_point_range <- function(object, test.data = NULL, X.var = c(1, 2),
-                                grid.len = 100) {
+prepare_point_range <- function(object, X.var = c(1, 2), grid.len = 10,
+                                plot.test = TRUE) {
   # Helper function for iplot_predict() and iplot_dec_bound()
   X <- lapply(object$ipriorKernel$Xl, as.matrix)  # make all X a matrix
   col.info <- sapply(X, ncol)  # no. of cols of each matrix in the list
@@ -108,23 +108,35 @@ prepare_point_range <- function(object, test.data = NULL, X.var = c(1, 2),
   }
 
   # Build the plotting data frame (predicted probabilities) --------------------
-  prob <- predict_iprobit(object, xx, test.data)$prob  # predicted probabilities
+  prob <- predict_iprobit(object, xx, NULL)$prob  # predicted probabilities
   plot.df <- xx.all[, X.var]
   plot.df <- data.frame(plot.df, prob)
   colnames(plot.df)[1:2] <- c("X1", "X2")
-  colnames(plot.df)[-(1:p)] <- paste0("class",
-                                      seq_along(object$ipriorKernel$y.levels))
+  colnames(plot.df)[-(1:p)] <- seq_along(object$ipriorKernel$y.levels)
 
   # Build the plotting data frame (observed data points) -----------------------
   classes <- factor(object$ipriorKernel$y)
   levels(classes) <- object$ipriorKernel$y.levels
   XX <- do.call(cbind, X)
-  points.df <- data.frame(XX[, X.var], classes)
-  if (!is.null(test.data)) {
-    if (is.iprobitData(test.data)) test.data <- as.data.frame(test.data)
-    points.df <- test.data  # replace with test.data if supplied
+  points.df <- data.frame(XX[, X.var], classes, "")
+  colnames(points.df) <- c("X1", "X2", "Class", "prob")
+
+  # Test data frame for plotting points ----------------------------------------
+  test.fit <- object$test
+  if (!is.null(test.fit) & isTRUE(plot.test)) {
+    y.test <- factor(object$ipriorKernel$y.test)
+    levels(y.test) <- object$ipriorKernel$y.levels
+    x.test <- object$ipriorKernel$Xl.test
+    x.test <- do.call(cbind, x.test)  # combine into one big matrix
+    prob.ind <- test.fit$prob
+    for (j in seq_len(ncol(prob.ind))) {
+      prob.ind[, j] <- y.test == levels(y.test)[j]
+    }
+    probs.test <- unlist(test.fit$prob)[unlist(prob.ind)]
+    test.df <- data.frame(x.test[, X.var], y.test, iprior::dec_plac(probs.test, 2))
+    colnames(test.df) <- c("X1", "X2", "Class", "prob")
+    points.df <- rbind(points.df, test.df)
   }
-  colnames(points.df) <- c("X1", "X2", "Class")
 
   # Others ---------------------------------------------------------------------
   mm <- t(do.call(cbind, Xl.minmax))  # max and min for each variable (rows)
@@ -136,49 +148,6 @@ prepare_point_range <- function(object, test.data = NULL, X.var = c(1, 2),
     xname <- object$ipriorKernel$xname
   }
 
-
-#
-#   maxmin <- cbind(apply(X, 2, min), apply(X, 2, max))
-#   xx <- list(NULL)
-#   for (j in 1:2) {
-#     mm <- maxmin[X.var[j], ]
-#     xx[[j]] <- seq(from = mm[1] - 1, to = mm[2] + 1, length.out = 10)
-#   }
-#   mm <- maxmin[X.var, ]
-#   plot.df <- expand.grid(xx[[1]], xx[[2]])
-#   if (p > 2) {
-#     X.avg <- X[, -X.var]
-#     xx.avg <- apply(X.avg, 2, mean)
-#     plot.df <- cbind(plot.df, lapply(xx.avg, function(x) x))
-#   }
-#
-#   classes <- factor(object$ipriorKernel$y)
-#   levels(classes) <- object$ipriorKernel$y.levels
-#   points.df <- data.frame(X[, X.var], classes)
-#
-#   if (!is.null(object$formula)) {
-#     # Fitted using formula
-#     xname <- colnames(plot.df)[1:2] <-
-#       attr(object$ipriorKernel$terms, "term.labels")[X.var]
-#     prob <- predict(object, newdata = plot.df)$prob
-#     if (!is.null(test.data)) {
-#       if (is.iprobitData(test.data)) test.data <- as.data.frame(test.data)
-#       points.df <- test.data
-#     }
-#   } else {
-#     prob <- predict(object, newdata = list(plot.df))$prob
-#     if (!is.null(test.data)) {
-#       if (is.iprobitData(test.data)) test.data <- as.data.frame(test.data)
-#       points.df <- test.data
-#     }
-#   }
-  # plot.df <- cbind(plot.df, prob)
-  # colnames(plot.df)[1:2] <- c("X1", "X2")
-  # colnames(plot.df)[-(1:p)] <- paste0("class", seq_along(object$y.levels))
-  # colnames(points.df) <- c("X1", "X2", "Class")
-  # list(maxmin = maxmin, mm = mm, plot.df = plot.df, points.df = points.df,
-  #      prob = prob, X = X, classes = classes, j = j, p = p,
-  #      test.data = test.data, X.var = X.var, xname = xname, xx = xx)
   list(plot.df = plot.df, points.df = points.df, mm = mm, xname = xname[X.var])
 }
 
@@ -188,14 +157,21 @@ prepare_point_range <- function(object, test.data = NULL, X.var = c(1, 2),
 
 #' @export
 iplot_dec_bound <- function(object, X.var = c(1, 2), col = "grey35", size = 0.8,
-                            grid.len = 100, ...) {
-  list2env(prepare_point_range(object, NULL, X.var, grid.len),
+                            grid.len = 50, ...) {
+  list2env(prepare_point_range(object, X.var, grid.len, FALSE),
            envir = environment())
   m <- get_m(object)
+
+  plot.df <- reshape2::melt(plot.df, id.vars = c("X1", "X2"))
+  # plot.df$value[plot.df$value > 1 / m] <- 1
+  # plot.df$value[plot.df$value <= 1 / m] <- 0
+  # head(plot.df)
+
   ggplot() +
     geom_point(data = points.df, aes(X1, X2, col = Class)) +
-    geom_contour(data = plot.df, aes(X1, X2, z = class1, size = "Decision\nboundary"),
-                 binwidth = 0.5 + 1e-12, col = col, ...) +
+    geom_contour(data = plot.df, aes(X1, X2, z = value, group = variable,
+                                     size = "Decision\nboundary"),
+                 bins = 2, col = col, ...) +
     coord_cartesian(xlim = mm[1, ], ylim = mm[2, ]) +
     scale_colour_manual(values = c(iprior::gg_col_hue(m), "grey30")) +
     scale_size_manual(values = size, name = NULL) +
@@ -206,15 +182,16 @@ iplot_dec_bound <- function(object, X.var = c(1, 2), col = "grey35", size = 0.8,
 }
 
 #' @export
-iplot_predict <- function(object, test.data = NULL, X.var = c(1, 2),
-                          grid.len = 100) {
-  list2env(prepare_point_range(object, test.data, X.var, grid.len),
+iplot_predict <- function(object, X.var = c(1, 2), grid.len = 50,
+                          dec.bound = TRUE, plot.test = TRUE) {
+  list2env(prepare_point_range(object, X.var, grid.len, plot.test),
            envir = environment())
 
   if (is.iprobitMod_bin(object))
-    p <- iplot_predict_bin(plot.df, points.df, mm[1, ], mm[2, ], 2)
+    p <- iplot_predict_bin(plot.df, points.df, mm[1, ], mm[2, ], 2, dec.bound)
   if (is.iprobitMod_mult(object))
-    p <- iplot_predict_mult(plot.df, points.df, mm[1, ], mm[2, ], get_m(object))
+    p <- iplot_predict_mult(plot.df, points.df, mm[1, ], mm[2, ], get_m(object),
+                            dec.bound)
 
   # if (isNystrom(object)) {
   #   Nys.m <- object$ipriorKernel$Nystrom$m
@@ -228,12 +205,19 @@ iplot_predict <- function(object, test.data = NULL, X.var = c(1, 2),
 
   yname <- ifelse(object$ipriorKernel$yname == "y", "Class",
                   object$ipriorKernel$yname)
-  p <- p +
-    labs(x = xname[1], y = xname[2], col = yname)
-  p
+
+  # if (!is.null(test.df)) {
+  #   p <- p +
+  #     geom_point(data = test.df, aes(X1, X2, col = Class)) +
+  #     ggrepel::geom_label_repel(data = test.df,
+  #                                      aes(X1, X2, col = Class,
+  #                                          label = iprior::dec_plac(prob, 2)))
+  # }
+
+  p + labs(x = xname[1], y = xname[2], col = yname)
 }
 
-iplot_predict_bin <- function(plot.df, points.df, x, y, m) {
+iplot_predict_bin <- function(plot.df, points.df, x, y, m, dec.bound) {
   ggplot() +
     geom_raster(data = plot.df, aes(X1, X2, fill = class2), alpha = 0.5) +
     scale_fill_gradient(low = "#F8766D", high = "#00BFC4", limits = c(0, 1)) +
@@ -248,38 +232,58 @@ iplot_predict_bin <- function(plot.df, points.df, x, y, m) {
     theme_bw()
 }
 
-iplot_predict_mult <- function(plot.df, points.df, x, y, m) {
+iplot_predict_mult <- function(plot.df, points.df, x, y, m, dec.bound) {
   fill.col <- iprior::gg_col_hue(m)
   alpha <- 0.6
   class.ind <- sort(seq(from = ncol(plot.df), by = -1, length = m))
-
-  # decbound.df <- NULL
-  # for (j in 1:m) {
-  #   tmp <- plot.df[round(plot.df[, 2 + j], 1) == 0.5, 1:2]
-  #   decbound.df[[j]] <- tmp[order(tmp[, 1]), ]
-  # }
 
   # Add first layer ------------------------------------------------------------
   p <- ggplot() +
     geom_raster(data = plot.df, aes(X1, X2, fill = fill.col[1],
                                     alpha = alpha * plot.df[, class.ind[1]])) +
     scale_alpha_continuous(range = c(0, 0.5))
-    # geom_line(data = decbound.df[[1]], aes(X1, X2))
 
   # Add subsequent layers ------------------------------------------------------
   for (j in 2:m) {
     p <- p +
       annotate(geom = "raster", x = plot.df[, 1], y = plot.df[, 2],
                alpha = alpha * plot.df[, class.ind[j]], fill = fill.col[j])
-      # geom_line(data = decbound.df[[j]], aes(X1, X2))
   }
 
-  # Add points and touch up remaining plot  ------------------------------------
+  # Add points and decision boundary, and touch up remaining plot --------------
+  if (isTRUE(dec.bound)) {
+    decbound.df <- reshape2::melt(plot.df, id.vars = c("X1", "X2"))
+    p <- p +
+      geom_contour(data = decbound.df, aes(X1, X2, z = value, group = variable,
+                                           col = variable,
+                                           size = "Decision\nboundary"),
+                   # binwidth = 0.5 + 1e-12,
+                   bins = 2,
+                   linetype = "dashed") +
+      scale_size_manual(values = 0.8, name = NULL) +
+      scale_color_discrete(name = " Class") +
+      coord_cartesian(xlim = x, ylim = y) +
+      guides(fill = FALSE, alpha = FALSE,
+             size = guide_legend(override.aes = list(linetype = 2, col = "grey35")),
+             col = guide_legend(order = 1, override.aes = list(linetype = 0))) +
+      theme_bw() +
+      theme(legend.key.width = unit(2, "line"))
+  } else {
+    p <- p +
+      coord_cartesian(xlim = x, ylim = y) +
+      guides(fill = FALSE, alpha = FALSE) +
+      theme_bw()
+  }
+
+  # Add points -----------------------------------------------------------------
   p <- p +
+    ggrepel::geom_label_repel(data = points.df, segment.colour = "grey25",
+                              box.padding = 0.9, show.legend = FALSE,
+                              aes(X1, X2, col = Class, label = prob)) +
     geom_point(data = points.df, aes(X1, X2, col = Class)) +
-    coord_cartesian(xlim = x, ylim = y) +
-    guides(fill = FALSE, alpha = FALSE) +
-    theme_bw()
+    geom_point(data = subset(points.df, points.df$prob != ""), aes(X1, X2),
+               shape = 1, col = "grey25")
+
   p
 }
 

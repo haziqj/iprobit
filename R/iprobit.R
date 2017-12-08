@@ -42,7 +42,7 @@ iprobit.default <- function(y, ..., kernel = "linear", interactions = NULL,
 
   # Set up controls ------------------------------------------------------------
   control_ <- list(
-    maxit          = 1,
+    maxit          = 10,
     stop.crit      = 1e-5,
     silent         = FALSE,
     alpha0         = NULL,  # if NULL, parameters are
@@ -97,7 +97,7 @@ iprobit.default <- function(y, ..., kernel = "linear", interactions = NULL,
       } else {
         stop("Not implemented yet.")
       }
-      class(res) <- c("iprobitMod", "iprobitMod_bin")
+      class(res) <- c("iprobitMod", "iprobitMod_mult")
       res$coefficients <- param.full_to_coef(res$param.full, mod)
     }
     if (res$conv == 0)
