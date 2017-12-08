@@ -84,9 +84,6 @@ iprobit.default <- function(y, ..., kernel = "linear", interactions = NULL,
                                  "% acc.).")
       }
       class(res) <- c("iprobitMod", "iprobitMod_bin")
-      res$coefficients <- iprior::.reduce_theta(
-        param.summ_to_param.full(res$param.summ), mod$estl
-      )$theta.reduced
     } else {
       # Multinomial models -----------------------------------------------------
       if (est.method["em.closed"]) {  # VB CLOSED-FORM
@@ -98,7 +95,6 @@ iprobit.default <- function(y, ..., kernel = "linear", interactions = NULL,
         stop("Not implemented yet.")
       }
       class(res) <- c("iprobitMod", "iprobitMod_mult")
-      res$coefficients <- param.full_to_coef(res$param.full, mod)
     }
     if (res$conv == 0)
       res$est.conv <- paste("Converged to within", control$stop.crit,
@@ -109,6 +105,7 @@ iprobit.default <- function(y, ..., kernel = "linear", interactions = NULL,
       res$est.conv <- res$message
     res$ipriorKernel <- mod
   }
+  res$coefficients <- param.full_to_coef(res$param.full, mod)
 
   # Change the call to "iprobit" -----------------------------------------------
   res$call <- iprior::.fix_call_default(match.call(), "iprobit")

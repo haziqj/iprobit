@@ -73,8 +73,6 @@ predict.iprobitMod <- function(object, newdata = list(), y.test = NULL,
     xrownames <- rownames(do.call(cbind, newdata))
   }
 
-  if (isTRUE(list(...)$return.xstar)) return(xstar)
-
   res <- predict_iprobit(object, xstar, y.test, quantiles = quantiles,
                          n.samp = n.samp, transform = transform, raw = raw)
   # names(res$y) <- xrownames
@@ -102,16 +100,6 @@ predict_iprobit <- function(object, xstar, y.test, quantiles = FALSE,
   }
   res
 }
-
-#'   }
-#'   if (is.iprobitMod_mult(object)) {
-#'     # environment(lambdaExpand_mult) <- environment()
-#'     # environment(HlamFn_mult) <- environment()
-#'     # lambdaExpand_mult(env = environment(), y = NULL)
-#'     # HlamFn_mult(env = environment())
-#'     # return(rep(alpha, each = nrow(Hlam.mat[[1]])) +
-#'     #          mapply("%*%", Hlam.mat, split(w, col(w))))
-#'   }
 
 calc_ystar <- function(object, xstar, alpha, theta, w) {
   # Args: An ipriorKernel object.
@@ -208,19 +196,21 @@ sample_prob_bin <- function(object, n.samp, xstar = NULL, y = NULL) {
   # binary models.
   #
   # Args: An iprobitMod_x object.
-  alpha <- get_alpha(object)
-
   alpha.samp <- sample_alpha(n.samp, get_alpha(object), get_sd_alpha(object))
-  lambda.samp <- sample_lambda(n.samp, get_lambda(object),
-                               get_sd_lambda(object))
-  w.samp <- mvtnorm::rmvnorm(n.samp, object$w, object$Varw)  # n.samp x n matrix
+  if (grepl("Closed-form", object$est.method)) {
+    theta.samp <- sample_lambda(n.samp, get_lambda(object),
+                                get_sd_lambda(object))
+  } else {
+    stop("Not implemented yet.")
+  }
+  w.samp <- sample_w(n.samp, object$w, object$Varw)  # n.samp x n matrix
   phat.samp <- list()
   error.samp <- brier.samp <- rep(NA, n.samp)
   if (is.null(y)) y <- as.numeric(factor(object$ipriorKernel$y))
 
   for (i in seq_len(n.samp)) {
     alpha <- alpha.samp[i]
-    theta <- hyperparam_to_theta(lambda.samp[i, ])
+    theta <- hyperparam_to_theta(theta.samp[i, ])
     w <- w.samp[i, ]
     ystar.samp <- calc_ystar(object$ipriorKernel, xstar, alpha, theta, w)
     tmp <- probs_yhat_error(y, object$ipriorKernel$y.levels, ystar.samp)
@@ -232,14 +222,20 @@ sample_prob_bin <- function(object, n.samp, xstar = NULL, y = NULL) {
   list(phat.samp = phat.samp, error.samp = error.samp, brier.samp = brier.samp)
 }
 
-sample_alpha <- function(n.samp, mean, sd) rnorm(n.samp, mean, sd)
+sample_alpha <- function(n.samp, mean, sd) {
+  rnorm(n.samp, mean, sd)
+}
 
 sample_lambda <- function(n.samp, mean, sd) {
   if (length(mean) > 1) {
     return(mvtnorm::rmvnorm(n.samp, mean, diag(sd ^ 2)))
   } else {
-    return(matrix(rnorm(n.samp, mean, sd)))
+    return(matrix(log(rnorm(n.samp, mean, sd))))  # note the log(lambda)
   }
+}
+
+sample_w <- function(n.samp, mean, variance) {
+  mvtnorm::rmvnorm(n.samp, mean, variance)
 }
 
 #' calc_ystar <- function(object, xstar) {

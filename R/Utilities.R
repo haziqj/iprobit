@@ -192,7 +192,7 @@ get_sd <- function(object) {
 
 get_sd_alpha <- function(object) {
   res <- get_sd(object)
-  res[grep("alpha", names(res))]
+  res[grep("Intercept", names(res))]
 }
 
 get_sd_lambda <- function(object) {
@@ -298,6 +298,7 @@ get_Hlam <- function(object, theta, theta.is.lambda = FALSE) {
   # Returns: For binary models, this calculate Hlam. For multinomial models,
   # this calculates Hlam for every class---so a list is returned.
   if (is.iprobit_bin(object)) {
+    if (is.matrix(theta)) theta <- theta[, 1]
     return(iprior::.get_Hlam(object = object, theta = theta,
                              theta.is.lambda = theta.is.lambda))
   } else {
@@ -313,6 +314,7 @@ get_Hlam <- function(object, theta, theta.is.lambda = FALSE) {
 
 get_Htildelam <- function(object, theta, xstar) {
   if (is.iprobit_bin(object)) {
+    if (is.matrix(theta)) theta <- theta[, 1]
     return(iprior::.get_Htildelam(object, theta, xstar))
   } else {
     res <- NULL
@@ -324,30 +326,6 @@ get_Htildelam <- function(object, theta, xstar) {
   }
 }
 
-HlamsqFn_mult <- function(env = environment()) {
-  environment(Hlam_two_way_index) <- env
-  res.Hlam.matsq <- NULL
-  for (j in 1:m) {
-    if (is.null(Hsql))
-      square.terms <- Reduce("+", mapply("*", Psql, lambda.sq[, j],
-                                         SIMPLIFY = FALSE))
-    else
-      square.terms <- Reduce("+", mapply("*", Hsql, lambda.sq[, j],
-                                         SIMPLIFY = FALSE))
-
-    if (is.null(ind1) && is.null(ind2))
-      two.way.terms <- 0
-    else {
-      lambda.two.way <- Hlam_two_way_index(lambda[, j], lambda.sq[, j])
-      two.way.terms <-
-        Reduce("+", mapply("*", H2l, lambda.two.way, SIMPLIFY = FALSE))
-    }
-
-    res.Hlam.matsq[[j]] <- square.terms + two.way.terms
-  }
-
-  assign("Hlam.matsq", res.Hlam.matsq, envir = env)
-}
 
 get_Hlamsq <- function() {
   # Calculate Hlamsq for closed-form VB.
@@ -406,57 +384,6 @@ get_Hlamsq <- function() {
   }
 }
 
-
-
-# lambda expansion and Hlam.mat calculation for multinomial IIA models ---------
-
-lambdaExpand_mult <- function(x = lambda, y = lambda.sq, env = iprobit.env) {
-  environment(.lambdaExpand) <- environment()
-  original.lambda <- x
-  lambda.tmp <- NULL
-  for (j in 1:m) {
-    .lambdaExpand(x = original.lambda[, j], env = environment())
-    lambda.tmp[[j]] <- lambda
-  }
-  assign("lambda", matrix(unlist(lambda.tmp), ncol = m), envir = env)
-
-  if (!is.null(y)) {
-    original.lambda.sq <- y
-    lambda.sq.tmp <- NULL
-    for (j in 1:m) {
-      .lambdaExpand(x = original.lambda.sq[, j], env = environment())
-      lambda.sq.tmp[[j]] <- lambda
-    }
-    assign("lambda.sq", matrix(unlist(lambda.sq.tmp), ncol = m), envir = env)
-  }
-}
-
-
-
-HlamsqFn_mult <- function(env = environment()) {
-  environment(Hlam_two_way_index) <- env
-  res.Hlam.matsq <- NULL
-  for (j in 1:m) {
-    if (is.null(Hsql))
-      square.terms <- Reduce("+", mapply("*", Psql, lambda.sq[, j],
-                                         SIMPLIFY = FALSE))
-    else
-      square.terms <- Reduce("+", mapply("*", Hsql, lambda.sq[, j],
-                                         SIMPLIFY = FALSE))
-
-    if (is.null(ind1) && is.null(ind2))
-      two.way.terms <- 0
-    else {
-      lambda.two.way <- Hlam_two_way_index(lambda[, j], lambda.sq[, j])
-      two.way.terms <-
-        Reduce("+", mapply("*", H2l, lambda.two.way, SIMPLIFY = FALSE))
-    }
-
-    res.Hlam.matsq[[j]] <- square.terms + two.way.terms
-  }
-
-  assign("Hlam.matsq", res.Hlam.matsq, envir = env)
-}
 
 Hlam_two_way_index <- function(lam, lamsq) {
   # mod <- iprior::.kernL(Species ~ . ^ 2, iris)

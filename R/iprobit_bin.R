@@ -105,7 +105,9 @@ iprobit_bin <- function(mod, maxit = 100, stop.crit = 1e-5, silent = FALSE,
       (sum(diag(W)) + determinant(A)$modulus + sum(log(ct))) / 2
 
     # theta --------------------------------------------------------------------
-    theta <- hyperparam_to_theta(lambda = lambda[1:p])
+    if (length(lambda) == 1) theta <- log(lambda[1:p])
+    else theta <- lambda[1:p]
+    theta <- matrix(theta, ncol = 2, nrow = length(theta))
 
     # Calculate fitted values and error rates ----------------------------------
     f.tmp <- as.numeric(alpha + Hlam %*% w)
@@ -128,20 +130,15 @@ iprobit_bin <- function(mod, maxit = 100, stop.crit = 1e-5, silent = FALSE,
   time.taken <- iprior::as.time(end.time - start.time)
 
   # Calculate posterior s.d. and prepare param table ---------------------------
-  hyperparam <- c(alpha, lambda[1:p])
-  se <- sqrt(c(1 / n, 1 / ct[1:p]))  # c(alpha, lambda)
+  param.full <- theta_to_param.full(theta, alpha, mod)
   param.summ <- data.frame(
-    Mean    = hyperparam,
-    S.D.    = se,
-    `2.5%`  = hyperparam - qnorm(0.975) * se,
-    `97.5%` = hyperparam + qnorm(0.975) * se
+    Mean    = c(alpha, lambda[1:p]),
+    S.D.    = sqrt(c(1 / n, 1 / ct[1:p])),
+    `2.5%`  = c(alpha, lambda[1:p]) - qnorm(0.975) * sqrt(c(1 / n, 1 / ct[1:p])),
+    `97.5%` = c(alpha, lambda[1:p]) + qnorm(0.975) * sqrt(c(1 / n, 1 / ct[1:p]))
   )
   colnames(param.summ) <- c("Mean", "S.D.", "2.5%", "97.5%")
-  if (length(lambda) > 1) {
-    rownames(param.summ) <- c("alpha", paste0("lambda[", seq_along(lambda), "]"))
-  } else {
-    rownames(param.summ) <- c("alpha", "lambda")
-  }
+  rownames(param.summ) <- get_names(mod, expand = FALSE)
 
   # Clean up and close ---------------------------------------------------------
   convergence <- niter == maxit
@@ -151,8 +148,8 @@ iprobit_bin <- function(mod, maxit = 100, stop.crit = 1e-5, silent = FALSE,
     else cat("Converged after", niter, "iterations.\n")
   }
 
-  list(theta = theta, param.summ = param.summ, w = w, Varw = Varw,
-       lower.bound = as.numeric(na.omit(lb)), niter = niter,
+  list(theta = theta, param.full = param.full, param.summ = param.summ, w = w,
+       Varw = Varw, lower.bound = as.numeric(na.omit(lb)), niter = niter,
        start.time = start.time, end.time = end.time, time = time.taken,
        fitted.values = fitted.values, test = fitted.test,
        train.error = as.numeric(na.omit(train.error)),
