@@ -44,7 +44,15 @@ iplot_fitted <- function(object) {
 }
 
 #' @export
-iplot_lb <- function(x, niter.plot = NULL, lab.pos = c("up", "down")) {
+iplot_lb <- function(x, niter.plot = NULL, lab.pos = c("up", "down"), ...) {
+  lae.check <- FALSE
+  extra.opt <- list(...)
+  if (isTRUE(extra.opt$lb.and.error)) {
+    lae.check <- TRUE
+    x.major <- extra.opt$x.major
+    x.minor <- extra.opt$x.minor
+  }
+
   if (x$niter < 2) stop("Nothing to plot.")
 
   lab.pos <- match.arg(lab.pos, c("up", "down"))
@@ -52,29 +60,45 @@ iplot_lb <- function(x, niter.plot = NULL, lab.pos = c("up", "down")) {
   else lab.pos <- 1.5
 
   lb.original <- x$lower.bound
-  if (is.null(niter.plot)) niter.plot <- c(1, length(lb.original))
+  if (missing(niter.plot)) niter.plot <- seq_along(lb.original)
   else if (length(niter.plot) == 1) niter.plot <- c(1, niter.plot)
-  niter.plot <- niter.plot[1]:niter.plot[2]
   lb <- lb.original[niter.plot]
   plot.df <- data.frame(Iteration = niter.plot, lb = lb)
   time.per.iter <- x$time$time / x$niter
   if (time.per.iter < 0.001) time.per.iter <- 0.001
+  if (isTRUE(lae.check)) plot.df$Iteration <- plot.df$Iteration * time.per.iter
 
-  ggplot(plot.df, aes(x = Iteration, y = lb, label = max(lb))) +
+  p <- ggplot(plot.df, aes(x = Iteration, y = lb, label = max(lb))) +
     geom_line(col = "grey60") +
     geom_point() +
     geom_hline(yintercept = max(lb.original), linetype = 2, col = "red") +
-    scale_x_continuous(
-      sec.axis = sec_axis(~ . * time.per.iter, name = "Time (seconds)"),
-      breaks = scales::pretty_breaks(n = min(5, ifelse(x$niter == 2, 1, x$niter)))
-    ) +
-    # directlabels::geom_dl(method = "bottom.pieces") +
     geom_text(aes(label = ifelse(lb == max(lb), round(max(lb), 2), "")),
               vjust = 1.5, size = 3.7) +
-    annotate("text", col = "red", x = niter.plot[1], y = max(lb.original),
+    annotate("text", col = "red", x = min(plot.df$Iteration), y = max(lb.original),
              vjust = lab.pos, label = round(max(lb.original), 2), size = 3.7) +
     labs(y = "Variational lower bound") +
     theme_bw()
+
+  if (isTRUE(lae.check)) {
+    p <- p +
+      labs(x = "Time (seconds)") +
+      scale_y_continuous(sec.axis = dup_axis()) +
+      scale_x_continuous(
+        position = "top",
+        breaks = x.major * time.per.iter,
+        minor_breaks = x.minor * time.per.iter
+      ) +
+      coord_cartesian(xlim = c(min(niter.plot) * time.per.iter,
+                               (max(niter.plot) + 0.5) * time.per.iter))
+  } else {
+    p <- p +
+      scale_x_continuous(
+        sec.axis = sec_axis(~ . * time.per.iter, name = "Time (seconds)"),
+        breaks = scales::pretty_breaks(n = min(5, ifelse(x$niter == 2, 1, x$niter)))
+      )
+  }
+
+  p
 }
 
 prepare_point_range <- function(object, X.var = c(1, 2), grid.len = 10,
@@ -151,10 +175,6 @@ prepare_point_range <- function(object, X.var = c(1, 2), grid.len = 10,
   list(plot.df = plot.df, points.df = points.df, mm = mm, xname = xname[X.var])
 }
 
-# set.seed(123)
-# dat <- gen_circle(200)
-# mod <- iprobit(y ~ X1 + X2, dat, one.lam = TRUE, kernel = "FBM")
-
 #' @export
 iplot_dec_bound <- function(object, X.var = c(1, 2), col = "grey35", size = 0.8,
                             grid.len = 50, ...) {
@@ -205,14 +225,6 @@ iplot_predict <- function(object, X.var = c(1, 2), grid.len = 50,
 
   yname <- ifelse(object$ipriorKernel$yname == "y", "Class",
                   object$ipriorKernel$yname)
-
-  # if (!is.null(test.df)) {
-  #   p <- p +
-  #     geom_point(data = test.df, aes(X1, X2, col = Class)) +
-  #     ggrepel::geom_label_repel(data = test.df,
-  #                                      aes(X1, X2, col = Class,
-  #                                          label = iprior::dec_plac(prob, 2)))
-  # }
 
   p + labs(x = xname[1], y = xname[2], col = yname)
 }
@@ -288,54 +300,82 @@ iplot_predict_mult <- function(plot.df, points.df, x, y, m, dec.bound) {
 }
 
 #' @export
-iplot_error <- function(x, niter.plot = NULL) {
+iplot_error <- function(x, niter.plot, plot.test = TRUE) {
   if (x$niter < 2) stop("Nothing to plot.")
-  if (is.null(niter.plot)) niter.plot <- c(1, length(x$train.error))
+  if (missing(niter.plot)) niter.plot <- seq_along(x$train.error)
   else if (length(niter.plot) == 1) niter.plot <- c(1, niter.plot)
-  niter.plot <- niter.plot[1]:niter.plot[2]
+
+  # Prepare plotting data frame ------------------------------------------------
   plot.df <- data.frame(Iteration = niter.plot,
                         error     = x$train.error[niter.plot] / 100,
-                        brier     = x$train.brier[niter.plot])
+                        brier     = x$train.brier[niter.plot],
+                        Type      = "train")
+  if (!is.null(x$test) & isTRUE(plot.test)) {
+    plot.df <- rbind(plot.df, data.frame(
+      Iteration = niter.plot,
+      error     = x$test.error[niter.plot] / 100,
+      brier     = x$test.brier[niter.plot],
+      Type      = "test"
+    ))
+  }
   time.per.iter <- x$time$time / x$niter
   if (time.per.iter < 0.001) time.per.iter <- 0.001
-  plot.df <- reshape2::melt(plot.df, id = "Iteration")
+  plot.df <- reshape2::melt(plot.df, id = c("Iteration", "Type"))
+
+  # Prepare data frame of the last points for labelling ------------------------
   last.value.df <- subset(plot.df, plot.df$Iteration == max(plot.df$Iteration))
   last.value.df$lab <- NA
-  last.value.df$lab[1] <- decimal_place(last.value.df$value[1] * 100)
-  last.value.df$lab[1] <- paste0(last.value.df$lab[1], "%")
-  last.value.df$lab[2] <- decimal_place(last.value.df$value[2], 3)
+  ind.error <- last.value.df$variable == "error"
+  ind.brier <- last.value.df$variable == "brier"
+  last.value.df$lab[ind.error] <-
+    iprior::dec_plac(last.value.df$value[ind.error] * 100)
+  last.value.df$lab[ind.error] <- paste0(
+    "(", last.value.df$Type[ind.error], ")\n", last.value.df$lab[ind.error], "%"
+  )
+  last.value.df$lab[ind.brier] <- paste0(
+    "(", last.value.df$Type[ind.brier], ")\n",
+    iprior::dec_plac(last.value.df$value[ind.brier], 3)
+  )
 
-  ggplot(plot.df, aes(x = Iteration, y = value, col = variable)) +
-    geom_line(alpha = 0.5) +
-    directlabels::geom_dl(aes(label = variable), method = ("lines2")) +
+  # The plot -------------------------------------------------------------------
+  ggplot(plot.df, aes(x = Iteration, y = value, col = variable,
+                      linetype = Type)) +
+    geom_line(alpha = 0.9) +
+    directlabels::geom_dl(aes(label = variable), method = "extreme.grid") +
     geom_point(size = 0.9) +
-    geom_text(data = last.value.df, aes(label = lab, y = value + 0.002),
-              vjust = 0, hjust = 0.5) +
+    ggrepel::geom_text_repel(data = last.value.df, nudge_x = 0.5,
+                             segment.colour = NA, size = 3.7,
+                             aes(label = lab, y = value)) +
     scale_x_continuous(
       sec.axis = sec_axis(~ . * time.per.iter, name = "Time (seconds)"),
       breaks = scales::pretty_breaks(n = min(5, ifelse(x$niter == 2, 1, x$niter)))
     ) +
     scale_y_continuous(
-      name = "Training error rate",
+      name = "Misclassification rate",
       labels = scales::percent,
       sec.axis = sec_axis(~ ., name = "Brier score")
     ) +
+    coord_cartesian(xlim = c(min(niter.plot), max(niter.plot) + 0.5)) +
     theme_bw() +
     theme(legend.position = "none")
 }
 
-iplot_lb_and_error <- function(x, niter.plot = 10, lab.pos = c("up", "down")) {
-  p1 <- iplot_lb(mod, niter.plot, lab.pos) +
-    scale_y_continuous(sec.axis = dup_axis())
-    # theme(axis.title.x=element_blank(),
-    #       axis.text.x=element_blank(),
-    #       axis.ticks.x=element_blank())
+iplot_lb_and_error <- function(x, niter.plot, lab.pos) {
   suppressMessages(
-    p2 <- iplot_error(mod, niter.plot) +
+    p2 <- iplot_error(x, niter.plot) +
       scale_x_continuous(
         breaks = scales::pretty_breaks(n = min(5, ifelse(x$niter == 2, 1, x$niter)))
       )
   )
+
+  tmp <- ggplot_build(p2)$layout$panel_ranges[[1]]
+  x.major <- tmp$x.major_source
+  x.minor <- tmp$x.minor_source
+
+  if (missing(lab.pos)) lab.pos <- "down"
+
+  p1 <- iplot_lb(x, niter.plot, lab.pos, lb.and.error = TRUE,
+                 x.major = x.major, x.minor = x.minor)
 
   cowplot::plot_grid(p1, p2, nrow = 2)
 }
