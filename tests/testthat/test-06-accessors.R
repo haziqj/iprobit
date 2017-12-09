@@ -1,6 +1,6 @@
 # context("Methods for iprobitMod objects")
-#
-# # Update/refit -----------------------------------------------------------------
+
+# Update/refit -----------------------------------------------------------------
 #
 # test_that("Update from formula", {
 #

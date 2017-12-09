@@ -30,7 +30,7 @@ iprobit.default <- function(y, ..., kernel = "linear", interactions = NULL,
                             train.samp, control = list()) {
   # Load the I-prior model -----------------------------------------------------
   if (iprior::is.ipriorKernel(y)) {
-    mod <- y
+    mod <- remove_psi(y)  # remove psi from estimation procedure if not already
   } else {
     mod <- iprior::kernL(y, ..., kernel = kernel, interactions = interactions,
                          est.lambda = TRUE, est.psi = FALSE, psi = 1,
@@ -42,16 +42,17 @@ iprobit.default <- function(y, ..., kernel = "linear", interactions = NULL,
 
   # Set up controls ------------------------------------------------------------
   control_ <- list(
-    maxit          = 10,
+    maxit          = 100,
     stop.crit      = 1e-5,
     silent         = FALSE,
     alpha0         = NULL,  # if NULL, parameters are
-    lambda0        = NULL,  # initialised in VB
+    # lambda0        = NULL,  # initialised in VB
     w0             = NULL,  # routine
     theta0         = NULL,
     n.samp         = 100,  # settings for
     sd.samp        = 0.15,   # the metropolis
     thin.samp      = 2,    # sampler
+    seed           = NULL,
     restarts       = 0,
     restart.method = c("lb", "error", "brier")
   )
@@ -74,11 +75,11 @@ iprobit.default <- function(y, ..., kernel = "linear", interactions = NULL,
     if (m == 2) {
       # Binary models ----------------------------------------------------------
       if (est.method["em.closed"]) {  # VB CLOSED-FORM
-        res <- iprobit_bin(mod, maxit, stop.crit, silent, alpha0, lambda0, w0)
+        res <- iprobit_bin(mod, maxit, stop.crit, silent, alpha0, theta0, w0)
         res$est.method <- "Closed-form VB-EM algorithm."
       } else {
         res <- iprobit_bin_metr(mod, maxit, stop.crit, silent, alpha0, theta0,
-                                w0, n.samp, sd.samp, thin.samp)
+                                w0, n.samp, sd.samp, thin.samp, seed)
         res$est.method <- paste0("VB-EM with Metropolis sampler (",
                                  iprior::dec_plac(mean(res$acc.rate) * 100, 1),
                                  "% acc.).")
@@ -87,12 +88,16 @@ iprobit.default <- function(y, ..., kernel = "linear", interactions = NULL,
     } else {
       # Multinomial models -----------------------------------------------------
       if (est.method["em.closed"]) {  # VB CLOSED-FORM
-        res <- iprobit_mult(mod, maxit, stop.crit, silent, alpha0, lambda0, w0,
+        res <- iprobit_mult(mod, maxit, stop.crit, silent, alpha0, theta0, w0,
                             common.intercept, common.RKHS.scale)
         res$est.method <- "Closed-form VB-EM algorithm."
-        # res$coefficients <- rbind(get_alpha(res), get_lambda(res))
       } else {
-        stop("Not implemented yet.")
+        res <- iprobit_mult_metr(mod, maxit, stop.crit, silent, alpha0, theta0,
+                                 w0, n.samp, sd.samp, thin.samp, seed,
+                                 common.intercept, common.RKHS.scale)
+        res$est.method <- paste0("VB-EM with Metropolis sampler (",
+                                 iprior::dec_plac(mean(res$acc.rate) * 100, 1),
+                                 "% acc.).")
       }
       class(res) <- c("iprobitMod", "iprobitMod_mult")
     }
@@ -106,6 +111,7 @@ iprobit.default <- function(y, ..., kernel = "linear", interactions = NULL,
     res$ipriorKernel <- mod
   }
   res$coefficients <- param.full_to_coef(res$param.full, mod)
+  # rownames(res$coefficients) <- get_names(mod, expand = FALSE)
 
   # Change the call to "iprobit" -----------------------------------------------
   res$call <- iprior::.fix_call_default(match.call(), "iprobit")
@@ -146,7 +152,6 @@ iprobit.formula <- function(formula, data, kernel = "linear", one.lam = FALSE,
 iprobit.ipriorKernel <- function(object, control = list(),
                                  common.intercept = FALSE,
                                  common.RKHS.scale = FALSE, ...) {
-  object <- remove_psi(object)
   res <- iprobit.default(y = object, method = method, control = control,
                          common.intercept = common.intercept,
                          common.RKHS.scale = common.RKHS.scale)

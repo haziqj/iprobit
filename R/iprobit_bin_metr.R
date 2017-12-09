@@ -1,6 +1,40 @@
+################################################################################
+#
+#   iprobit: Binary and Multinomial Probit Regression with I-priors
+#   Copyright (C) 2017  Haziq Jamil
+#
+#   This program is free software: you can redistribute it and/or modify
+#   it under the terms of the GNU General Public License as published by
+#   the Free Software Foundation, either version 3 of the License, or
+#   (at your option) any later version.
+#
+#   This program is distributed in the hope that it will be useful,
+#   but WITHOUT ANY WARRANTY; without even the implied warranty of
+#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+#   GNU General Public License for more details.
+#
+#   You should have received a copy of the GNU General Public License
+#   along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+################################################################################
+
+# The updating equation for theta depends on a density that cannot be
+# recognised. Therefore, in order to obtain posterior samples from this density,
+# we must emebed a Metropolis step within the VB-EM. After getting samples
+# theta.samp, we can then calculate any statistic of interest, including
+# E[H_theta], E[H_theta^2], the unconstrained version of the parameters
+# g^{-1})(theta), and so on. Uncertainty of these estimates can be summarised
+# through the standard deviation of the samples, and we also calculate the
+# quantiles c(0.025, 0.975) for the relevant samples.
+#
+# In order to obtain E[H_theta] and E[H_theta^2], we create a list Hlaml (c.f.
+# Hlamsql) of length n.samp. For each value of theta.samp, calculate H_theta and
+# store it in the list. The estimate would then be the sample mean.
+
 iprobit_bin_metr <- function(mod, maxit = 20, stop.crit = 1e-5, silent = FALSE,
                              alpha0 = NULL, theta0 = NULL, w0 = NULL,
-                             n.samp = 1000, sd.samp = 0.1, thin.samp = 10) {
+                             n.samp = 1000, sd.samp = 0.15, thin.samp = 10,
+                             seed = NULL) {
   # Declare all variables and functions to be used into environment ------------
   iprobit.env <- environment()
   list2env(mod, iprobit.env)
@@ -10,6 +44,7 @@ iprobit_bin_metr <- function(mod, maxit = 20, stop.crit = 1e-5, silent = FALSE,
   thin.seq <- seq_len(n.samp)[seq_len(n.samp) %% thin.samp == 0]
 
   # Initialise -----------------------------------------------------------------
+  if (!is.null(seed)) set.seed(seed)
   if (is.null(alpha0)) alpha0 <- rnorm(1)
   if (is.null(theta0)) theta0 <- rnorm(thetal$n.theta)
   if (is.null(w0)) w0 <- rep(0, n)
@@ -83,6 +118,7 @@ iprobit_bin_metr <- function(mod, maxit = 20, stop.crit = 1e-5, silent = FALSE,
     }
     acc.rate[niter] <- count / n.samp
     theta <- apply(theta.samp[thin.seq, ], 2, mean)
+    theta <- matrix(theta, ncol = 2, nrow = length(theta))
     Hlam <- Reduce("+", Hlaml[thin.seq]) / length(Hlaml[thin.seq])
     Hlamsq <- Reduce("+", Hlamsql[thin.seq]) / length(Hlamsql[thin.seq])
 
@@ -116,10 +152,12 @@ iprobit_bin_metr <- function(mod, maxit = 20, stop.crit = 1e-5, silent = FALSE,
   time.taken <- iprior::as.time(end.time - start.time)
 
   # Calculate posterior s.d. and prepare param table ---------------------------
+  param.full <- theta_to_param.full(theta, alpha, mod)
   param.summ <- rbind(
-    alpha = c(alpha, 1 / n, alpha - qnorm(0.975) / n, alpha + qnorm(0.975) / n),
-    theta.samp_to_param.summ(theta.samp[thin.seq, ], mod)
+    c(alpha, 1 / n, alpha - qnorm(0.975) / n, alpha + qnorm(0.975) / n),
+    theta.samp_to_summ(theta.samp[thin.seq, ], mod)
   )
+  rownames(param.summ) <- get_names(mod, expand = FALSE)
 
   # Clean up and close ---------------------------------------------------------
   convergence <- niter == maxit
@@ -129,8 +167,8 @@ iprobit_bin_metr <- function(mod, maxit = 20, stop.crit = 1e-5, silent = FALSE,
     else cat("Converged after", niter, "iterations.\n")
   }
 
-  list(theta = theta, param.summ = param.summ, w = w, Varw = Varw,
-       lower.bound = as.numeric(na.omit(lb)), niter = niter,
+  list(theta = theta, param.full = param.full, param.summ = param.summ, w = w,
+       Varw = Varw, lower.bound = as.numeric(na.omit(lb)), niter = niter,
        start.time = start.time, end.time = end.time, time = time.taken,
        fitted.values = fitted.values, test = fitted.test,
        train.error = as.numeric(na.omit(train.error)),
@@ -141,7 +179,7 @@ iprobit_bin_metr <- function(mod, maxit = 20, stop.crit = 1e-5, silent = FALSE,
        theta.samp = theta.samp[thin.seq, ])
 }
 
-theta.samp_to_param.summ <- function(theta.samp, object) {
+theta.samp_to_summ <- function(theta.samp, object) {
   # Args: theta.samp is the sample from the (approximate) posterior q(theta),
   # and object is an ipriorKernel object.
   theta <- apply(theta.samp, 2, mean)
@@ -151,14 +189,14 @@ theta.samp_to_param.summ <- function(theta.samp, object) {
   ginv.theta.sd <- apply(ginv.theta.samp, 2, sd)
   ginv.theta.0025 <- apply(ginv.theta.samp, 2, stats::quantile, probs = 0.025)
   ginv.theta.0975 <- apply(ginv.theta.samp, 2, stats::quantile, probs = 0.975)
-  param.summ <- data.frame(
+  res <- data.frame(
     Mean    = ginv.theta,
     S.D.    = ginv.theta.sd,
     `2.5%`  = ginv.theta.0025,
     `97.5%` = ginv.theta.0975
   )
-  colnames(param.summ) <- c("Mean", "S.D.", "2.5%", "97.5%")
-  param.summ
+  colnames(res) <- c("Mean", "S.D.", "2.5%", "97.5%")
+  res
 }
 
 

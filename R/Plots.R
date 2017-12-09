@@ -18,6 +18,13 @@
 #
 ################################################################################
 
+# iplot_fitted()
+# iplot_dec_bound()
+# iplot_predict()
+# iplot_lb()
+# iplot_error()
+# iplot_lb_and_error()
+
 #' @export
 plot.iprobitMod <- function(x, niter.plot = NULL, levels = NULL, ...) {
   iplot_fitted(x)
@@ -27,10 +34,9 @@ plot.iprobitMod <- function(x, niter.plot = NULL, levels = NULL, ...) {
 iplot_fitted <- function(object) {
   list2env(object, environment())
   list2env(ipriorKernel, environment())
-  list2env(model, environment())
 
   probs <- fitted(object)$prob
-  if (isNystrom(ipriorKernel)) probs <- probs[order(Nystrom$Nys.samp), ]
+  # if (isNystrom(ipriorKernel)) probs <- probs[order(Nystrom$Nys.samp), ]
   df.plot <- data.frame(probs, i = 1:n)
   colnames(df.plot) <- c(y.levels, "i")
   df.plot <- reshape2::melt(df.plot, id.vars = "i")
@@ -44,7 +50,7 @@ iplot_fitted <- function(object) {
 }
 
 #' @export
-iplot_lb <- function(x, niter.plot = NULL, lab.pos = c("up", "down"), ...) {
+iplot_lb <- function(x, niter.plot, lab.pos = c("up", "down"), ...) {
   lae.check <- FALSE
   extra.opt <- list(...)
   if (isTRUE(extra.opt$lb.and.error)) {
@@ -61,7 +67,7 @@ iplot_lb <- function(x, niter.plot = NULL, lab.pos = c("up", "down"), ...) {
 
   lb.original <- x$lower.bound
   if (missing(niter.plot)) niter.plot <- seq_along(lb.original)
-  else if (length(niter.plot) == 1) niter.plot <- c(1, niter.plot)
+  else if (length(niter.plot) == 1) niter.plot <- seq_len(niter.plot)
   lb <- lb.original[niter.plot]
   plot.df <- data.frame(Iteration = niter.plot, lb = lb)
   time.per.iter <- x$time$time / x$niter
@@ -191,7 +197,7 @@ iplot_dec_bound <- function(object, X.var = c(1, 2), col = "grey35", size = 0.8,
     geom_point(data = points.df, aes(X1, X2, col = Class)) +
     geom_contour(data = plot.df, aes(X1, X2, z = value, group = variable,
                                      size = "Decision\nboundary"),
-                 bins = 2, col = col, ...) +
+                 binwidth = 0.5 + 1e-12, col = col, ...) +
     coord_cartesian(xlim = mm[1, ], ylim = mm[2, ]) +
     scale_colour_manual(values = c(iprior::gg_col_hue(m), "grey30")) +
     scale_size_manual(values = size, name = NULL) +
@@ -230,18 +236,44 @@ iplot_predict <- function(object, X.var = c(1, 2), grid.len = 50,
 }
 
 iplot_predict_bin <- function(plot.df, points.df, x, y, m, dec.bound) {
-  ggplot() +
-    geom_raster(data = plot.df, aes(X1, X2, fill = class2), alpha = 0.5) +
+  p <- ggplot() +
+    geom_raster(data = plot.df, aes(X1, X2, fill = `2`), alpha = 0.5) +
     scale_fill_gradient(low = "#F8766D", high = "#00BFC4", limits = c(0, 1)) +
     # annotate(geom = "raster", x = plot.df[, 1], y = plot.df[, 2],
     #          alpha = 0.6 * plot.df[, 3], fill = "#F8766D") +
     # annotate(geom = "raster", x = plot.df[, 1], y = plot.df[, 2],
     #          alpha = 0.6 * plot.df[, 4], fill = "#00BFC4") +
-    geom_point(data = points.df, aes(X1, X2, col = Class)) +
-               # col = "black", shape = 21, stroke = 0.8) +
-    coord_cartesian(xlim = x, ylim = y) +
-    guides(fill = FALSE) +
     theme_bw()
+
+  # Add decision boundary ------------------------------------------------------
+  if (isTRUE(dec.bound)) {
+    p <- p +
+      geom_contour(data = plot.df, aes(X1, X2, z = `2`,
+                                       size = "Decision\nboundary"),
+                   binwidth = 0.5 + 1e-12, col = "grey35",
+                   linetype = "dashed") +
+      scale_size_manual(values = 0.8, name = NULL) +
+      scale_color_discrete(name = " Class") +
+      guides(fill = FALSE,
+             size = guide_legend(override.aes = list(linetype = 2, col = "grey35")),
+             col = guide_legend(order = 1, override.aes = list(linetype = 0))) +
+      theme(legend.key.width = unit(2, "line"))
+  } else {
+    p <- p + guides(fill = FALSE)
+  }
+
+  # Add points -----------------------------------------------------------------
+  p <- p +
+    ggrepel::geom_label_repel(data = points.df, segment.colour = "grey25",
+                              box.padding = 0.9, show.legend = FALSE,
+                              aes(X1, X2, col = Class, label = prob)) +
+    geom_point(data = points.df, aes(X1, X2, col = Class)) +
+    geom_point(data = subset(points.df, points.df$prob != ""), aes(X1, X2),
+               shape = 1, col = "grey25")
+
+  # Touch up plot and return ---------------------------------------------------
+  p + coord_cartesian(xlim = x, ylim = y)
+
 }
 
 iplot_predict_mult <- function(plot.df, points.df, x, y, m, dec.bound) {
@@ -262,15 +294,15 @@ iplot_predict_mult <- function(plot.df, points.df, x, y, m, dec.bound) {
                alpha = alpha * plot.df[, class.ind[j]], fill = fill.col[j])
   }
 
-  # Add points and decision boundary, and touch up remaining plot --------------
+  # Add decision boundary ------------------------------------------------------
   if (isTRUE(dec.bound)) {
     decbound.df <- reshape2::melt(plot.df, id.vars = c("X1", "X2"))
     p <- p +
       geom_contour(data = decbound.df, aes(X1, X2, z = value, group = variable,
                                            col = variable,
                                            size = "Decision\nboundary"),
-                   # binwidth = 0.5 + 1e-12,
-                   bins = 2,
+                   binwidth = 0.5 + 1e-12,
+                   # bins = 2,
                    linetype = "dashed") +
       scale_size_manual(values = 0.8, name = NULL) +
       scale_color_discrete(name = " Class") +
@@ -303,7 +335,7 @@ iplot_predict_mult <- function(plot.df, points.df, x, y, m, dec.bound) {
 iplot_error <- function(x, niter.plot, plot.test = TRUE) {
   if (x$niter < 2) stop("Nothing to plot.")
   if (missing(niter.plot)) niter.plot <- seq_along(x$train.error)
-  else if (length(niter.plot) == 1) niter.plot <- c(1, niter.plot)
+  else if (length(niter.plot) == 1) niter.plot <- seq_len(niter.plot)
 
   # Prepare plotting data frame ------------------------------------------------
   plot.df <- data.frame(Iteration = niter.plot,
@@ -360,9 +392,9 @@ iplot_error <- function(x, niter.plot, plot.test = TRUE) {
     theme(legend.position = "none")
 }
 
-iplot_lb_and_error <- function(x, niter.plot, lab.pos) {
+iplot_lb_and_error <- function(x, niter.plot, lab.pos, plot.test = TRUE) {
   suppressMessages(
-    p2 <- iplot_error(x, niter.plot) +
+    p2 <- iplot_error(x, niter.plot, plot.test) +
       scale_x_continuous(
         breaks = scales::pretty_breaks(n = min(5, ifelse(x$niter == 2, 1, x$niter)))
       )

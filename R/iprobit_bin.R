@@ -18,9 +18,8 @@
 #
 ################################################################################
 
-#' @export
 iprobit_bin <- function(mod, maxit = 100, stop.crit = 1e-5, silent = FALSE,
-                        alpha0 = NULL, lambda0 = NULL, w0 = NULL) {
+                        alpha0 = NULL, theta0 = NULL, w0 = NULL) {
   # Declare all variables and functions to be used into environment ------------
   iprobit.env <- environment()
   list2env(mod, iprobit.env)
@@ -33,8 +32,12 @@ iprobit_bin <- function(mod, maxit = 100, stop.crit = 1e-5, silent = FALSE,
 
   # Initialise -----------------------------------------------------------------
   if (is.null(alpha0)) alpha0 <- rnorm(1)
-  if (is.null(lambda0)) lambda0 <- abs(rnorm(p))
+  if (is.null(theta0)) theta0 <- rnorm(p)
   if (is.null(w0)) w0 <- rep(0, n)
+  if (p == 1) lambda0 <- exp(theta0)  # ensures positive values
+  else lambda0 <- theta0
+
+  alpha <- alpha0
   lambda <- ct <- lambda0
   lambdasq <- lambda0 ^ 2
   Hl <- iprior::.expand_Hl_and_lambda(Hl, rep(1, p), intr, intr.3plus)$Hl  # expand Hl
@@ -42,7 +45,6 @@ iprobit_bin <- function(mod, maxit = 100, stop.crit = 1e-5, silent = FALSE,
   lambdasq <- expand_lambda(lambdasq[1:p], intr, intr.3plus)
   Hlam   <- get_Hlam(mod, lambda, theta.is.lambda = TRUE)
   Hlamsq <- get_Hlamsq()
-  alpha <- alpha0
   w <- w0
   Varw <- NA
   f.tmp <- as.numeric(alpha + Hlam %*% w)
@@ -105,7 +107,7 @@ iprobit_bin <- function(mod, maxit = 100, stop.crit = 1e-5, silent = FALSE,
       (sum(diag(W)) + determinant(A)$modulus + sum(log(ct))) / 2
 
     # theta --------------------------------------------------------------------
-    if (length(lambda) == 1) theta <- log(lambda[1:p])
+    if (p == 1) theta <- log(lambda[1])
     else theta <- lambda[1:p]
     theta <- matrix(theta, ncol = 2, nrow = length(theta))
 
@@ -138,7 +140,7 @@ iprobit_bin <- function(mod, maxit = 100, stop.crit = 1e-5, silent = FALSE,
     `97.5%` = c(alpha, lambda[1:p]) + qnorm(0.975) * sqrt(c(1 / n, 1 / ct[1:p]))
   )
   colnames(param.summ) <- c("Mean", "S.D.", "2.5%", "97.5%")
-  rownames(param.summ) <- get_names(mod, expand = FALSE)
+  rownames(param.summ) <- get_names(mod, c("intercept", "lambda"), FALSE)
 
   # Clean up and close ---------------------------------------------------------
   convergence <- niter == maxit
