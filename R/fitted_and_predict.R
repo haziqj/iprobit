@@ -60,7 +60,11 @@ predict.iprobitMod <- function(object, newdata = list(), y.test = NULL,
                                quantiles = FALSE, n.samp = 100,
                                transform = identity, raw = FALSE, ...) {
   if (length(newdata) == 0) {
-    return(cat("No new data supplied. Use fitted() instead."))
+    if (!is.null(object$test)) {
+      return(object$test)
+    } else {
+      return(cat("No new data supplied. Use fitted() instead."))
+    }
   }
   if (!is.null(object$ipriorKernel$formula)) {
     if (is.iprobitData(newdata)) newdata <- as.data.frame(newdata)
@@ -367,6 +371,7 @@ quantile_prob <- function(phats) {
   lapply(phats, as.data.frame)
 }
 
+#' @export
 print.iprobitPredict <- function(x, rows = 10, digits = 3, ...) {
   if (x$type == "train") {
     cat("Training error:", paste0(decimal_place(x$error.rate, digits), "%\n"))
@@ -396,6 +401,7 @@ print.iprobitPredict <- function(x, rows = 10, digits = 3, ...) {
   if (nrow(x$p) > rows) cat("# ... with", nrow(x$p) - rows, "more rows")
 }
 
+#' @export
 print.iprobitPredict_quant <- function(x, rows = 5, digits = 3, ...) {
   rows.act <- nrow(x$prob[[1]])
   rows <- min(rows.act, rows)

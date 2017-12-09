@@ -208,8 +208,8 @@ iplot_dec_bound <- function(object, X.var = c(1, 2), col = "grey35", size = 0.8,
 }
 
 #' @export
-iplot_predict <- function(object, X.var = c(1, 2), grid.len = 50,
-                          dec.bound = TRUE, plot.test = TRUE) {
+iplot_predict <- function(object, X.var = c(1, 2), grid.len = 100,
+                          dec.bound = FALSE, plot.test = TRUE) {
   list2env(prepare_point_range(object, X.var, grid.len, plot.test),
            envir = environment())
 
@@ -322,7 +322,7 @@ iplot_predict_mult <- function(plot.df, points.df, x, y, m, dec.bound) {
   # Add points -----------------------------------------------------------------
   p <- p +
     ggrepel::geom_label_repel(data = points.df, segment.colour = "grey25",
-                              box.padding = 0.9, show.legend = FALSE,
+                              box.padding = 0.5, show.legend = FALSE, force = 2,
                               aes(X1, X2, col = Class, label = prob)) +
     geom_point(data = points.df, aes(X1, X2, col = Class)) +
     geom_point(data = subset(points.df, points.df$prob != ""), aes(X1, X2),

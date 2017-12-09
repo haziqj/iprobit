@@ -4,7 +4,7 @@ output: github_document
 ---
 
 <!-- README.md is generated from README.Rmd. Please edit that file -->
-```{r setup, include=FALSE}
+```{r setup, include = FALSE}
 knitr::opts_chunk$set(echo = TRUE, collapse = TRUE)
 library(iprobit)
 ```
@@ -19,9 +19,9 @@ This is an `R` package which extends I-prior regression to unordered categorical
 
 #### Model fitting
 
-```{r, cache = TRUE}
-dat <- gen_spiral(n = 300)  # generate binary toy example data set
-mod <- iprobit(y ~ X1 + X2, dat, one.lam = TRUE, kernel = "FBM")
+```{r}
+dat <- gen_spiral(n = 300, seed = 123)  # generate binary toy example data set
+mod <- iprobit(y ~ X1 + X2, dat, one.lam = TRUE, kernel = "fbm")
 ```
 
 #### Model summary
@@ -40,41 +40,42 @@ iplot_predict(mod)
 
 #### Model fit report and parameter estimates
 
-```{r, cache = TRUE}
-dat <- gen_mixture(n = 500, m = 4, sd = 1.5)  # generate 4-class toy example data set
-(mod <- iprobit(y ~ X1 + X2, dat, control = list(maxit = 10)))
+```{r}
+dat <- gen_mixture(n = 400, m = 4, sd = 1.5, seed = 123)  # generate 4-class 
+                                                          # toy example data set
+(mod <- iprobit(y ~ X1 + X2, dat, train.samp = sample(1:400, size = 392),
+                control = list(maxit = 10)))  # set aside 8 points for testing
 ```
 
 #### Boundary plot for two-dimensional covariates
 
 ```{r}
-iplot_predict(mod)
+iplot_predict(mod, dec.bound = TRUE, plot.test = TRUE, grid.len = 50)
 ```
 
 #### Obtain out-of-sample test error rates, predicted classes and probabilities
 
 ```{r}
-dat.test <- gen_mixture(n = 100, m = 4, sd = 1.5)
-(mod.pred <- predict(mod, newdata = dat.test))
+predict(mod)
 ```
 
 ## Fisher's Iris data set
 
 #### Model fitting (common RKHS scale across classes for each covariate)
 
-```{r, cache = TRUE}
-mod <- iprobit(Species ~ ., iris, kernel = "FBM", one.lam = TRUE,
-               control = list(alpha0 = 1, lambda0 = 1, 
-                              stop.crit = 1e-1,
-                              common.RKHS.scale = TRUE, 
-                              common.intercept = FALSE))
+```{r, echo = -1}
+set.seed(123)
+mod <- iprobit(Species ~ ., iris, kernel = "fbm", one.lam = TRUE,
+               common.RKHS.scale = TRUE, common.intercept = FALSE,
+               control = list(alpha0 = 1, theta0 = 1, 
+                              stop.crit = 1e-1))
 
 summary(mod)
 ```
 
 #### Obtain training error rates, predicted classes and probabilities with posterior quantiles
 
-```{r, cache = TRUE}
+```{r}
 fitted(mod, quantiles = TRUE)
 ```
 

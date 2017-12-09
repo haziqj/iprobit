@@ -46,7 +46,7 @@ iprobit_mult <- function(mod, maxit = 10, stop.crit = 1e-5, silent = FALSE,
   else lambda0 <- theta0
   if (is.null(w0)) w0 <- matrix(0, ncol = m, nrow = n)
 
-  alpha <- alpha0
+  alpha <- rep(1, m); alpha[] <- alpha0  # sometimes it is convenient to set alpha0 = 1
   theta <- lambda <- ct <- dt <- matrix(lambda0, ncol = m, nrow = p)
   lambdasq <- lambda ^ 2
   Hl <- iprior::.expand_Hl_and_lambda(Hl, rep(1, p), intr, intr.3plus)$Hl  # expand Hl
