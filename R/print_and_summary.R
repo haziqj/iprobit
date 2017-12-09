@@ -19,88 +19,77 @@
 ################################################################################
 
 #' @export
-print.iprobitMod <- function(x, dp = 2, ...) {
-  theta <- coef(x)
-
-  cat("Training error rate:", decimal_place(x$fitted.values$train.error, dp), "%\n")
+print.iprobitMod <- function(x, digits = 5, ...) {
+  cat("Training error rate:", round(x$fitted.values$error, 2), "%\n")
   # cat("Brier score:", decimal_place(x$brier.score, dp), "\n")
   cat("Lower bound value:", x$lower.bound[x$niter], "\n")
   # cat("Iterations = ", x$niter, "\n")
   cat("\n")
-  print(round(theta, 5))
+  print(round(coef(x), digits))
 }
 
 #' @export
 summary.iprobitMod <- function(object, ...) {
-  if (is.iprobitMod_bin(object)) {
-    theta <- coef(object)
-    se <- c(object$se.alpha, object$se.lambda)
-  }
-  if (is.iprobitMod_mult(object)) {
-    tmp <- get_coef_se_mult(object)
-    theta <- tmp$theta
-    se <- tmp$se
-  }
+  tab <- object$param.summ
 
-  tab <- cbind(
-    Mean    = round(theta, digits = 4),
-    S.D.    = round(se, digits = 4),
-    "2.5%"  = round(theta - 1.96 * se, digits = 4),
-    "97.5%" = round(theta + 1.96 * se, digits = 4)
+  suppressWarnings(
+    kernel.used <- iprior::.kernels_for_summary(object)
   )
 
-  kernel.used <- factor(get_kernel(object))
-  kernels <- levels(kernel.used)
-  kernels <- gsub("FBM,", "Fractional Brownian motion with Hurst coef. ", kernels)
-  x.var.list <- rep(list(NULL), length(kernels))
-  x.var <- object$ipriorKernel$model$xname
-  for (i in seq_along(x.var)) {
-    x.var.list[[as.numeric(kernel.used[i])]] <-
-      c(x.var.list[[as.numeric(kernel.used[i])]], x.var[i])
+  train.error <- object$fitted.values$error
+  train.brier <- object$fitted.values$brier
+  test.error <- test.brier <- NULL
+  if (iprior::.is.ipriorKernel_cv(object$ipriorKernel)) {
+    test.error <- object$test$error
+    test.brier <- object$test$brier
   }
-  x.var.list <- lapply(x.var.list, function(x) paste0(x, collapse = ", "))
-  x.var.list <- mapply(FUN = function(x, y) paste0(x, " (", y, ")"),
-                       kernels, x.var.list)
 
-  res <- list(call = object$call, kernel.used = x.var.list, tab = tab,
-              maxit = object$maxit, niter = object$niter,
-              stop.crit = object$stop.crit, lb = object$lower.bound,
-              classes = object$y.levels, Nystrom = object$ipriorKernel$Nystrom,
-              Nystrom.check = isNystrom(object$ipriorKernel),
-              train.error = object$fitted.values$train.error,
-              brier.score = object$fitted.values$brier.score)
-  class(res) <- "iprobitSummary"
+  res <- list(tab = tab, lb = as.numeric(logLik(object)),
+              classes = object$ipriorKernel$y.levels,
+              train.error = train.error, train.brier = train.brier,
+              test.error = test.error, test.brier = test.brier,
+              call = object$call, x.kern = kernel.used,
+              est.method = object$est.method, est.conv = object$est.conv,
+              niter = object$niter, maxit = object$control$maxit,
+              time = object$time)
+  class(res) <- "iprobitMod_summary"
   res
 }
 
 #' @export
-print.iprobitSummary <- function(x, ...) {
-  cat("\nCall:\n")
-  print(x$call)
-
-  cat("\nClasses: ")
-  cat(paste0(x$classes, collapse = ", "), "\n")
-
-  cat("\nRKHS used:\n")
-  for (i in seq_along(x$kernel.used))
-    cat(x$kernel.used[[i]], "\n")
-
-  cat("\nParameter estimates:\n")
-  print(x$tab)
-
-  if (x$niter == x$maxit) {
-    cat("\nConvergence criterion not met. ")
+print.iprobitMod_summary <- function(x, wrap = FALSE, ...) {
+  cat("Call:\n")
+  cl <- x$call
+  if (isTRUE(wrap)) {
+    cl <- capture.output(cl)
+    cl <- paste0(strwrap(cl, ...), collapse = "\n  ")
+    cat(cl)
+    cat("\n\n")
   } else {
-    cat("\nConverged to within", x$stop.crit, "tolerance. ")
+    print(cl)
+    cat("\n")
   }
-  cat("No. of iterations:", x$niter)
-
-  if (isTRUE(x$Nystrom.check)) {
-    cat("\nNystrom approximation used (with", x$Nystrom$m, "random subsamples)")
-  }
-
-  cat("\nVariational lower bound:", x$lb[x$niter], "\n")
-  cat("Training error rate:", decimal_place(x$train.error),
-      "%. Brier score:", decimal_place(x$brier.score), "\n")
+  cat("Classes: ")
+  cat(paste0(x$classes, collapse = ", "), "\n")
   cat("\n")
+  cat("RKHS used:\n")
+  cat(x$x.kern)
+  cat("\n")
+  cat("Hyperparameters:\n")
+  tmp <- capture.output(print(round(x$tab, 4)))
+  cat(paste(gsub("NA", "  ", tmp), collapse = "\n"))
+  cat("\n")
+  cat("---\n")
+  cat("\n")
+  cat(x$est.method)
+  cat(" Iterations:", paste0(x$niter, "/", x$maxit), "\n")
+  cat(x$est.conv)
+  cat(" Time taken: ")
+  print(x$time)
+  cat("\n")
+  cat("Variational lower bound:", x$lb, "\n")
+  cat("Training error:", paste0(x$train.error, "%. Brier score:"), x$train.brier, "\n")
+  if (!is.null(x$test.error) & !is.null(x$test.brier)) {
+    cat("Test error:", paste0(x$test.error, "%. Brier score:"), x$test.brier, "\n")
+  }
 }

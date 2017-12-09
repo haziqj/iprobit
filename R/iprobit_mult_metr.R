@@ -18,42 +18,47 @@
 #
 ################################################################################
 
-iprobit_mult <- function(mod, maxit = 10, stop.crit = 1e-5, silent = FALSE,
-                         alpha0 = NULL, theta0 = NULL, w0 = NULL,
-                         common.intercept = FALSE, common.RKHS.scale = FALSE) {
+# theta.samp would now be a list of length n.samp and each component of this
+# list is the matrix theta.samp.
+#
+# Similarly Hlaml and Hlamsql are lists of length n.samp, and each component of
+# the list is another list of length  m (no. of classes) where the values
+# Hlam_theta for each theta.samp are stored.
+
+iprobit_mult_metr <- function(mod, maxit = 5, stop.crit = 1e-5, silent = FALSE,
+                              alpha0 = NULL, theta0 = NULL, w0 = NULL,
+                              n.samp = 100, sd.samp = 0.15, thin.samp = 1,
+                              seed = NULL, common.intercept = FALSE,
+                              common.RKHS.scale = FALSE) {
   # Declare all variables and functions to be used into environment ------------
   iprobit.env <- environment()
   list2env(mod, iprobit.env)
-  list2env(BlockBStuff, iprobit.env)
-  environment(BlockB) <- iprobit.env
-  environment(get_Hlamsq) <- iprobit.env
   environment(loop_logical) <- iprobit.env
   y <- as.numeric(factor(y))  # as.factor then as.numeric to get y = 1, 2, ...
   m <- length(y.levels)
   nm <- n * m
   maxit <- max(1, maxit)
+  thin.seq <- seq_len(n.samp)[seq_len(n.samp) %% thin.samp == 0]
 
   # Initialise -----------------------------------------------------------------
+  if (!is.null(seed)) set.seed(seed)
   if (is.null(alpha0)) {
     if (isTRUE(common.intercept)) alpha0 <- rep(rnorm(1), m)
     else alpha0 <- rnorm(m)
   }
   if (is.null(theta0)) {
-    if (isTRUE(common.RKHS.scale)) theta0 <- rep(rnorm(p), m)
-    else theta0 <- rnorm(p * m)
+    if (isTRUE(common.RKHS.scale)) theta0 <- rep(abs(rnorm(p)), m)
+    else theta0 <- abs(rnorm(p * m))
   }
-  if (p == 1) lambda0 <- exp(theta0)
-  else lambda0 <- theta0
   if (is.null(w0)) w0 <- matrix(0, ncol = m, nrow = n)
 
-  alpha <- rep(1, m); alpha[] <- alpha0  # sometimes it is convenient to set alpha0 = 1
-  theta <- lambda <- ct <- dt <- matrix(lambda0, ncol = m, nrow = p)
-  lambdasq <- lambda ^ 2
-  Hl <- iprior::.expand_Hl_and_lambda(Hl, rep(1, p), intr, intr.3plus)$Hl  # expand Hl
-  lambda <- expand_lambda(lambda[1:p, , drop = FALSE], intr, intr.3plus)
-  lambdasq <- expand_lambda(lambdasq[1:p, , drop = FALSE], intr, intr.3plus)
-  Hlam   <- get_Hlam(mod, lambda[1:p, , drop = FALSE], theta.is.lambda = TRUE)
-  Hlamsq <- get_Hlamsq()
+  alpha <- alpha0
+  theta.samp <- Hlaml <- Hlamsql <- list(NULL)
+  theta <- matrix(theta0, ncol = m, nrow = thetal$n.theta)
+  Hlaml[[1]] <- Hlam <- get_Hlam(mod, theta)
+  Hlamsql[[1]] <- Hlamsq <- lapply(Hlaml[[1]], iprior::fastSquare)
+  theta.samp[[1]] <- theta
+
   w <- f.tmp <- ystar <- w0
   Varw <- W <- list(NULL)
   f.tmp <- rep(alpha, each = n) + mapply("%*%", Hlam, split(w, col(w)))
@@ -64,6 +69,10 @@ iprobit_mult <- function(mod, maxit = 10, stop.crit = 1e-5, silent = FALSE,
   niter <- 0
   lb <- train.error <- train.brier <- test.error <- test.brier <- rep(NA, maxit)
   logClb <- rep(NA, n)
+  log.q.star <- rep(NA, m)
+  log.q <- matrix(NA, ncol = m, nrow = n.samp)
+  log.q[1, ] <- sapply(Hlamsq, function(x) -0.5 * sum(diag(x)))
+  acc.rate <- matrix(NA, nrow = maxit, ncol = m)
 
   # The variational EM loop ----------------------------------------------------
   if (!silent) pb <- txtProgressBar(min = 0, max = maxit, style = 1)
@@ -111,48 +120,91 @@ iprobit_mult <- function(mod, maxit = 10, stop.crit = 1e-5, silent = FALSE,
       logdetA <- rep(logdetA[1], m)
     }
 
-    # Update lambda ------------------------------------------------------------
-    for (k in 1:p) {
-      for (j in 1:m) {
-        lambda   <- expand_lambda(lambda[1:p, , drop = FALSE], intr)
-        lambdasq <- expand_lambda(lambdasq[1:p, , drop = FALSE], intr)
-        BlockB(k, lambda[, j])
-        ct[k, j] <- sum(Psql[[k]] * W[[j]])
-        dt[k, j] <- as.numeric(
-          crossprod(ystar[, j] - alpha[j], Pl[[k]]) %*% w[, j] -
-            sum(Sl[[k]] * W[[j]]) / 2
-        )
+    # Update theta -------------------------------------------------------------
+    count <- rep(0, m)
+    if (isTRUE(common.RKHS.scale)) {
+      # SAME RKHS PARAMETERS, SO JUST NEED TO SAMPLE ONCE AND REPEAT IN EACH CLASS
+      for (t in seq_len(n.samp - 1)) {
+        theta.star <- theta.current <- theta.samp[[t]]
+        theta.star[] <- rnorm(thetal$n.theta, mean = theta.current[, 1], sd = sd.samp)
+        Hlam.star <- get_Hlam(mod, theta.star)
+        Hlamsq.star <- lapply(Hlam.star, iprior::fastSquare)
+        log.q.star[] <- as.numeric(-0.5 * (
+          sum(Hlamsq.star[[1]] * W[[1]]) -
+            2 * crossprod(ystar[, 1] - alpha[1], Hlam.star[[1]]) %*% w[, 1]
+        ))
+        log.prob.acc <- log.q.star - log.q[t, ]
+        prob.acc <- exp(log.prob.acc)
+        prob.acc[prob.acc > 1] <- 1
+        if (runif(1) < prob.acc[j]) {
+          theta.samp[[t + 1]] <- theta.star
+          Hlaml[[t + 1]] <- Hlam.star
+          Hlamsql[[t + 1]] <- Hlamsq.star
+          log.q[t + 1, ] <- log.q.star
+          count <- count + 1
+        } else {
+          theta.samp[[t + 1]] <- theta.current
+          Hlaml[[t + 1]] <- Hlaml[[t]]
+          Hlamsql[[t + 1]] <- Hlamsql[[t]]
+          log.q[t + 1, ] <- log.q[t, ]
+        }
       }
-      if (isTRUE(common.RKHS.scale)) {
-        lambda[k, ] <- rep(sum(dt[k, ]) / sum(ct[k, ]), m)
-        lambdasq[k, ] <- rep(1 / sum(ct[k, ]) + lambda[k, 1] ^ 2, m)
-      } else {
-        lambda[k, ] <- dt[k, ] / ct[k, ]
-        lambdasq[k, ] <- 1 / ct[k, ] + lambda[k, ] ^ 2
+    } else {
+      # DIFFERENT RKHS SCALE, SO INDEPENDENT SAMPLER FOR EACH CLASS
+      for (t in seq_len(n.samp - 1)) {
+        theta.star <- theta.current <- theta.samp[[t]]
+        for (j in 1:m) {
+          theta.star[, j] <- rnorm(thetal$n.theta, mean = theta.current[, j], sd = sd.samp)
+        }
+        Hlam.star <- get_Hlam(mod, theta.star)
+        Hlamsq.star <- lapply(Hlam.star, iprior::fastSquare)
+        for (j in 1:m) {
+          log.q.star[j] <- as.numeric(-0.5 * (
+            sum(Hlamsq.star[[j]] * W[[j]]) -
+              2 * crossprod(ystar[, j] - alpha[j], Hlam.star[[j]]) %*% w[, j]
+          ))
+        }
+        log.prob.acc <- log.q.star - log.q[t, ]
+        prob.acc <- exp(log.prob.acc)
+        prob.acc[prob.acc > 1] <- 1
+        Hlam.tmp <- Hlaml[[t]]
+        Hlamsq.tmp <- Hlamsql[[t]]
+        theta.tmp <- theta.current
+        for (j in 1:m) {
+          if (runif(1) < prob.acc[j]) {
+            theta.tmp[, j] <- theta.star[, j]
+            Hlam.tmp[[j]] <- Hlam.star[[j]]
+            Hlamsq.tmp[[j]] <- Hlamsq.star[[j]]
+            log.q[t + 1, j] <- log.q.star[j]
+            count[j] <- count[j] + 1
+          } else {
+            log.q[t + 1, j] <- log.q[t, j]
+          }
+        }
+        theta.samp[[t + 1]] <- theta.tmp
+        Hlaml[[t + 1]] <- Hlam.tmp
+        Hlamsql[[t + 1]] <- Hlamsq.tmp
       }
     }
+    acc.rate[niter, ] <- count / n.samp
+    theta <- Reduce("+", theta.samp[thin.seq]) / length(theta.samp[thin.seq])
 
-    # Update H.lam and H.lam.sq ------------------------------------------------
-    lambda   <- expand_lambda(lambda[1:p, , drop = FALSE], intr)
-    lambdasq <- expand_lambda(lambdasq[1:p, , drop = FALSE], intr)
-    Hlam     <- get_Hlam(mod, lambda, theta.is.lambda = TRUE)
-    Hlamsq   <- get_Hlamsq()
+    # Update Hlam and Hlamsq ---------------------------------------------------
+    for (j in 1:m) {
+      tmp <- lapply(Hlaml, function(x) x[[j]])
+      Hlam[[j]] <- Reduce("+", tmp[thin.seq]) / length(tmp[thin.seq])
+      tmp <- lapply(Hlamsql, function(x) x[[j]])
+      Hlamsq[[j]] <- Reduce("+", tmp[thin.seq]) / length(tmp[thin.seq])
+    }
 
     # Update alpha -------------------------------------------------------------
     alpha <- apply(ystar - mapply("%*%", Hlam, split(w, col(w))), 2, mean)
     if (isTRUE(common.intercept)) alpha <- rep(mean(alpha), m)
 
-    # theta --------------------------------------------------------------------
-    if (p == 1) theta <- log(lambda[1, , drop = FALSE])
-    else theta <- lambda[1:p, , drop = FALSE]
-
     # Calculate lower bound ----------------------------------------------------
     lb.ystar <- sum(logClb)
     lb.w <- 0.5 * (nm - sum(sapply(W, function(x) sum(diag(x)))) - sum(logdetA))
-    if (isTRUE(common.RKHS.scale))
-      lb.lambda <- (p / 2) * (1 + log(2 * pi)) - sum(log(apply(ct, 1, sum))) / 2
-    else
-      lb.lambda <- (m / 2) * (p * (1 + log(2 * pi)) - sum(log(ct)) / m)
+    lb.lambda <- -sum(apply(log.q, 2, mean))
     if (isTRUE(common.intercept))
       lb.alpha <- 0.5 * (1 + log(2 * pi) - log(nm))
     else
@@ -187,23 +239,14 @@ iprobit_mult <- function(mod, maxit = 10, stop.crit = 1e-5, silent = FALSE,
   } else {
     se.alpha <- rep(sqrt(1 / n), m)
   }
-  lambda <- lambda[1:p, , drop = FALSE]
-  if (isTRUE(common.RKHS.scale)) {
-    lambda <- apply(lambda, 1, unique)  # since they're all the same
-    se.lambda <- matrix(sqrt(1 / apply(ct, 1, sum)), ncol = m, nrow = p)[, 1]
-  } else {
-    lambda <- c(t(lambda))
-    se.lambda <- c(t(matrix(sqrt(1 / ct[1:p, ]), ncol = m, nrow = p)))
-  }
-  param.summ <- data.frame(
-    Mean    = c(alpha, lambda),
-    S.D.    = c(se.alpha, se.lambda),
-    `2.5%`  = c(alpha, lambda) - qnorm(0.975) * c(se.alpha, se.lambda),
-    `97.5%` = c(alpha, lambda) + qnorm(0.975) * c(se.alpha, se.lambda)
-  )
-  colnames(param.summ) <- c("Mean", "S.D.", "2.5%", "97.5%")
+  alpha.summ <- cbind(alpha, se.alpha, alpha - qnorm(0.975) * se.alpha,
+                      alpha + qnorm(0.975) * se.alpha)
+  theta.summ <- theta.samp_to_summ_mult(theta.samp, mod)
+  colnames(alpha.summ) <- colnames(theta.summ)
+  param.summ <- rbind(alpha.summ, theta.summ)
   rownames(param.summ) <- c(get_names(mod, "intercept", !common.intercept),
-                            get_names(mod, "lambda", !common.RKHS.scale))
+                            get_names(mod, c("lambda", "hurst", "lengthscale",
+                                             "offset"), !common.RKHS.scale))
 
   # Clean up and close ---------------------------------------------------------
   convergence <- niter == maxit
@@ -220,7 +263,30 @@ iprobit_mult <- function(mod, maxit = 10, stop.crit = 1e-5, silent = FALSE,
        train.error = as.numeric(na.omit(train.error)),
        train.brier = as.numeric(na.omit(train.brier)),
        test.error = as.numeric(na.omit(test.error)),
-       test.brier = as.numeric(na.omit(test.brier)), convergence = convergence)
+       test.brier = as.numeric(na.omit(test.brier)), convergence = convergence,
+       acc.rate = as.numeric(na.omit(acc.rate)),
+       theta.samp = theta.samp[thin.seq])
+}
+
+theta.samp_to_summ_mult <- function(theta.samp, object) {
+  m <- ncol(theta.samp[[1]])
+  theta.samp_col <- function(x, j) x[, j]
+  res <- NULL
+  for (j in seq_len(m)) {
+    tmp <- t(sapply(theta.samp, theta.samp_col, j = j))
+    res[[j]] <- theta.samp_to_summ(tmp, object)
+  }
+  res.lambda <- do.call(rbind, lapply(res, function(x) x[grep("lambda", rownames(x)), ]))
+  res.hurst <- do.call(rbind, lapply(res, function(x) x[grep("hurst", rownames(x)), ]))
+  res.lengthscale <- do.call(rbind, lapply(res, function(x) x[grep("lengthscale", rownames(x)), ]))
+  res.offset <- do.call(rbind, lapply(res, function(x) x[grep("offset", rownames(x)), ]))
+
+  res <- rbind(
+    res.lambda, res.hurst, res.lengthscale, res.offset
+  )
+  unq.ind <- match(unique(res[, 1]), res[, 1])
+  # rownames(res) <- get_names(mod, c("lambda", "hurst", "lengthscale", "offset"))
+  res[unq.ind, ]
 }
 
 # else {

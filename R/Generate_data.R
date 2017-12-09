@@ -1,6 +1,28 @@
+################################################################################
+#
+#   iprobit: Binary and Multinomial Probit Regression with I-priors
+#   Copyright (C) 2017  Haziq Jamil
+#
+#   This program is free software: you can redistribute it and/or modify
+#   it under the terms of the GNU General Public License as published by
+#   the Free Software Foundation, either version 3 of the License, or
+#   (at your option) any later version.
+#
+#   This program is distributed in the hope that it will be useful,
+#   but WITHOUT ANY WARRANTY; without even the implied warranty of
+#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+#   GNU General Public License for more details.
+#
+#   You should have received a copy of the GNU General Public License
+#   along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+################################################################################
+
 #' @export
 gen_mixture <- function(n = 500, m = 2, mu = m / 2 + 1, sd = 1,
-                        proportion = rep(0.5, m)) {
+                        proportion = rep(0.5, m), seed = NULL) {
+  if (!is.null(seed)) set.seed(seed)
+
   # Angles
   angles <- seq(from = 0, by = 360 / m, length = m) * pi / 180
 
@@ -28,7 +50,9 @@ gen_mixture <- function(n = 500, m = 2, mu = m / 2 + 1, sd = 1,
 }
 
 #' @export
-gen_spiral <- function(n = 300, m = 2, cycles = 2, sd = 0) {
+gen_spiral <- function(n = 300, m = 2, cycles = 2, sd = 0, seed = NULL) {
+  if (!is.null(seed)) set.seed(seed)
+
   angles <- seq(from = 0, by = 360 / m, length = m) * pi / 180
 
   y <- factor(c(rep(1, round(n / m) + n %% m), rep(2:m, each = round(n / m))))
@@ -56,7 +80,9 @@ gen_spiral <- function(n = 300, m = 2, cycles = 2, sd = 0) {
 }
 
 #' @export
-gen_circle <- function(n = 100, m = 2, sd = 0.1 / sqrt(m)) {
+gen_circle <- function(n = 100, m = 2, sd = 0.1 / sqrt(m), seed = NULL) {
+  if (!is.null(seed)) set.seed(seed)
+
   n.sim <- rep(n %/% m, m)
   n.sim[seq_len(n %% m)] <- n.sim[seq_len(n %% m)] + 1
 
@@ -87,5 +113,5 @@ plot.iprobitData <- function(x, ...) {
 
 #' @export
 as.data.frame.iprobitData <- function(x, ...) {
-  data.frame(x$X, y = x$y)
+  data.frame(y = x$y, x$X)
 }
