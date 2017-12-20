@@ -25,7 +25,7 @@ iprobit <- function(...) UseMethod("iprobit")
 iprobit.default <- function(y, ..., kernel = "linear", interactions = NULL,
                             est.hurst = FALSE, est.lengthscale = FALSE,
                             est.offset = FALSE, common.intercept = FALSE,
-                            common.RKHS.scale = FALSE,
+                            common.RKHS.scale = FALSE, method = c("vb", "laplace"),
                             # nystrom = FALSE, nys.seed = NULL,
                             train.samp, control = list()) {
   # Load the I-prior model -----------------------------------------------------
@@ -41,6 +41,12 @@ iprobit.default <- function(y, ..., kernel = "linear", interactions = NULL,
   }
 
   # Set up controls ------------------------------------------------------------
+  method <- tolower(method)
+  method <- match.arg(method, c("vb", "laplace"))
+  if (method == "vb") method <- "em"
+  if (method == "laplace") method <- "direct"
+
+
   control_ <- list(
     maxit          = 100,
     stop.crit      = 1e-5,
@@ -64,7 +70,7 @@ iprobit.default <- function(y, ..., kernel = "linear", interactions = NULL,
   if (mod$no.int.3plus > 0)
     stop("Can't fit more than three-way interactions yet.")
   mod$m <- m <- length(mod$y.levels)  # no. of classes
-  est.method <- iprior::.iprior_method_checker(mod, "em")
+  est.method <- iprior::.iprior_method_checker(mod, method)
   # >>> CHECK IF PSI = 1 <<<
 
   # Pass to the correct VB routine ---------------------------------------------
@@ -74,7 +80,11 @@ iprobit.default <- function(y, ..., kernel = "linear", interactions = NULL,
   } else {
     if (m == 2) {
       # Binary models ----------------------------------------------------------
-      if (est.method["em.closed"]) {  # VB CLOSED-FORM
+      if (est.method["direct"]) {  # LAPLACE METHOD
+        res <- iprobit_bin_laplace(mod, silent, maxit, alpha0, theta0, w0, seed,
+                                   stop.crit)
+        res$est.method <- "Laplace approximation."
+      } else if (est.method["em.closed"]) {  # VB CLOSED-FORM
         res <- iprobit_bin(mod, maxit, stop.crit, silent, alpha0, theta0, w0)
         res$est.method <- "Closed-form VB-EM algorithm."
       } else {
@@ -129,7 +139,7 @@ iprobit.default <- function(y, ..., kernel = "linear", interactions = NULL,
 iprobit.formula <- function(formula, data, kernel = "linear", one.lam = FALSE,
                             est.hurst = FALSE, est.lengthscale = FALSE,
                             est.offset = FALSE, common.intercept = FALSE,
-                            common.RKHS.scale = FALSE, lambda = 1,
+                            common.RKHS.scale = FALSE, lambda = 1, method = c("vb", "laplace"),
                             # nystrom = FALSE, nys.seed = NULL,
                             train.samp, control = list(), ...) {
   # Simply load the kernel and pass to iprobit.default() ------------------------
@@ -140,7 +150,7 @@ iprobit.formula <- function(formula, data, kernel = "linear", one.lam = FALSE,
                        lambda = lambda, psi = 1,
                        # nystrom = nystrom, nys.seed = nys.seed,
                        train.samp = train.samp, ...)
-  res <- iprobit.default(y = mod, control = control,
+  res <- iprobit.default(y = mod, control = control, method = method,
                          common.intercept = common.intercept,
                          common.RKHS.scale = common.RKHS.scale)
   res$call <- iprior::.fix_call_formula(match.call(), "iprobit")
@@ -149,7 +159,7 @@ iprobit.formula <- function(formula, data, kernel = "linear", one.lam = FALSE,
 }
 
 #' @export
-iprobit.ipriorKernel <- function(object, control = list(),
+iprobit.ipriorKernel <- function(object, method = c("vb", "laplace"), control = list(),
                                  common.intercept = FALSE,
                                  common.RKHS.scale = FALSE, ...) {
   res <- iprobit.default(y = object, method = method, control = control,

@@ -19,7 +19,7 @@
 ################################################################################
 
 iprobit_bin <- function(mod, maxit = 100, stop.crit = 1e-5, silent = FALSE,
-                        alpha0 = NULL, theta0 = NULL, w0 = NULL) {
+                        alpha0 = NULL, theta0 = NULL, w0 = NULL, w.only = FALSE) {
   # Declare all variables and functions to be used into environment ------------
   iprobit.env <- environment()
   list2env(mod, iprobit.env)
@@ -80,25 +80,27 @@ iprobit_bin <- function(mod, maxit = 100, stop.crit = 1e-5, silent = FALSE,
     Varw <- iprior::fastVDiag(V, 1 / u)  # V %*% uinv.Vt
     W <- Varw + tcrossprod(w)
 
-    # Update lambda ------------------------------------------------------------
-    for (k in 1:p) {
-      lambda   <- expand_lambda(lambda[1:p], intr)
-      lambdasq <- expand_lambda(lambdasq[1:p], intr)
-      BlockB(k)  # Updates Pl, Psql, and Sl in environment
-      ct[k] <- sum(Psql[[k]] * W)
-      dt <- as.numeric(
-        crossprod(ystar - alpha, Pl[[k]]) %*% w - sum(Sl[[k]] * W) / 2
-      )
-      lambda[k] <- dt / ct[k]
-      lambdasq[k] <- 1 / ct[k] + (dt / ct[k]) ^ 2
-    }
-    lambda   <- expand_lambda(lambda[1:p], intr, intr.3plus)
-    lambdasq <- expand_lambda(lambdasq[1:p], intr, intr.3plus)
-    Hlam     <- get_Hlam(mod, lambda, theta.is.lambda = TRUE)
-    Hlamsq   <- get_Hlamsq()
+    if (!isTRUE(w.only)) {
+      # Update lambda ----------------------------------------------------------
+      for (k in 1:p) {
+        lambda   <- expand_lambda(lambda[1:p], intr)
+        lambdasq <- expand_lambda(lambdasq[1:p], intr)
+        BlockB(k)  # Updates Pl, Psql, and Sl in environment
+        ct[k] <- sum(Psql[[k]] * W)
+        dt <- as.numeric(
+          crossprod(ystar - alpha, Pl[[k]]) %*% w - sum(Sl[[k]] * W) / 2
+        )
+        lambda[k] <- dt / ct[k]
+        lambdasq[k] <- 1 / ct[k] + (dt / ct[k]) ^ 2
+      }
+      lambda   <- expand_lambda(lambda[1:p], intr, intr.3plus)
+      lambdasq <- expand_lambda(lambdasq[1:p], intr, intr.3plus)
+      Hlam     <- get_Hlam(mod, lambda, theta.is.lambda = TRUE)
+      Hlamsq   <- get_Hlamsq()
 
-    # Update alpha -------------------------------------------------------------
-    alpha <- mean(ystar - Hlam %*% w)
+      # Update alpha -----------------------------------------------------------
+      alpha <- mean(ystar - Hlam %*% w)
+    }
 
     # Calculate lower bound ----------------------------------------------------
     lb[niter + 1] <- lb.const +
