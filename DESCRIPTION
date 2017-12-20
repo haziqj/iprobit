@@ -16,7 +16,7 @@ Imports:
   foreach,
   ggplot2,
   ggrepel,
-  iprior (>= 0.6.5.9005),
+  iprior (>= 0.7.0.9006),
   mlbench,
   mvtnorm,
   parallel,
