@@ -41,26 +41,22 @@ iprobit.default <- function(y, ..., kernel = "linear", interactions = NULL,
   }
 
   # Set up controls ------------------------------------------------------------
-  method <- tolower(method)
-  method <- match.arg(method, c("vb", "laplace"))
-  if (method == "vb") method <- "em"
-  if (method == "laplace") method <- "direct"
-
-
   control_ <- list(
     maxit          = 100,
     stop.crit      = 1e-5,
     silent         = FALSE,
-    alpha0         = NULL,  # if NULL, parameters are
-    # lambda0        = NULL,  # initialised in VB
-    w0             = NULL,  # routine
-    theta0         = NULL,
+    alpha0         = NULL,    # if NULL, parameters
+    # lambda0        = NULL,  # are initialised
+    w0             = NULL,    # in
+    theta0         = NULL,    # VB routine
     n.samp         = 100,  # settings for
-    sd.samp        = 0.15,   # the metropolis
-    thin.samp      = 2,    # sampler
-    seed           = NULL,
+    sd.samp        = 0.15, # the
+    thin.samp      = 2,    # metropolis
+    seed           = NULL, # sampler
     restarts       = 0,
-    restart.method = c("lb", "error", "brier")
+    no.cores       = parallel::detectCores(),
+    par.method     = c("lb", "error", "brier"),
+    par.maxit      = 10
   )
   control <- iprior::.update_control(control, control_)
   list2env(control, environment())
@@ -70,14 +66,21 @@ iprobit.default <- function(y, ..., kernel = "linear", interactions = NULL,
   if (mod$no.int.3plus > 0)
     stop("Can't fit more than three-way interactions yet.")
   mod$m <- m <- length(mod$y.levels)  # no. of classes
-  est.method <- iprior::.iprior_method_checker(mod, method)
-  # >>> CHECK IF PSI = 1 <<<
 
   # Pass to the correct VB routine ---------------------------------------------
-  if (control$restarts > 1) {
-    # res <- iprobit_parallel(ipriorKernel, con$restarts, con$restart.method, con)
-    stop("Not implemented yet.")
+  if (as.numeric(control$restarts) >= 1) {
+    res <- iprobit_parallel(mod, method = method, control = control)
+    res$est.method <- paste0(
+      gsub("\\.", "", res$est.method), " with random restarts."
+    )
   } else {
+    # Method checker (VB closed-form, VB Metropolis or Laplace) ----------------
+    method <- tolower(method)
+    method <- match.arg(method, c("vb", "laplace"))
+    if (method == "vb") method <- "em"
+    if (method == "laplace") method <- "direct"
+    est.method <- iprior::.iprior_method_checker(mod, method)
+
     if (m == 2) {
       # Binary models ----------------------------------------------------------
       if (est.method["direct"]) {  # LAPLACE METHOD
@@ -159,7 +162,8 @@ iprobit.formula <- function(formula, data, kernel = "linear", one.lam = FALSE,
 }
 
 #' @export
-iprobit.ipriorKernel <- function(object, method = c("vb", "laplace"), control = list(),
+iprobit.ipriorKernel <- function(object, method = c("vb", "laplace"),
+                                 control = list(),
                                  common.intercept = FALSE,
                                  common.RKHS.scale = FALSE, ...) {
   res <- iprobit.default(y = object, method = method, control = control,

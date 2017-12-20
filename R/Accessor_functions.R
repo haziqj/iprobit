@@ -80,10 +80,8 @@ get_sd_lambda <- function(object) {
   res[grep("lambda", names(res))]
 }
 
-
-
 #' @export
-get_error_rate <- function(x) x$fitted.values$train.error
+get_error_rate <- function(x) x$fitted.values$error
 
 #' @export
 get_error_rates <- function(x) {
@@ -93,7 +91,7 @@ get_error_rates <- function(x) {
 }
 
 #' @export
-get_brier_score <- function(x) x$fitted.values$brier.score
+get_brier_score <- function(x) x$fitted.values$brier
 
 #' @export
 get_brier_scores <- function(x) {

@@ -5,7 +5,7 @@ iprobit_bin_laplace <- function(mod, silent = FALSE, maxit = 100, alpha0 = NULL,
   iprobit.env <- environment()
   list2env(mod, iprobit.env)
   environment(loop_logical) <- iprobit.env
-  # maxit <- max(1, maxit)  # cannot have maxit <= 0
+  maxit <- max(1, maxit)  # cannot have maxit <= 0
   y <- as.numeric(factor(y))  # as.factor then as.numeric to get y = 1, 2, ...
 
   # Initialise -----------------------------------------------------------------
@@ -58,7 +58,7 @@ iprobit_bin_laplace <- function(mod, silent = FALSE, maxit = 100, alpha0 = NULL,
   V <- tmp$vec
   Fi.inv <- V %*% (t(V) / u)
   se <- sqrt(diag(Fi.inv))
-  # se <- convert_se(se, res$par, mod)  # delta method to convert to parameter s.e.
+  se[-1] <- iprior::.convert_se(se[-1], theta, mod)  # delta method to convert to parameter s.e.
 
   # Calculate posterior s.d. and prepare param table ---------------------------
   theta <- matrix(theta, ncol = 2, nrow = length(theta))
@@ -70,6 +70,7 @@ iprobit_bin_laplace <- function(mod, silent = FALSE, maxit = 100, alpha0 = NULL,
     param - qnorm(0.975) * se,
     param + qnorm(0.975) * se
   )
+  colnames(param.summ) <- c("Mean", "S.D.", "2.5%", "97.5%")
   rownames(param.summ) <- get_names(mod, expand = FALSE)
 
   list(theta = theta, param.full = param.full, param.summ = param.summ, w = w,
@@ -79,7 +80,8 @@ iprobit_bin_laplace <- function(mod, silent = FALSE, maxit = 100, alpha0 = NULL,
        train.error = as.numeric(na.omit(train.error)),
        train.brier = as.numeric(na.omit(train.brier)),
        test.error = as.numeric(na.omit(test.error)),
-       test.brier = as.numeric(na.omit(test.brier)), convergence = res$convergence)
+       test.brier = as.numeric(na.omit(test.brier)), convergence = res$convergence,
+       message = res$message)
 }
 
 lap_bin <- function(mu, object, w0, trace = FALSE, env = NULL) {
@@ -126,3 +128,4 @@ Q_bin <- function(w, alpha, Hlam, y) {
 # dat <- gen_mixture(100)
 # mod <- iprior::kernL(y ~ ., dat, one.lam = TRUE, est.psi = FALSE)
 # iprobit_bin_laplace(mod)
+

@@ -31,11 +31,11 @@ plot.iprobitMod <- function(x, niter.plot = NULL, levels = NULL, ...) {
 }
 
 #' @export
-iplot_fitted <- function(object) {
-  list2env(object, environment())
+iplot_fitted <- function(x) {
+  list2env(x, environment())
   list2env(ipriorKernel, environment())
 
-  probs <- fitted(object)$prob
+  probs <- fitted(x)$prob
   # if (isNystrom(ipriorKernel)) probs <- probs[order(Nystrom$Nys.samp), ]
   df.plot <- data.frame(probs, i = 1:n)
   colnames(df.plot) <- c(y.levels, "i")
