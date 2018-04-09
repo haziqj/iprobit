@@ -49,8 +49,10 @@ get_intercept <- function(object, by.class = FALSE) {
   res
 }
 
+#' @export
 get_alpha <- get_intercept
 
+#' @export
 get_lambda <- function(object, by.class = FALSE) {
   res <- get_hyperparam(object)
   res <- res[grep("lambda", rownames(res)), , drop = FALSE]
@@ -66,6 +68,7 @@ get_lambda <- function(object, by.class = FALSE) {
   res
 }
 
+#' @export
 get_sd <- function(object) {
   setNames(object$param.summ$S.D., rownames(object$param.summ))
 }
@@ -103,21 +106,6 @@ get_brier_scores <- function(x) {
 get_m <- function(object) {
   if (is.iprobitMod(object)) object <- object$ipriorKernel
   length(object$y.levels)
-}
-
-
-#' Extract the variational lower bound
-#'
-#' @param object An object of class \code{ipriorProbit}.
-#' @param ... This is not used here.
-#'
-#' @return The variational lower bound.
-#' @export
-logLik.iprobitMod <- function(object, ...) {
-  lb <- object$lower.bound[!is.na(object$lower.bound)]
-  lb <- lb[length(lb)]
-  class(lb) <- "iprobitLowerBound"
-  lb
 }
 
 #' @export

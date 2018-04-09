@@ -55,7 +55,8 @@ iprobit.default <- function(y, ..., kernel = "linear", interactions = NULL,
     restarts       = 0,
     no.cores       = parallel::detectCores(),
     par.method     = c("lb", "error", "brier"),
-    par.maxit      = 10
+    par.maxit      = 10,
+    w.only         = FALSE  # to obtain log-likelihood
   )
   control <- iprior::.update_control(control, control_)
   list2env(control, environment())
@@ -87,7 +88,8 @@ iprobit.default <- function(y, ..., kernel = "linear", interactions = NULL,
                                    stop.crit)
         res$est.method <- "Laplace approximation."
       } else if (est.method["em.closed"]) {  # VB CLOSED-FORM
-        res <- iprobit_bin(mod, maxit, stop.crit, silent, alpha0, theta0, w0)
+        res <- iprobit_bin(mod, maxit, stop.crit, silent, alpha0, theta0, w0,
+                           w.only = w.only)
         res$est.method <- "Closed-form VB-EM algorithm."
       } else {
         res <- iprobit_bin_metr(mod, maxit, stop.crit, silent, alpha0, theta0,

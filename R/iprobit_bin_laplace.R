@@ -1,3 +1,4 @@
+#' @export
 iprobit_bin_laplace <- function(mod, silent = FALSE, maxit = 100, alpha0 = NULL,
                                 theta0 = NULL, w0 = NULL, seed = NULL,
                                 stop.crit = 1e-5) {
@@ -84,6 +85,7 @@ iprobit_bin_laplace <- function(mod, silent = FALSE, maxit = 100, alpha0 = NULL,
        message = res$message)
 }
 
+#' @export
 lap_bin <- function(mu, object, w0, trace = FALSE, env = NULL) {
   alpha <- mu[1]
   theta <- mu[-1]
@@ -112,6 +114,7 @@ lap_bin <- function(mu, object, w0, trace = FALSE, env = NULL) {
   res
 }
 
+#' @export
 Q_bin <- function(w, alpha, Hlam, y) {
   # The Q function for the Laplace method for binary models.
   #
