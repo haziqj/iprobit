@@ -28,8 +28,7 @@
 iprobit_mult_metr <- function(mod, maxit = 5, stop.crit = 1e-5, silent = FALSE,
                               alpha0 = NULL, theta0 = NULL, w0 = NULL,
                               n.samp = 100, sd.samp = 0.15, thin.samp = 1,
-                              seed = NULL, common.intercept = FALSE,
-                              common.RKHS.scale = TRUE) {
+                              seed = NULL) {
   # Declare all variables and functions to be used into environment ------------
   iprobit.env <- environment()
   list2env(mod, iprobit.env)
@@ -94,8 +93,8 @@ iprobit_mult_metr <- function(mod, maxit = 5, stop.crit = 1e-5, silent = FALSE,
 
     # Update w -----------------------------------------------------------------
     for (j in 1:m) {
-      A <- Hlamsq[[j]] + diag(1, n)
-      a <- as.numeric(crossprod(Hlam[[j]], ystar[, j] - alpha[j]))
+      A <- Hlamsq + diag(1, n)
+      a <- as.numeric(crossprod(Hlam, ystar[, j] - alpha[j]))
       eigenA <- iprior::eigenCpp(A)
       V <- eigenA$vec
       u <- eigenA$val + 1e-8  # ensure positive eigenvalues
@@ -112,10 +111,10 @@ iprobit_mult_metr <- function(mod, maxit = 5, stop.crit = 1e-5, silent = FALSE,
       theta.star <- theta.current <- theta.samp[[t]]
       theta.star[] <- rnorm(thetal$n.theta, mean = theta.current[, 1], sd = sd.samp)
       Hlam.star <- get_Hlam(mod, theta.star)
-      Hlamsq.star <- lapply(Hlam.star, iprior::fastSquare)
+      Hlamsq.star <- iprior::fastSquare(Hlam.star)
       log.q.star[] <- as.numeric(-0.5 * (
-        sum(Hlamsq.star[[1]] * W[[1]]) -
-          2 * crossprod(ystar[, 1] - alpha[1], Hlam.star[[1]]) %*% w[, 1]
+        sum(Hlamsq.star * W[[1]]) -
+          2 * crossprod(ystar[, 1] - alpha[1], Hlam.star) %*% w[, 1]
       ))
       log.prob.acc <- log.q.star - log.q[t, ]
       prob.acc <- exp(log.prob.acc)

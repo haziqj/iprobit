@@ -128,8 +128,7 @@ calc_ystar <- function(object, xstar, alpha, theta, w, theta.is.lambda = FALSE,
   } else {
     m <- get_m(object)
     if (length(alpha) == 1) alpha <- rep(alpha, m)
-    return(rep(alpha, each = nrow(Hlam.new[[1]])) +
-             mapply("%*%", Hlam.new, split(w, col(w))))
+    return(rep(alpha, each = nrow(Hlam.new)) + Hlam.new %*% w)
   }
 }
 

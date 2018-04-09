@@ -20,33 +20,33 @@ test_that("VB-EM (Closed-form)", {
 
 })
 
-test_that("VB-EM with Metropolis sampler", {
-
-  mod <- iprior::kernL(y ~ ., gen_circle(n = 6, m = 3, seed = 123), kernel = "fbm",
-                       est.hurst = TRUE, est.psi = FALSE)
-  theta0 <- matrix(c(1, 1, 0, 0), ncol = 3, nrow = 4)
-  alpha0 <- rep(1, 3)
-
-  # Only different intercepts in each class ------------------------------------
-  mod1 <- iprobit(mod,
-                  control = list(silent = TRUE, maxit = 20, theta0 = theta0,
-                                 alpha0 = alpha0, n.samp = 5, thin.samp = 1,
-                                 seed = 123))
-  mod2 <- iprobit_mult_metr(mod, 20, silent = TRUE, alpha0 = alpha0,
-                            theta0 = theta0, n.samp = 5, thin.samp = 1,
-                            seed = 123)
-  expect_equal(as.numeric(coef(mod1)[, 1]),
-               c(-0.001513346, 1.0390585, 1.0274495, 0.4885230, 0.5595608),
-               tol = 1e-5)
-  expect_equal(as.numeric(coef(mod1)[, 2]),
-               c(0.005148759, 1.0390585, 1.0274495, 0.4885230, 0.5595608),
-               tol = 1e-5)
-  expect_equal(as.numeric(coef(mod1)[, 3]),
-               c(-0.003635412, 1.0390585, 1.0274495, 0.4885230, 0.5595608),
-               tol = 1e-5)
-  expect_equal(mod1$param.full, mod2$param.full, tol = 1e-5)
-
-})
+# test_that("VB-EM with Metropolis sampler", {
+#
+#   mod <- iprior::kernL(y ~ ., gen_circle(n = 6, m = 3, seed = 123), kernel = "fbm",
+#                        est.hurst = TRUE, est.psi = FALSE)
+#   theta0 <- matrix(c(1, 1, 0, 0), ncol = 3, nrow = 4)
+#   alpha0 <- rep(1, 3)
+#
+#   # Only different intercepts in each class ------------------------------------
+#   mod1 <- iprobit(mod,
+#                   control = list(silent = TRUE, maxit = 20, theta0 = theta0,
+#                                  alpha0 = alpha0, n.samp = 5, thin.samp = 1,
+#                                  seed = 123))
+#   mod2 <- iprobit_mult_metr(mod, 20, silent = TRUE, alpha0 = alpha0,
+#                             theta0 = theta0, n.samp = 5, thin.samp = 1,
+#                             seed = 123)
+#   expect_equal(as.numeric(coef(mod1)[, 1]),
+#                c(-0.001513346, 1.0390585, 1.0274495, 0.4885230, 0.5595608),
+#                tol = 1e-5)
+#   expect_equal(as.numeric(coef(mod1)[, 2]),
+#                c(0.005148759, 1.0390585, 1.0274495, 0.4885230, 0.5595608),
+#                tol = 1e-5)
+#   expect_equal(as.numeric(coef(mod1)[, 3]),
+#                c(-0.003635412, 1.0390585, 1.0274495, 0.4885230, 0.5595608),
+#                tol = 1e-5)
+#   expect_equal(mod1$param.full, mod2$param.full, tol = 1e-5)
+#
+# })
 
 context("Multinomial models")
 
@@ -61,18 +61,18 @@ mod <- iprobit(dat$y, dat$X, control = list(maxit = 5, silent = TRUE))
 modf <- iprobit(y ~ ., dat, one.lam = TRUE, train.samp = c(1, 5),
                 control = list(maxit = 5, silent = TRUE))
 # Metropolis
-modmetr <- iprobit(y ~ ., dat, kernel = "fbm", est.hurst = TRUE,
-                   control = list(maxit = 2, silent = TRUE))
+# modmetr <- iprobit(y ~ ., dat, kernel = "fbm", est.hurst = TRUE,
+#                    control = list(maxit = 2, silent = TRUE))
 
 # Predict without quantiles ----------------------------------------------------
 mod.predict <- predict(mod, newdata = list(dat.test$X))
 modf.predict <- predict(modf, newdata = dat.test)
-modmetr.predict <- predict(modmetr, newdata = dat.test)
+# modmetr.predict <- predict(modmetr, newdata = dat.test)
 
 # Predict with quantiles -------------------------------------------------------
 mod.predict.q <- predict(mod, list(dat.test$X), quantiles = TRUE, n.samp = 3)
 modf.predict.q <- predict(modf, dat.test, quantiles = TRUE, n.samp = 3)
-modmetr.predict.q <- predict(modmetr, dat.test,  quantiles = TRUE, n.samp = 3)
+# modmetr.predict.q <- predict(modmetr, dat.test,  quantiles = TRUE, n.samp = 3)
 
 test_that("Fitting binary models", {
 
@@ -115,11 +115,11 @@ test_that("Predict (without test error rate)", {
 
   expect_s3_class(mod.predict, "iprobitPredict")
   expect_s3_class(modf.predict, "iprobitPredict")
-  expect_s3_class(modmetr.predict, "iprobitPredict")
+  # expect_s3_class(modmetr.predict, "iprobitPredict")
 
   expect_s3_class(mod.predict.q, "iprobitPredict_quant")
   expect_s3_class(modf.predict.q, "iprobitPredict_quant")
-  expect_s3_class(modmetr.predict.q, "iprobitPredict_quant")
+  # expect_s3_class(modmetr.predict.q, "iprobitPredict_quant")
 
   expect_that(print(mod.predict), prints_text("Test data not provided."))
 
@@ -131,6 +131,6 @@ test_that("Predict (with test error rate)", {
 
   expect_that(print(mod.predict), prints_text("Test error"))
   expect_that(print(modf.predict), prints_text("Test error"))
-  expect_that(print(modmetr.predict), prints_text("Test error"))
+  # expect_that(print(modmetr.predict), prints_text("Test error"))
 
 })

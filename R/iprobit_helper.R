@@ -40,40 +40,40 @@ expand_lambda <- function(x, intr, intr.3plus = NULL) {
   }
 }
 
+# get_Hlam <- function(object, theta, theta.is.lambda = FALSE) {
+#   # Obtains the kernel matrix Hlam.
+#   #
+#   # Args:
+#   #
+#   # Returns: For binary models, this calculate Hlam. For multinomial models,
+#   # this calculates Hlam for every class---so a list is returned.
+#   if (is.iprobit_bin(object)) {
+#     if (is.matrix(theta)) theta <- theta[, 1]
+#     return(iprior::.get_Hlam(object, theta, theta.is.lambda))
+#   } else {
+#     res <- NULL
+#     m <- get_m(object)
+#     for (j in seq_len(m)) {
+#       res[[j]] <- iprior::.get_Hlam(object, as.numeric(theta[, j]),
+#                                     theta.is.lambda)
+#     }
+#     return(res)
+#   }
+# }
+
 get_Hlam <- function(object, theta, theta.is.lambda = FALSE) {
   # Obtains the kernel matrix Hlam.
   #
   # Args:
   #
-  # Returns: For binary models, this calculate Hlam. For multinomial models,
-  # this calculates Hlam for every class---so a list is returned.
-  if (is.iprobit_bin(object)) {
-    if (is.matrix(theta)) theta <- theta[, 1]
-    return(iprior::.get_Hlam(object, theta, theta.is.lambda))
-  } else {
-    res <- NULL
-    m <- get_m(object)
-    for (j in seq_len(m)) {
-      res[[j]] <- iprior::.get_Hlam(object, as.numeric(theta[, j]),
-                                    theta.is.lambda)
-    }
-    return(res)
-  }
+  # Returns: Hlam
+  if (is.matrix(theta)) theta <- theta[, 1]
+  return(iprior::.get_Hlam(object, theta, theta.is.lambda))
 }
 
 get_Htildelam <- function(object, theta, xstar, theta.is.lambda = FALSE) {
-  if (is.iprobit_bin(object)) {
-    if (is.matrix(theta)) theta <- theta[, 1]
-    return(iprior::.get_Htildelam(object, theta, xstar, theta.is.lambda))
-  } else {
-    res <- NULL
-    m <- get_m(object)
-    for (j in seq_len(m)) {
-      res[[j]] <- iprior::.get_Htildelam(object, as.numeric(theta[, j]), xstar,
-                                         theta.is.lambda)
-    }
-    return(res)
-  }
+  if (is.matrix(theta)) theta <- theta[, 1]
+  return(iprior::.get_Htildelam(object, theta, xstar, theta.is.lambda))
 }
 
 get_Hlamsq <- function() {
@@ -86,51 +86,27 @@ get_Hlamsq <- function() {
   # multinomial models.
   environment(Hlam_two_way_index) <- environment()
   q <- p + no.int
-  m <- get_m(mod)
+  if (is.matrix(lambda)) lambda <- lambda[, 1]
+  if (is.matrix(lambdasq)) lambdasq <- lambdasq[, 1]
 
-  if (is.iprobit_bin(mod)) { # BINARY MODEL
-    # Calculate square terms of Hlamsq -----------------------------------------
-    if (is.null(Hsql))
-      square.terms <- Reduce("+", mapply("*", Psql[1:q], lambdasq[1:q],
-                                         SIMPLIFY = FALSE))
-    else
-      square.terms <- Reduce("+", mapply("*", Hsql[1:q], lambdasq[1:q],
-                                         SIMPLIFY = FALSE))
+  # Calculate square terms of Hlamsq -----------------------------------------
+  if (is.null(Hsql))
+    square.terms <- Reduce("+", mapply("*", Psql[1:q], lambdasq[1:q],
+                                       SIMPLIFY = FALSE))
+  else
+    square.terms <- Reduce("+", mapply("*", Hsql[1:q], lambdasq[1:q],
+                                       SIMPLIFY = FALSE))
 
-    # Calculate two-way terms of Hlamsq ----------------------------------------
-    if (is.null(ind1) && is.null(ind2)) {
-      two.way.terms <- 0
-    } else {
-      lambda.two.way <- Hlam_two_way_index(lambda, lambdasq)
-      two.way.terms <- Reduce("+", mapply("*", H2l, lambda.two.way,
-                                          SIMPLIFY = FALSE))
-    }
-
-    return(square.terms + two.way.terms)
+  # Calculate two-way terms of Hlamsq ----------------------------------------
+  if (is.null(ind1) && is.null(ind2)) {
+    two.way.terms <- 0
   } else {
-    res <- NULL
-    for (j in seq_len(m)) { # MULTINOMIAL MODEL
-      # Calculate square terms of Hlamsq -----------------------------------------
-      if (is.null(Hsql))
-        square.terms <- Reduce("+", mapply("*", Psql[1:q], lambdasq[1:q, j],
-                                           SIMPLIFY = FALSE))
-      else
-        square.terms <- Reduce("+", mapply("*", Hsql[1:q], lambdasq[1:q, j],
-                                           SIMPLIFY = FALSE))
-
-      # Calculate two-way terms of Hlamsq ----------------------------------------
-      if (is.null(ind1) && is.null(ind2))
-        two.way.terms <- 0
-      else {
-        lambda.two.way <- Hlam_two_way_index(lambda[1:q, j], lambdasq[1:q, j])
-        two.way.terms <-
-          Reduce("+", mapply("*", H2l, lambda.two.way, SIMPLIFY = FALSE))
-      }
-
-      res[[j]] <- square.terms + two.way.terms
-    }
-    return(res)
+    lambda.two.way <- Hlam_two_way_index(lambda, lambdasq)
+    two.way.terms <- Reduce("+", mapply("*", H2l, lambda.two.way,
+                                        SIMPLIFY = FALSE))
   }
+
+  return(square.terms + two.way.terms)
 }
 
 Hlam_two_way_index <- function(lam, lamsq) {

@@ -31,7 +31,6 @@ iprobit_mult <- function(mod, maxit = 10, stop.crit = 1e-5, silent = FALSE,
   m <- length(y.levels)
   nm <- n * m
   maxit <- max(1, maxit)
-  common.RKHS.scale <- TRUE
 
   # Initialise -----------------------------------------------------------------
   if (is.null(alpha0)) alpha0 <- rnorm(m)
@@ -50,7 +49,7 @@ iprobit_mult <- function(mod, maxit = 10, stop.crit = 1e-5, silent = FALSE,
   Hlamsq <- get_Hlamsq()
   w <- f.tmp <- ystar <- w0
   Varw <- W <- list(NULL)
-  f.tmp <- rep(alpha, each = n) + mapply("%*%", Hlam, split(w, col(w)))
+  f.tmp <- rep(alpha, each = n) + Hlam %*% w
   logdetA <- rep(NA, m)
   niter <- 0
   lb <- train.error <- train.brier <- test.error <- test.brier <- rep(NA, maxit)
@@ -85,8 +84,8 @@ iprobit_mult <- function(mod, maxit = 10, stop.crit = 1e-5, silent = FALSE,
 
     # Update w -----------------------------------------------------------------
     for (j in 1:m) {
-      A <- Hlamsq[[j]] + diag(1, n)
-      a <- as.numeric(crossprod(Hlam[[j]], ystar[, j] - alpha[j]))
+      A <- Hlamsq + diag(1, n)
+      a <- as.numeric(crossprod(Hlam, ystar[, j] - alpha[j]))
       eigenA <- iprior::eigenCpp(A)
       V <- eigenA$vec
       u <- eigenA$val + 1e-8  # ensure positive eigenvalues
@@ -120,7 +119,7 @@ iprobit_mult <- function(mod, maxit = 10, stop.crit = 1e-5, silent = FALSE,
     Hlamsq   <- get_Hlamsq()
 
     # Update alpha -------------------------------------------------------------
-    alpha <- apply(ystar - mapply("%*%", Hlam, split(w, col(w))), 2, mean)
+    alpha <- apply(ystar - Hlam %*% w, 2, mean)
     alpha <- alpha - mean(alpha)
 
     # theta --------------------------------------------------------------------
@@ -135,7 +134,7 @@ iprobit_mult <- function(mod, maxit = 10, stop.crit = 1e-5, silent = FALSE,
     lb[niter + 1] <- lb.ystar + lb.w + lb.lambda + lb.alpha
 
     # Calculate fitted values and error rate -----------------------------------
-    f.tmp <- rep(alpha, each = n) + mapply("%*%", Hlam, split(w, col(w)))
+    f.tmp <- rep(alpha, each = n) + Hlam %*% w
     # f.var.tmp
     fitted.values <- probs_yhat_error(y, y.levels, f.tmp)
     train.error[niter + 1] <- fitted.values$error
