@@ -128,7 +128,9 @@ calc_ystar <- function(object, xstar, alpha, theta, w, theta.is.lambda = FALSE,
   } else {
     m <- get_m(object)
     if (length(alpha) == 1) alpha <- rep(alpha, m)
-    return(rep(alpha, each = nrow(Hlam.new)) + Hlam.new %*% w)
+    f.tmp <- rep(alpha, each = nrow(Hlam.new)) + Hlam.new %*% w
+    f.var.tmp <- sapply(Varw, function(x) diag(Hlam.new %*% tcrossprod(x, Hlam.new)) + 1)
+    return(list(ystar = f.tmp, sigma = sqrt(f.var.tmp)))
   }
 }
 
@@ -146,10 +148,13 @@ probs_yhat_error <- function(y, y.levels, ystar, type = c("train", "test")) {
     y.hat <- factor(y.hat, levels = 1:2)
   } else {
     # Multinomial model --------------------------------------------------------
+    sigma <- ystar$sigma
+    ystar <- ystar$ystar
+
     p.hat <- ystar
     for (i in seq_len(nrow(ystar))) {
       for (j in seq_along(y.levels)) {
-        p.hat[i, j] <- EprodPhiZ(ystar[i, j] - ystar[i, seq_along(y.levels)[-j]])
+        p.hat[i, j] <- EprodPhiZ(ystar[i, ], sigma = sigma, j = j)
       }
       # p.hat[i, m] <- 1 - sum(p.hat[i, 1:(m - 1)])
     }
@@ -308,7 +313,7 @@ sample_prob_mult <- function(object, n.samp, xstar = NULL, y = NULL) {
     alpha <- alpha.samp[[i]]
     theta <- theta.samp[[i]]
     w <- w.samp[[i]]
-    ystar.samp <- calc_ystar(object$ipriorKernel, xstar, alpha, theta, w, til)
+    ystar.samp <- calc_ystar(object$ipriorKernel, xstar, alpha, theta, w, til, object$Varw)
     tmp <- probs_yhat_error(y, object$ipriorKernel$y.levels, ystar.samp)
     phat.samp[[i]] <- tmp$prob
     error.samp[i] <- tmp$error

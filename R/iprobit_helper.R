@@ -226,12 +226,15 @@ loop_logical <- function() {
 #   pmvnorm(upper = mu, sigma = Sigma)
 # }
 
-EprodPhiZ <- function(mu, sigma = rep(1, length(mu)), log = FALSE) {
+EprodPhiZ <- function(mu, sigma = rep(1, length(mu)), j, log = FALSE) {
+  indx <- seq_along(mu)[-j]
   res <- integrate(
     function(z) {
       tmp <- 0
-      for (i in seq_len(length(mu)))
-        tmp <- tmp + pnorm(z + mu[i], log.p = TRUE)
+      for (k in indx) tmp <- tmp + pnorm(
+        sigma[j] * z / sigma[k] + (mu[j] - mu[k]) / sigma[k],
+        log.p = TRUE
+      )
       exp(tmp) * dnorm(z)
     },
     lower = -Inf, upper = Inf

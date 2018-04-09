@@ -65,7 +65,7 @@ iprobit_mult <- function(mod, maxit = 10, stop.crit = 1e-5, silent = FALSE,
       j <- as.numeric(y[i])
       fi <- f.tmp[i, ]
       fik <- fi[-j]; fij <- fi[j]
-      logClb[i] <- logC <- EprodPhiZ(fij - fik, log = TRUE)
+      logClb[i] <- logC <- EprodPhiZ(fi, j = j, log = TRUE)
       for (k in seq_len(m)[-j]) {
         logD <- log(integrate(
           function(z) {
@@ -135,13 +135,14 @@ iprobit_mult <- function(mod, maxit = 10, stop.crit = 1e-5, silent = FALSE,
 
     # Calculate fitted values and error rate -----------------------------------
     f.tmp <- rep(alpha, each = n) + Hlam %*% w
-    # f.var.tmp
-    fitted.values <- probs_yhat_error(y, y.levels, f.tmp)
+    f.var.tmp <- sapply(Varw, function(x) diag(Hlam %*% x %*% Hlam) + 1)
+    fitted.values <- probs_yhat_error(y, y.levels, list(ystar = f.tmp,
+                                                        sigma = sqrt(f.var.tmp)))
     train.error[niter + 1] <- fitted.values$error
     train.brier[niter + 1] <- fitted.values$brier
     fitted.test <- NULL
     if (iprior::.is.ipriorKernel_cv(mod)) {
-      ystar.test <- calc_ystar(mod, mod$Xl.test, alpha, theta, w)
+      ystar.test <- calc_ystar(mod, mod$Xl.test, alpha, theta, w, Varw = Varw)
       fitted.test <- probs_yhat_error(y.test, y.levels, ystar.test)
       test.error[niter + 1] <- fitted.test$error
       test.brier[niter + 1] <- fitted.test$brier
