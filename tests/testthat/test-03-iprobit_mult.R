@@ -7,54 +7,15 @@ test_that("VB-EM (Closed-form)", {
   theta0 <- matrix(rep(1, 6), ncol = 3)
   alpha0 <- rep(1, 3)
 
-  # Different hyperparameters in each class ------------------------------------
-  mod1 <- iprobit(mod, control = list(silent = TRUE, maxit = 20, theta0 = theta0,
-                                      alpha0 = alpha0))
+  mod1 <- iprobit(mod, control = list(silent = TRUE, maxit = 20,
+                                      theta0 = theta0, alpha0 = alpha0))
   mod2 <- iprobit_mult(mod, 20, silent = TRUE, alpha0 = alpha0, theta0 = theta0)
   expect_equal(as.numeric(coef(mod1)[, 1]),
-               c(6.502061e-01, 5.067932e-01, -6.667536e-05), tol = 1e-5)
+               c(-0.389863967, -0.005820041, 0.048168828), tol = 1e-5)
   expect_equal(as.numeric(coef(mod1)[, 2]),
-               c(0.998459716, 0.001371398, 0.760741027), tol = 1e-5)
+               c(-0.003042599, -0.005820041, 0.048168828), tol = 1e-5)
   expect_equal(as.numeric(coef(mod1)[, 3]),
-               c(1.3513342, 0.1209030, 0.6443124), tol = 1e-5)
-  expect_equal(mod1$param.full, mod2$param.full, tol = 1e-5)
-
-  # Only different RKHS parameters in each class -------------------------------
-  mod1 <- iprobit(mod, common.intercept = TRUE,
-                  control = list(silent = TRUE, maxit = 20, theta0 = theta0,
-                                 alpha0 = alpha0))
-  mod2 <- iprobit_mult(mod, 20, silent = TRUE, alpha0 = alpha0, theta0 = theta0,
-                       common.intercept = TRUE)
-  expect_equal(as.numeric(coef(mod1)[, 1]),
-               c(1, 0.4390309548, -0.0001031719), tol = 1e-5)
-  expect_equal(as.numeric(coef(mod1)[, 2]),
-               c(1, 0.0009601449, 0.7745982109), tol = 1e-5)
-  expect_equal(as.numeric(coef(mod1)[, 3]),
-               c(1, 0.1150476, 0.6924896), tol = 1e-5)
-  expect_equal(mod1$param.full, mod2$param.full, tol = 1e-5)
-
-  # Only different intercepts in each class ------------------------------------
-  mod1 <- iprobit(mod, common.RKHS.scale = TRUE,
-                  control = list(silent = TRUE, maxit = 20, theta0 = theta0,
-                                 alpha0 = alpha0))
-  mod2 <- iprobit_mult(mod, 20, silent = TRUE, alpha0 = alpha0, theta0 = theta0,
-                       common.RKHS.scale = TRUE)
-  expect_equal(as.numeric(coef(mod1)[, 1]),
-               c(0.61014, -0.005820041, 0.048168828), tol = 1e-5)
-  expect_equal(as.numeric(coef(mod1)[, 2]),
-               c(0.99696, -0.005820041, 0.048168828), tol = 1e-5)
-  expect_equal(as.numeric(coef(mod1)[, 3]),
-               c(1.39291, -0.005820041, 0.048168828), tol = 1e-5)
-  expect_equal(mod1$param.full, mod2$param.full, tol = 1e-5)
-
-  # Same hyperparameters in each class -----------------------------------------
-  mod1 <- iprobit(mod, common.intercept = TRUE, common.RKHS.scale = TRUE,
-                  control = list(silent = TRUE, maxit = 20, theta0 = theta0,
-                                 alpha0 = alpha0))
-  mod2 <- iprobit_mult(mod, 20, silent = TRUE, alpha0 = alpha0, theta0 = theta0,
-                       common.intercept = TRUE, common.RKHS.scale = TRUE)
-  expect_equal(as.numeric(coef(mod1)[, 1]),
-               c(1, 0 , 0), tol = 1e-5)
+               c(0.392906565, -0.005820041, 0.048168828), tol = 1e-5)
   expect_equal(mod1$param.full, mod2$param.full, tol = 1e-5)
 
 })
@@ -66,70 +27,23 @@ test_that("VB-EM with Metropolis sampler", {
   theta0 <- matrix(c(1, 1, 0, 0), ncol = 3, nrow = 4)
   alpha0 <- rep(1, 3)
 
-  # Different hyperparameters in each class ------------------------------------
-  mod1 <- iprobit(mod, control = list(silent = TRUE, maxit = 20, theta0 = theta0,
-                                      alpha0 = alpha0, n.samp = 5,
-                                      thin.samp = 1, seed = 123))
+  # Only different intercepts in each class ------------------------------------
+  mod1 <- iprobit(mod,
+                  control = list(silent = TRUE, maxit = 20, theta0 = theta0,
+                                 alpha0 = alpha0, n.samp = 5, thin.samp = 1,
+                                 seed = 123))
   mod2 <- iprobit_mult_metr(mod, 20, silent = TRUE, alpha0 = alpha0,
                             theta0 = theta0, n.samp = 5, thin.samp = 1,
                             seed = 123)
   expect_equal(as.numeric(coef(mod1)[, 1]),
-               c(0.9985691, 1.0150100, 1.1014431, 0.5292299, 0.6026026),
+               c(-0.001513346, 1.0390585, 1.0274495, 0.4885230, 0.5595608),
                tol = 1e-5)
   expect_equal(as.numeric(coef(mod1)[, 2]),
-               c(1.0055504, 0.6488293, 0.9076343, 0.5466233, 0.4670734),
+               c(0.005148759, 1.0390585, 1.0274495, 0.4885230, 0.5595608),
                tol = 1e-5)
   expect_equal(as.numeric(coef(mod1)[, 3]),
-               c(0.9958806, 0.9745103, 0.9592181, 0.4971903, 0.4359529),
+               c(-0.003635412, 1.0390585, 1.0274495, 0.4885230, 0.5595608),
                tol = 1e-5)
-  expect_equal(mod1$param.full, mod2$param.full, tol = 1e-5)
-
-  # Only different RKHS parameters in each class -------------------------------
-  mod1 <- iprobit(mod, common.intercept = TRUE,
-                  control = list(silent = TRUE, maxit = 20, theta0 = theta0,
-                                 alpha0 = alpha0, n.samp = 5, thin.samp = 1,
-                                 seed = 123))
-  mod2 <- iprobit_mult_metr(mod, 20, silent = TRUE, alpha0 = alpha0,
-                            theta0 = theta0, n.samp = 5, thin.samp = 1,
-                            seed = 123, common.intercept = TRUE)
-  expect_equal(as.numeric(coef(mod1)[, 1]),
-               c(1, 1.0150100, 1.1014431, 0.5292299, 0.6026026), tol = 1e-5)
-  expect_equal(as.numeric(coef(mod1)[, 2]),
-               c(1, 0.6488293, 0.9076343, 0.5466233, 0.4670734), tol = 1e-5)
-  expect_equal(as.numeric(coef(mod1)[, 3]),
-               c(1, 0.9745103, 0.9592181, 0.4971903, 0.4359529), tol = 1e-5)
-  expect_equal(mod1$param.full, mod2$param.full, tol = 1e-5)
-
-  # Only different intercepts in each class ------------------------------------
-  mod1 <- iprobit(mod, common.RKHS.scale = TRUE,
-                  control = list(silent = TRUE, maxit = 20, theta0 = theta0,
-                                 alpha0 = alpha0, n.samp = 5, thin.samp = 1,
-                                 seed = 123))
-  mod2 <- iprobit_mult_metr(mod, 20, silent = TRUE, alpha0 = alpha0,
-                            theta0 = theta0, n.samp = 5, thin.samp = 1,
-                            seed = 123, common.RKHS.scale = TRUE)
-  expect_equal(as.numeric(coef(mod1)[, 1]),
-               c(0.9984867, 1.0390585, 1.0274495, 0.4885230, 0.5595608),
-               tol = 1e-5)
-  expect_equal(as.numeric(coef(mod1)[, 2]),
-               c(1.0051488, 1.0390585, 1.0274495, 0.4885230, 0.5595608),
-               tol = 1e-5)
-  expect_equal(as.numeric(coef(mod1)[, 3]),
-               c(0.9963646, 1.0390585, 1.0274495, 0.4885230, 0.5595608),
-               tol = 1e-5)
-  expect_equal(mod1$param.full, mod2$param.full, tol = 1e-5)
-
-  # Same hyperparameters in each class -----------------------------------------
-  mod1 <- iprobit(mod, common.intercept = TRUE, common.RKHS.scale = TRUE,
-                  control = list(silent = TRUE, maxit = 20, theta0 = theta0,
-                                 alpha0 = alpha0, n.samp = 5, thin.samp = 1,
-                                 seed = 123))
-  mod2 <- iprobit_mult_metr(mod, 20, silent = TRUE, alpha0 = alpha0,
-                            theta0 = theta0, n.samp = 5, thin.samp = 1,
-                            seed = 123, common.RKHS.scale = TRUE,
-                            common.intercept = TRUE)
-  expect_equal(as.numeric(coef(mod1)[, 1]),
-               c(1, 1.0390585, 1.0274495, 0.4885230, 0.5595608), tol = 1e-5)
   expect_equal(mod1$param.full, mod2$param.full, tol = 1e-5)
 
 })

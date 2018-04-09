@@ -29,7 +29,7 @@ iprobit_mult_metr <- function(mod, maxit = 5, stop.crit = 1e-5, silent = FALSE,
                               alpha0 = NULL, theta0 = NULL, w0 = NULL,
                               n.samp = 100, sd.samp = 0.15, thin.samp = 1,
                               seed = NULL, common.intercept = FALSE,
-                              common.RKHS.scale = FALSE) {
+                              common.RKHS.scale = TRUE) {
   # Declare all variables and functions to be used into environment ------------
   iprobit.env <- environment()
   list2env(mod, iprobit.env)
@@ -42,14 +42,8 @@ iprobit_mult_metr <- function(mod, maxit = 5, stop.crit = 1e-5, silent = FALSE,
 
   # Initialise -----------------------------------------------------------------
   if (!is.null(seed)) set.seed(seed)
-  if (is.null(alpha0)) {
-    if (isTRUE(common.intercept)) alpha0 <- rep(rnorm(1), m)
-    else alpha0 <- rnorm(m)
-  }
-  if (is.null(theta0)) {
-    if (isTRUE(common.RKHS.scale)) theta0 <- rep(abs(rnorm(p)), m)
-    else theta0 <- abs(rnorm(p * m))
-  }
+  if (is.null(alpha0)) alpha0 <- rnorm(m)
+  if (is.null(theta0)) theta0 <- rep(abs(rnorm(p)), m)
   if (is.null(w0)) w0 <- matrix(0, ncol = m, nrow = n)
 
   alpha <- alpha0
@@ -63,9 +57,6 @@ iprobit_mult_metr <- function(mod, maxit = 5, stop.crit = 1e-5, silent = FALSE,
   Varw <- W <- list(NULL)
   f.tmp <- rep(alpha, each = n) + mapply("%*%", Hlam, split(w, col(w)))
   logdetA <- rep(NA, m)
-  w.ind <- seq_len(
-    ifelse(isTRUE(common.intercept) && isTRUE(common.RKHS.scale), 1, m)
-  )
   niter <- 0
   lb <- train.error <- train.brier <- test.error <- test.brier <- rep(NA, maxit)
   logClb <- rep(NA, n)
@@ -102,7 +93,7 @@ iprobit_mult_metr <- function(mod, maxit = 5, stop.crit = 1e-5, silent = FALSE,
     }
 
     # Update w -----------------------------------------------------------------
-    for (j in w.ind) {
+    for (j in 1:m) {
       A <- Hlamsq[[j]] + diag(1, n)
       a <- as.numeric(crossprod(Hlam[[j]], ystar[, j] - alpha[j]))
       eigenA <- iprior::eigenCpp(A)
@@ -114,76 +105,32 @@ iprobit_mult_metr <- function(mod, maxit = 5, stop.crit = 1e-5, silent = FALSE,
       W[[j]] <- Varw[[j]] + tcrossprod(w[, j])
       logdetA[j] <- determinant(A)$mod
     }
-    if (isTRUE(common.intercept) && isTRUE(common.RKHS.scale)) {
-      w <- matrix(w[, 1], nrow = n, ncol = m)
-      W <- rep(list(W[[1]]), m)
-      logdetA <- rep(logdetA[1], m)
-    }
 
     # Update theta -------------------------------------------------------------
     count <- rep(0, m)
-    if (isTRUE(common.RKHS.scale)) {
-      # SAME RKHS PARAMETERS, SO JUST NEED TO SAMPLE ONCE AND REPEAT IN EACH CLASS
-      for (t in seq_len(n.samp - 1)) {
-        theta.star <- theta.current <- theta.samp[[t]]
-        theta.star[] <- rnorm(thetal$n.theta, mean = theta.current[, 1], sd = sd.samp)
-        Hlam.star <- get_Hlam(mod, theta.star)
-        Hlamsq.star <- lapply(Hlam.star, iprior::fastSquare)
-        log.q.star[] <- as.numeric(-0.5 * (
-          sum(Hlamsq.star[[1]] * W[[1]]) -
-            2 * crossprod(ystar[, 1] - alpha[1], Hlam.star[[1]]) %*% w[, 1]
-        ))
-        log.prob.acc <- log.q.star - log.q[t, ]
-        prob.acc <- exp(log.prob.acc)
-        prob.acc[prob.acc > 1] <- 1
-        if (runif(1) < prob.acc[j]) {
-          theta.samp[[t + 1]] <- theta.star
-          Hlaml[[t + 1]] <- Hlam.star
-          Hlamsql[[t + 1]] <- Hlamsq.star
-          log.q[t + 1, ] <- log.q.star
-          count <- count + 1
-        } else {
-          theta.samp[[t + 1]] <- theta.current
-          Hlaml[[t + 1]] <- Hlaml[[t]]
-          Hlamsql[[t + 1]] <- Hlamsql[[t]]
-          log.q[t + 1, ] <- log.q[t, ]
-        }
-      }
-    } else {
-      # DIFFERENT RKHS SCALE, SO INDEPENDENT SAMPLER FOR EACH CLASS
-      for (t in seq_len(n.samp - 1)) {
-        theta.star <- theta.current <- theta.samp[[t]]
-        for (j in 1:m) {
-          theta.star[, j] <- rnorm(thetal$n.theta, mean = theta.current[, j], sd = sd.samp)
-        }
-        Hlam.star <- get_Hlam(mod, theta.star)
-        Hlamsq.star <- lapply(Hlam.star, iprior::fastSquare)
-        for (j in 1:m) {
-          log.q.star[j] <- as.numeric(-0.5 * (
-            sum(Hlamsq.star[[j]] * W[[j]]) -
-              2 * crossprod(ystar[, j] - alpha[j], Hlam.star[[j]]) %*% w[, j]
-          ))
-        }
-        log.prob.acc <- log.q.star - log.q[t, ]
-        prob.acc <- exp(log.prob.acc)
-        prob.acc[prob.acc > 1] <- 1
-        Hlam.tmp <- Hlaml[[t]]
-        Hlamsq.tmp <- Hlamsql[[t]]
-        theta.tmp <- theta.current
-        for (j in 1:m) {
-          if (runif(1) < prob.acc[j]) {
-            theta.tmp[, j] <- theta.star[, j]
-            Hlam.tmp[[j]] <- Hlam.star[[j]]
-            Hlamsq.tmp[[j]] <- Hlamsq.star[[j]]
-            log.q[t + 1, j] <- log.q.star[j]
-            count[j] <- count[j] + 1
-          } else {
-            log.q[t + 1, j] <- log.q[t, j]
-          }
-        }
-        theta.samp[[t + 1]] <- theta.tmp
-        Hlaml[[t + 1]] <- Hlam.tmp
-        Hlamsql[[t + 1]] <- Hlamsq.tmp
+    for (t in seq_len(n.samp - 1)) {
+      theta.star <- theta.current <- theta.samp[[t]]
+      theta.star[] <- rnorm(thetal$n.theta, mean = theta.current[, 1], sd = sd.samp)
+      Hlam.star <- get_Hlam(mod, theta.star)
+      Hlamsq.star <- lapply(Hlam.star, iprior::fastSquare)
+      log.q.star[] <- as.numeric(-0.5 * (
+        sum(Hlamsq.star[[1]] * W[[1]]) -
+          2 * crossprod(ystar[, 1] - alpha[1], Hlam.star[[1]]) %*% w[, 1]
+      ))
+      log.prob.acc <- log.q.star - log.q[t, ]
+      prob.acc <- exp(log.prob.acc)
+      prob.acc[prob.acc > 1] <- 1
+      if (runif(1) < prob.acc[j]) {
+        theta.samp[[t + 1]] <- theta.star
+        Hlaml[[t + 1]] <- Hlam.star
+        Hlamsql[[t + 1]] <- Hlamsq.star
+        log.q[t + 1, ] <- log.q.star
+        count <- count + 1
+      } else {
+        theta.samp[[t + 1]] <- theta.current
+        Hlaml[[t + 1]] <- Hlaml[[t]]
+        Hlamsql[[t + 1]] <- Hlamsql[[t]]
+        log.q[t + 1, ] <- log.q[t, ]
       }
     }
     acc.rate[niter, ] <- count / n.samp
@@ -199,16 +146,14 @@ iprobit_mult_metr <- function(mod, maxit = 5, stop.crit = 1e-5, silent = FALSE,
 
     # Update alpha -------------------------------------------------------------
     alpha <- apply(ystar - mapply("%*%", Hlam, split(w, col(w))), 2, mean)
-    if (isTRUE(common.intercept)) alpha <- rep(mean(alpha), m)
+    alpha <- alpha - mean(alpha)
+    # if (isTRUE(common.intercept)) alpha <- rep(mean(alpha), m)
 
     # Calculate lower bound ----------------------------------------------------
     lb.ystar <- sum(logClb)
     lb.w <- 0.5 * (nm - sum(sapply(W, function(x) sum(diag(x)))) - sum(logdetA))
     lb.lambda <- -sum(apply(log.q, 2, mean))
-    if (isTRUE(common.intercept))
-      lb.alpha <- 0.5 * (1 + log(2 * pi) - log(nm))
-    else
-      lb.alpha <- (m / 2) * (1 + log(2 * pi) - log(n))
+    lb.alpha <- (m / 2) * (1 + log(2 * pi) - log(n))
     lb[niter + 1] <- lb.ystar + lb.w + lb.lambda + lb.alpha
 
     # Calculate fitted values and error rate -----------------------------------
@@ -233,20 +178,15 @@ iprobit_mult_metr <- function(mod, maxit = 5, stop.crit = 1e-5, silent = FALSE,
 
   # Calculate posterior s.d. and prepare param table ---------------------------
   param.full <- theta_to_param.full(theta, alpha, mod)
-  if (isTRUE(common.intercept)) {
-    alpha <- unique(alpha)  # since they're all the same
-    se.alpha <- sqrt(1 / nm)
-  } else {
-    se.alpha <- rep(sqrt(1 / n), m)
-  }
+  se.alpha <- rep(sqrt(1 / n), m)
   alpha.summ <- cbind(alpha, se.alpha, alpha - qnorm(0.975) * se.alpha,
                       alpha + qnorm(0.975) * se.alpha)
   theta.summ <- theta.samp_to_summ_mult(theta.samp, mod)
   colnames(alpha.summ) <- colnames(theta.summ)
   param.summ <- rbind(alpha.summ, theta.summ)
-  rownames(param.summ) <- c(get_names(mod, "intercept", !common.intercept),
+  rownames(param.summ) <- c(get_names(mod, "intercept", TRUE),
                             get_names(mod, c("lambda", "hurst", "lengthscale",
-                                             "offset"), !common.RKHS.scale))
+                                             "offset"), FALSE))
 
   # Clean up and close ---------------------------------------------------------
   convergence <- niter == maxit

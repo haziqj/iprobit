@@ -269,8 +269,10 @@ sample_prob_mult <- function(object, n.samp, xstar = NULL, y = NULL) {
   sd.alpha <- get_sd_alpha(object)
 
   lambda <- get_lambda(object, by.class = TRUE)
-  sd.lambda <- matrix(get_sd_lambda(object), ncol = m, byrow = TRUE)
-  if (isTRUE(vb.closed)) til <- TRUE
+  if (isTRUE(vb.closed)) {
+    sd.lambda <- matrix(get_sd_lambda(object), ncol = m, byrow = TRUE)
+    til <- TRUE
+  }
 
   # First, sample per class ----------------------------------------------------
   for (j in seq_len(m)) {

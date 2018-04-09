@@ -24,8 +24,7 @@ iprobit <- function(...) UseMethod("iprobit")
 #' @export
 iprobit.default <- function(y, ..., kernel = "linear", interactions = NULL,
                             est.hurst = FALSE, est.lengthscale = FALSE,
-                            est.offset = FALSE, common.intercept = FALSE,
-                            common.RKHS.scale = FALSE, method = c("vb", "laplace"),
+                            est.offset = FALSE, method = c("vb", "laplace"),
                             # nystrom = FALSE, nys.seed = NULL,
                             train.samp, control = list()) {
   # Load the I-prior model -----------------------------------------------------
@@ -101,13 +100,11 @@ iprobit.default <- function(y, ..., kernel = "linear", interactions = NULL,
     } else {
       # Multinomial models -----------------------------------------------------
       if (est.method["em.closed"]) {  # VB CLOSED-FORM
-        res <- iprobit_mult(mod, maxit, stop.crit, silent, alpha0, theta0, w0,
-                            common.intercept, common.RKHS.scale)
+        res <- iprobit_mult(mod, maxit, stop.crit, silent, alpha0, theta0, w0)
         res$est.method <- "Closed-form VB-EM algorithm."
       } else {
         res <- iprobit_mult_metr(mod, maxit, stop.crit, silent, alpha0, theta0,
-                                 w0, n.samp, sd.samp, thin.samp, seed,
-                                 common.intercept, common.RKHS.scale)
+                                 w0, n.samp, sd.samp, thin.samp, seed)
         res$est.method <- paste0("VB-EM with Metropolis sampler (",
                                  iprior::dec_plac(mean(res$acc.rate) * 100, 1),
                                  "% acc.).")
@@ -132,8 +129,8 @@ iprobit.default <- function(y, ..., kernel = "linear", interactions = NULL,
 
   # Include these also in the iprobitMod object --------------------------------
   res$control <- control
-  res$common <- list(intercept  = ifelse(m == 2, TRUE, common.intercept),
-                     RKHS.param = ifelse(m == 2, TRUE, common.RKHS.scale))
+  res$common <- list(intercept  = ifelse(m == 2, TRUE, FALSE),  # remove this eventually
+                     RKHS.param = ifelse(m == 2, TRUE, TRUE))
 
   res
 }
@@ -141,8 +138,7 @@ iprobit.default <- function(y, ..., kernel = "linear", interactions = NULL,
 #' @export
 iprobit.formula <- function(formula, data, kernel = "linear", one.lam = FALSE,
                             est.hurst = FALSE, est.lengthscale = FALSE,
-                            est.offset = FALSE, common.intercept = FALSE,
-                            common.RKHS.scale = FALSE, lambda = 1, method = c("vb", "laplace"),
+                            est.offset = FALSE, lambda = 1, method = c("vb", "laplace"),
                             # nystrom = FALSE, nys.seed = NULL,
                             train.samp, control = list(), ...) {
   # Simply load the kernel and pass to iprobit.default() ------------------------
@@ -153,9 +149,7 @@ iprobit.formula <- function(formula, data, kernel = "linear", one.lam = FALSE,
                        lambda = lambda, psi = 1,
                        # nystrom = nystrom, nys.seed = nys.seed,
                        train.samp = train.samp, ...)
-  res <- iprobit.default(y = mod, control = control, method = method,
-                         common.intercept = common.intercept,
-                         common.RKHS.scale = common.RKHS.scale)
+  res <- iprobit.default(y = mod, control = control, method = method)
   res$call <- iprior::.fix_call_formula(match.call(), "iprobit")
   res$ipriorKernel$call <- iprior::.fix_call_formula(match.call(), "kernL")
   res
@@ -163,12 +157,8 @@ iprobit.formula <- function(formula, data, kernel = "linear", one.lam = FALSE,
 
 #' @export
 iprobit.ipriorKernel <- function(object, method = c("vb", "laplace"),
-                                 control = list(),
-                                 common.intercept = FALSE,
-                                 common.RKHS.scale = FALSE, ...) {
-  res <- iprobit.default(y = object, method = method, control = control,
-                         common.intercept = common.intercept,
-                         common.RKHS.scale = common.RKHS.scale)
+                                 control = list(), ...) {
+  res <- iprobit.default(y = object, method = method, control = control)
 
   # Fix call -------------------------------------------------------------------
   res$object$call <- ipriorKernel.call <- object$call
@@ -183,8 +173,7 @@ iprobit.ipriorKernel <- function(object, method = c("vb", "laplace"),
 
 #' @export
 iprobit.iprobitMod <- function(object, maxit = NULL, stop.crit = NULL,
-                               silent = NULL, common.intercept = FALSE,
-                               common.RKHS.scale = FALSE, ...) {
+                               silent = NULL, ...) {
   ipriorKernel <- object$ipriorKernel
   con          <- object$control
   con$w0       <- object$w

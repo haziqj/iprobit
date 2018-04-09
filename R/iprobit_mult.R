@@ -19,8 +19,7 @@
 ################################################################################
 
 iprobit_mult <- function(mod, maxit = 10, stop.crit = 1e-5, silent = FALSE,
-                         alpha0 = NULL, theta0 = NULL, w0 = NULL,
-                         common.intercept = FALSE, common.RKHS.scale = FALSE) {
+                         alpha0 = NULL, theta0 = NULL, w0 = NULL) {
   # Declare all variables and functions to be used into environment ------------
   iprobit.env <- environment()
   list2env(mod, iprobit.env)
@@ -32,16 +31,11 @@ iprobit_mult <- function(mod, maxit = 10, stop.crit = 1e-5, silent = FALSE,
   m <- length(y.levels)
   nm <- n * m
   maxit <- max(1, maxit)
+  common.RKHS.scale <- TRUE
 
   # Initialise -----------------------------------------------------------------
-  if (is.null(alpha0)) {
-    if (isTRUE(common.intercept)) alpha0 <- rep(rnorm(1), m)
-    else alpha0 <- rnorm(m)
-  }
-  if (is.null(theta0)) {
-    if (isTRUE(common.RKHS.scale)) theta0 <- rep(rnorm(p), m)
-    else theta0 <- rnorm(p * m)
-  }
+  if (is.null(alpha0)) alpha0 <- rnorm(m)
+  if (is.null(theta0)) theta0 <- rep(rnorm(p), m)
   if (p == 1) lambda0 <- exp(theta0)
   else lambda0 <- theta0
   if (is.null(w0)) w0 <- matrix(0, ncol = m, nrow = n)
@@ -58,9 +52,6 @@ iprobit_mult <- function(mod, maxit = 10, stop.crit = 1e-5, silent = FALSE,
   Varw <- W <- list(NULL)
   f.tmp <- rep(alpha, each = n) + mapply("%*%", Hlam, split(w, col(w)))
   logdetA <- rep(NA, m)
-  w.ind <- seq_len(
-    ifelse(isTRUE(common.intercept) && isTRUE(common.RKHS.scale), 1, m)
-  )
   niter <- 0
   lb <- train.error <- train.brier <- test.error <- test.brier <- rep(NA, maxit)
   logClb <- rep(NA, n)
@@ -93,7 +84,7 @@ iprobit_mult <- function(mod, maxit = 10, stop.crit = 1e-5, silent = FALSE,
     }
 
     # Update w -----------------------------------------------------------------
-    for (j in w.ind) {
+    for (j in 1:m) {
       A <- Hlamsq[[j]] + diag(1, n)
       a <- as.numeric(crossprod(Hlam[[j]], ystar[, j] - alpha[j]))
       eigenA <- iprior::eigenCpp(A)
@@ -104,11 +95,6 @@ iprobit_mult <- function(mod, maxit = 10, stop.crit = 1e-5, silent = FALSE,
       Varw[[j]] <- iprior::fastVDiag(V, 1 / u)  # V %*% uinv.Vt
       W[[j]] <- Varw[[j]] + tcrossprod(w[, j])
       logdetA[j] <- determinant(A)$mod
-    }
-    if (isTRUE(common.intercept) && isTRUE(common.RKHS.scale)) {
-      w <- matrix(w[, 1], nrow = n, ncol = m)
-      W <- rep(list(W[[1]]), m)
-      logdetA <- rep(logdetA[1], m)
     }
 
     # Update lambda ------------------------------------------------------------
@@ -123,13 +109,8 @@ iprobit_mult <- function(mod, maxit = 10, stop.crit = 1e-5, silent = FALSE,
             sum(Sl[[k]] * W[[j]]) / 2
         )
       }
-      if (isTRUE(common.RKHS.scale)) {
-        lambda[k, ] <- rep(sum(dt[k, ]) / sum(ct[k, ]), m)
-        lambdasq[k, ] <- rep(1 / sum(ct[k, ]) + lambda[k, 1] ^ 2, m)
-      } else {
-        lambda[k, ] <- dt[k, ] / ct[k, ]
-        lambdasq[k, ] <- 1 / ct[k, ] + lambda[k, ] ^ 2
-      }
+      lambda[k, ] <- rep(sum(dt[k, ]) / sum(ct[k, ]), m)
+      lambdasq[k, ] <- rep(1 / sum(ct[k, ]) + lambda[k, 1] ^ 2, m)
     }
 
     # Update H.lam and H.lam.sq ------------------------------------------------
@@ -140,7 +121,7 @@ iprobit_mult <- function(mod, maxit = 10, stop.crit = 1e-5, silent = FALSE,
 
     # Update alpha -------------------------------------------------------------
     alpha <- apply(ystar - mapply("%*%", Hlam, split(w, col(w))), 2, mean)
-    if (isTRUE(common.intercept)) alpha <- rep(mean(alpha), m)
+    alpha <- alpha - mean(alpha)
 
     # theta --------------------------------------------------------------------
     if (p == 1) theta <- log(lambda[1, , drop = FALSE])
@@ -149,14 +130,8 @@ iprobit_mult <- function(mod, maxit = 10, stop.crit = 1e-5, silent = FALSE,
     # Calculate lower bound ----------------------------------------------------
     lb.ystar <- sum(logClb)
     lb.w <- 0.5 * (nm - sum(sapply(W, function(x) sum(diag(x)))) - sum(logdetA))
-    if (isTRUE(common.RKHS.scale))
-      lb.lambda <- (p / 2) * (1 + log(2 * pi)) - sum(log(apply(ct, 1, sum))) / 2
-    else
-      lb.lambda <- (m / 2) * (p * (1 + log(2 * pi)) - sum(log(ct)) / m)
-    if (isTRUE(common.intercept))
-      lb.alpha <- 0.5 * (1 + log(2 * pi) - log(nm))
-    else
-      lb.alpha <- (m / 2) * (1 + log(2 * pi) - log(n))
+    lb.lambda <- (p / 2) * (1 + log(2 * pi)) - sum(log(apply(ct, 1, sum))) / 2
+    lb.alpha <- (m / 2) * (1 + log(2 * pi) - log(n))
     lb[niter + 1] <- lb.ystar + lb.w + lb.lambda + lb.alpha
 
     # Calculate fitted values and error rate -----------------------------------
@@ -181,20 +156,10 @@ iprobit_mult <- function(mod, maxit = 10, stop.crit = 1e-5, silent = FALSE,
 
   # Calculate posterior s.d. and prepare param table ---------------------------
   param.full <- theta_to_param.full(theta, alpha, mod)
-  if (isTRUE(common.intercept)) {
-    alpha <- unique(alpha)  # since they're all the same
-    se.alpha <- sqrt(1 / nm)
-  } else {
-    se.alpha <- rep(sqrt(1 / n), m)
-  }
+  se.alpha <- rep(sqrt(1 / n), m)
   lambda <- lambda[1:p, , drop = FALSE]
-  if (isTRUE(common.RKHS.scale)) {
-    lambda <- apply(lambda, 1, unique)  # since they're all the same
-    se.lambda <- matrix(sqrt(1 / apply(ct, 1, sum)), ncol = m, nrow = p)[, 1]
-  } else {
-    lambda <- c(t(lambda))
-    se.lambda <- c(t(matrix(sqrt(1 / ct[1:p, ]), ncol = m, nrow = p)))
-  }
+  lambda <- apply(lambda, 1, unique)  # since they're all the same
+  se.lambda <- matrix(sqrt(1 / apply(ct, 1, sum)), ncol = m, nrow = p)[, 1]
   param.summ <- data.frame(
     Mean    = c(alpha, lambda),
     S.D.    = c(se.alpha, se.lambda),
@@ -202,8 +167,8 @@ iprobit_mult <- function(mod, maxit = 10, stop.crit = 1e-5, silent = FALSE,
     `97.5%` = c(alpha, lambda) + qnorm(0.975) * c(se.alpha, se.lambda)
   )
   colnames(param.summ) <- c("Mean", "S.D.", "2.5%", "97.5%")
-  rownames(param.summ) <- c(get_names(mod, "intercept", !common.intercept),
-                            get_names(mod, "lambda", !common.RKHS.scale))
+  rownames(param.summ) <- c(get_names(mod, "intercept", TRUE),
+                            get_names(mod, "lambda", FALSE))
 
   # Clean up and close ---------------------------------------------------------
   convergence <- niter == maxit
