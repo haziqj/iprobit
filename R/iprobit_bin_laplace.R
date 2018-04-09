@@ -41,13 +41,14 @@ iprobit_bin_laplace <- function(mod, silent = FALSE, maxit = 100, alpha0 = NULL,
   time.taken <- iprior::as.time(end.time - start.time)
 
   # Calculate fitted values and error rates ----------------------------------
-  eta <- as.numeric(alpha + Hlam %*% w)
-  fitted.values <- probs_yhat_error(y, y.levels, eta)
+  f.tmp <- as.numeric(alpha + Hlam %*% w)  # E[ystar|y,theta]
+  f.var.tmp <- diag(Hlam %*% Varw %*% Hlam) + 1  # diag(Var[ystar|y,theta])
+  fitted.values <- probs_yhat_error(y, y.levels, f.tmp / sqrt(f.var.tmp))
   train.error <- fitted.values$error
   train.brier <- fitted.values$brier
   fitted.test <- NULL
   if (iprior::.is.ipriorKernel_cv(mod)) {
-    ystar.test <- calc_ystar(mod, mod$Xl.test, alpha, theta, w)
+    ystar.test <- calc_ystar(mod, mod$Xl.test, alpha, theta, w, Varw = Varw)
     fitted.test <- probs_yhat_error(y.test, y.levels, ystar.test)
     test.error[niter + 1] <- fitted.test$error
     test.brier[niter + 1] <- fitted.test$brier

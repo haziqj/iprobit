@@ -136,6 +136,7 @@ iprobit_mult <- function(mod, maxit = 10, stop.crit = 1e-5, silent = FALSE,
 
     # Calculate fitted values and error rate -----------------------------------
     f.tmp <- rep(alpha, each = n) + mapply("%*%", Hlam, split(w, col(w)))
+    # f.var.tmp
     fitted.values <- probs_yhat_error(y, y.levels, f.tmp)
     train.error[niter + 1] <- fitted.values$error
     train.brier[niter + 1] <- fitted.values$brier

@@ -98,7 +98,7 @@ predict_iprobit <- function(object, xstar, y.test, quantiles = FALSE,
   # Args: object is ipriorMod_x.
   if (!isTRUE(quantiles)) {
     ystar.new <- calc_ystar(object$ipriorKernel, xstar, get_alpha(object),
-                            get_theta(object), object$w)
+                            get_theta(object), object$w, Varw = object$Varw)
     res <- probs_yhat_error(y.test, object$ipriorKernel$y.levels, ystar.new,
                             type = "test")
   } else {
@@ -108,7 +108,8 @@ predict_iprobit <- function(object, xstar, y.test, quantiles = FALSE,
   res
 }
 
-calc_ystar <- function(object, xstar, alpha, theta, w, theta.is.lambda = FALSE) {
+calc_ystar <- function(object, xstar, alpha, theta, w, theta.is.lambda = FALSE,
+                       Varw) {
   # Args: An ipriorKernel object.
   #
   # Returns: For binary models, a vector of ystar. For multinomial models, this
@@ -120,7 +121,10 @@ calc_ystar <- function(object, xstar, alpha, theta, w, theta.is.lambda = FALSE) 
       stopifnot(all.same(as.numeric(alpha)))
       alpha <- alpha[1]
     }
-    return(as.numeric(alpha + Hlam.new %*% w))
+    # Calculate E[ystar|y,theta] and diag(Var[ystar|y,theta])
+    f.tmp <- as.numeric(alpha + Hlam.new %*% w)
+    f.var.tmp <- diag(Hlam.new %*% tcrossprod(Varw, Hlam.new)) + 1
+    return(f.tmp / sqrt(f.var.tmp))
   } else {
     m <- get_m(object)
     if (length(alpha) == 1) alpha <- rep(alpha, m)
@@ -247,7 +251,8 @@ sample_prob_bin <- function(object, n.samp, xstar = NULL, y = NULL) {
     alpha <- alpha.samp[i]
     theta <- theta.samp[i, ]
     w <- w.samp[i, ]
-    ystar.samp <- calc_ystar(object$ipriorKernel, xstar, alpha, theta, w, til)
+    ystar.samp <- calc_ystar(object$ipriorKernel, xstar, alpha, theta, w, til,
+                             object$Varw)
     tmp <- probs_yhat_error(y, object$ipriorKernel$y.levels, ystar.samp)
     phat.samp[[i]] <- tmp$prob
     error.samp[i] <- tmp$error

@@ -114,13 +114,14 @@ iprobit_bin <- function(mod, maxit = 100, stop.crit = 1e-5, silent = FALSE,
     theta <- matrix(theta, ncol = 2, nrow = length(theta))
 
     # Calculate fitted values and error rates ----------------------------------
-    f.tmp <- as.numeric(alpha + Hlam %*% w)
-    fitted.values <- probs_yhat_error(y, y.levels, f.tmp)
+    f.tmp <- as.numeric(alpha + Hlam %*% w)  # E[ystar|y,theta]
+    f.var.tmp <- diag(Hlam %*% Varw %*% Hlam) + 1  # diag(Var[ystar|y,theta])
+    fitted.values <- probs_yhat_error(y, y.levels, f.tmp / sqrt(f.var.tmp))
     train.error[niter + 1] <- fitted.values$error
     train.brier[niter + 1] <- fitted.values$brier
     fitted.test <- NULL
     if (iprior::.is.ipriorKernel_cv(mod)) {
-      ystar.test <- calc_ystar(mod, mod$Xl.test, alpha, theta, w)
+      ystar.test <- calc_ystar(mod, mod$Xl.test, alpha, theta, w, Varw = Varw)
       fitted.test <- probs_yhat_error(y.test, y.levels, ystar.test)
       test.error[niter + 1] <- fitted.test$error
       test.brier[niter + 1] <- fitted.test$brier
