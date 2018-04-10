@@ -55,15 +55,11 @@ get_alpha <- get_intercept
 #' @export
 get_lambda <- function(object, by.class = FALSE) {
   res <- get_hyperparam(object)
-  res <- res[grep("lambda", rownames(res)), , drop = FALSE]
+  res <- res[grep("lambda", rownames(res)), 1, drop = FALSE]  # just the first
+                                                              # column is fine
   if (!isTRUE(by.class)) {
     res <- c(res)
-    if (is.common.intercept(object)) {
-      res <- res[1]
-      names(res) <- get_names(object, "lambda", FALSE)
-    } else {
-      names(res) <- get_names(object, "lambda", TRUE)
-    }
+    names(res) <- get_names(object, "lambda", FALSE)
   }
   res
 }

@@ -122,6 +122,7 @@ iprobit.default <- function(y, ..., kernel = "linear", interactions = NULL,
       res$est.conv <- res$message
     res$ipriorKernel <- mod
   }
+  # res$coefficients <- res$param.full
   res$coefficients <- param.full_to_coef(res$param.full, mod)
   # rownames(res$coefficients) <- get_names(mod, expand = FALSE)
 

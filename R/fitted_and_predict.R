@@ -277,17 +277,19 @@ sample_prob_mult <- function(object, n.samp, xstar = NULL, y = NULL) {
   alpha <- c(get_alpha(object, by.class = TRUE))
   sd.alpha <- get_sd_alpha(object)
 
-  lambda <- get_lambda(object, by.class = TRUE)
+  lambda <- get_lambda(object, by.class = FALSE)  # vector
   if (isTRUE(vb.closed)) {
-    sd.lambda <- matrix(get_sd_lambda(object), ncol = m, byrow = TRUE)
+    # sd.lambda <- matrix(get_sd_lambda(object), ncol = m, byrow = TRUE)
+    sd.lambda <- get_sd_lambda(object)
     til <- TRUE
   }
 
+  lambda.samp <- sample_lambda(n.samp, lambda, sd.lambda)
   # First, sample per class ----------------------------------------------------
   for (j in seq_len(m)) {
     alpha.samp[[j]] <- sample_alpha(n.samp, alpha[j], sd.alpha[j])
     if (isTRUE(vb.closed)) {
-      theta.samp[[j]] <- sample_lambda(n.samp, lambda[, j], sd.lambda[, j])
+      theta.samp[[j]] <- lambda.samp
     }
     w.samp[[j]] <- sample_w(n.samp, object$w[, j], object$Varw[[j]])
   }

@@ -198,7 +198,10 @@ param.full_to_coef <- function(param.full, object) {
   res <- apply(param.full[-1, ], 2, function(x) {
     iprior::.reduce_theta(x, est.list = object$estl)$theta.reduced
   })
-  res <- rbind("Intercept" = param.full[1, ], res)
+  res <- rbind(param.full[1, ], res)
+
+  tmp.names <- rownames(param.full)[param.full[, 1] %in% res[, 1]]
+  rownames(res) <- tmp.names
   res
 }
 
