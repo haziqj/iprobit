@@ -14,17 +14,25 @@
 #
 #   dat <- gen_mixture(10)
 #   mod.lb <- iprobit(y ~ ., dat, control = list(restarts = 4, maxit = 4,
-#                                                restart.method = "lb"),
+#                                                par.method = "lb"),
 #                     silent = TRUE)
-#   mod.er <- iprobit(y ~ ., dat, control = list(restarts = 4, maxit = 4,
-#                                                restart.method = "error"),
+#   mod.trer <- iprobit(y ~ ., dat, control = list(restarts = 4, maxit = 4,
+#                                                  par.method = "traine"),
 #                     silent = TRUE)
-#   mod.br <- iprobit(y ~ ., dat, control = list(restarts = 4, maxit = 4,
-#                                                restart.method = "brier"),
+#   mod.tser <- iprobit(y ~ ., dat, control = list(restarts = 4, maxit = 4,
+#                                                  par.method = "teste"),
+#                     silent = TRUE)
+#   mod.trbr <- iprobit(y ~ ., dat, control = list(restarts = 4, maxit = 4,
+#                                                  par.method = "trainb"),
+#                     silent = TRUE)
+#   mod.tsbr <- iprobit(y ~ ., dat, control = list(restarts = 4, maxit = 4,
+#                                                  par.method = "testb"),
 #                     silent = TRUE)
 #
-#   expect_s3_class(mod.lb, "iprobitMod")
-#   expect_s3_class(mod.er, "iprobitMod")
-#   expect_s3_class(mod.br, "iprobitMod")
+#   expect_s3_class(mod.lb,   "iprobitMod")
+#   expect_s3_class(mod.trer, "iprobitMod")
+#   expect_s3_class(mod.tser, "iprobitMod")
+#   expect_s3_class(mod.trbr, "iprobitMod")
+#   expect_s3_class(mod.tsbr, "iprobitMod")
 #
 # })

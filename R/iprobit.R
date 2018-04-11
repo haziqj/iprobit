@@ -54,7 +54,7 @@ iprobit.default <- function(y, ..., kernel = "linear", interactions = NULL,
     seed           = NULL, # sampler
     restarts       = 0,
     no.cores       = parallel::detectCores(),
-    par.method     = c("lb", "error", "brier"),
+    par.method     = c("lb", "traine", "trainb", "teste", "testb"),
     par.maxit      = 10,
     w.only         = FALSE  # to obtain log-likelihood
   )
