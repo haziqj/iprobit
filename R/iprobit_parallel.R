@@ -94,7 +94,22 @@ iprobit_parallel <- function(mod, method = "vb",
   # res$niter <- res$niter + best.niter
   # res$lower.bound <- c(best.lb, res$lower.bound)
 
-  res[[best.run]]
+  the.res <- res[[best.run]]
+  par.combined <- list(lower.bound = list(NULL), train.error = list(NULL),
+                       train.brier = list(NULL), test.error = list(NULL),
+                       test.brier = list(NULL))
+  for (i in seq_along(res)) {
+    par.combined$lower.bound[[i]] <- res[[i]]$lower.bound
+    par.combined$train.error[[i]] <- res[[i]]$train.error
+    par.combined$train.brier[[i]] <- res[[i]]$train.brier
+    if (length(res[[i]]$test.error) > 0) {
+      par.combined$test.error[[i]]  <- res[[i]]$test.error
+      par.combined$test.brier[[i]]  <- res[[i]]$test.brier
+    }
+  }
+  the.res$par.combined <- par.combined
+
+  the.res
 }
 
 # ipar_compare_lb <- function(x) {

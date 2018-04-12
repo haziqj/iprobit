@@ -392,6 +392,7 @@ iplot_error <- function(x, niter.plot, plot.test = TRUE) {
     theme(legend.position = "none")
 }
 
+#' @export
 iplot_lb_and_error <- function(x, niter.plot, lab.pos, plot.test = TRUE) {
   suppressMessages(
     p2 <- iplot_error(x, niter.plot, plot.test) +
@@ -440,3 +441,113 @@ iplot_lb_and_error <- function(x, niter.plot, lab.pos, plot.test = TRUE) {
 #     labs(x = x.axis.lab, y = "Probability") +
 #     theme_bw()
 # }
+
+#' @export
+iplot_par_lb <- function(x, niter.plot, lab.pos = c("up", "down"), ...) {
+  if (is.null(x$par.combined)) stop("Nothing to plot.")
+
+  lab.pos <- match.arg(lab.pos, c("up", "down"))
+  if (lab.pos == "up") lab.pos <- -0.5
+  else lab.pos <- 1.5
+
+  # Create data frame containing lower bound values ----------------------------
+  lb.original <- x$par.combined$lower.bound
+  N <- sapply(lb.original, length)
+  seq.max <- seq_len(max(N))
+  lb.original <- as.data.frame(sapply(lb.original, "[", i = seq.max))
+  colnames(lb.original) <- paste0("Run ", seq_along(N))
+
+  if (missing(niter.plot)) niter.plot <- seq.max
+  else if (length(niter.plot) == 1) niter.plot <- seq_len(niter.plot)
+  lb <- lb.original[niter.plot, ]
+  plot.df <- cbind(Iteration = niter.plot, lb)
+  plot.df <- reshape2::melt(plot.df, id = "Iteration")
+
+  time.per.iter <- x$time$time / x$niter
+  if (time.per.iter < 0.001) time.per.iter <- 0.001
+
+  ggplot(plot.df, aes(x = Iteration, y = value)) +
+    geom_line(aes(col = variable), na.rm = TRUE) +
+    # geom_point() +
+    geom_hline(yintercept = max(plot.df$value, na.rm = TRUE), linetype = 2,
+               col = "grey10") +
+    annotate("text", x = min(plot.df$Iteration), col = "grey10",
+             y = max(plot.df$value, na.rm = TRUE), vjust = lab.pos,
+             label = round(max(plot.df$value, na.rm = TRUE), 2), size = 3.7) +
+    labs(y = "Variational lower bound") +
+    guides(col = guide_legend(title = "")) +
+    scale_x_continuous(
+      sec.axis = sec_axis(~ . * time.per.iter, name = "Time (seconds)"),
+      breaks = scales::pretty_breaks(n = min(5, ifelse(x$niter == 2, 1, x$niter)))
+    ) +
+    theme_bw()
+}
+
+#' @export
+iplot_par_error <- function(x, niter.plot, type = c("train", "test")) {
+  if (is.null(x$par.combined)) stop("Nothing to plot.")
+  type <- match.arg(type, c("train", "test"))
+
+  # Create data frame containing error and brier values ------------------------
+  train.error <- x$par.combined$train.error
+  train.brier <- x$par.combined$train.brier
+  N <- sapply(train.error, length)
+  seq.max <- seq_len(max(N))
+  train.error <- as.data.frame(sapply(train.error, "[", i = seq.max)) / 100
+  train.brier <- as.data.frame(sapply(train.brier, "[", i = seq.max))
+  train.df <- rbind(
+    cbind(train.error, errtype = "error"),
+    cbind(train.brier, errtype = "brier")
+  )
+  colnames(train.error) <- colnames(train.brier) <- paste0("Run ", seq_along(N))
+
+  if (missing(niter.plot)) niter.plot <- seq.max
+  else if (length(niter.plot) == 1) niter.plot <- seq_len(niter.plot)
+  plot.df <- cbind(
+    Iteration = niter.plot,
+    rbind(
+      cbind(train.error[niter.plot, ], errtype = "error"),
+      cbind(train.brier[niter.plot, ], errtype = "brier")
+    ),
+    Type      = "train"
+  )
+  if (!is.null(x$par.combined$test.error[[1]])) {
+    test.error <- x$par.combined$test.error
+    test.brier <- x$par.combined$test.brier
+    test.error <- as.data.frame(sapply(test.error, "[", i = seq.max)) / 100
+    test.brier <- as.data.frame(sapply(test.brier, "[", i = seq.max))
+    colnames(test.error) <- colnames(test.brier) <- paste0("Run ", seq_along(N))
+    plot.df <- rbind(
+      plot.df,
+      Iteration = niter.plot,
+      rbind(
+        cbind(test.error[niter.plot, ], errtype = "error"),
+        cbind(test.brier[niter.plot, ], errtype = "brier")
+      ),
+      Type      = "test"
+    )
+  }
+
+  time.per.iter <- x$time$time / x$niter
+  if (time.per.iter < 0.001) time.per.iter <- 0.001
+  plot.df <- reshape2::melt(plot.df, id = c("Iteration", "Type", "errtype"))
+  plot.df <- subset(plot.df, Type == type)
+
+  # The plot -------------------------------------------------------------------
+  ggplot(plot.df, aes(x = Iteration, y = value, col = variable,
+                      linetype = errtype)) +
+    geom_line(alpha = 0.9, na.rm = TRUE) +
+    scale_x_continuous(
+      sec.axis = sec_axis(~ . * time.per.iter, name = "Time (seconds)"),
+      breaks = scales::pretty_breaks(n = min(5, ifelse(x$niter == 2, 1, x$niter)))
+    ) +
+    scale_y_continuous(
+      name = "Misclassification rate",
+      labels = scales::percent,
+      sec.axis = sec_axis(~ ., name = "Brier score")
+    ) +
+    scale_color_discrete(name = "") +
+    scale_linetype_discrete(name = "") +
+    coord_cartesian(xlim = c(min(niter.plot), max(niter.plot) + 0.5)) +
+    theme_bw()
+}
