@@ -519,12 +519,14 @@ iplot_par_error <- function(x, niter.plot, type = c("train", "test")) {
     colnames(test.error) <- colnames(test.brier) <- paste0("Run ", seq_along(N))
     plot.df <- rbind(
       plot.df,
-      Iteration = niter.plot,
-      rbind(
-        cbind(test.error[niter.plot, ], errtype = "error"),
-        cbind(test.brier[niter.plot, ], errtype = "brier")
-      ),
-      Type      = "test"
+      cbind(
+        Iteration = niter.plot,
+        rbind(
+          cbind(test.error[niter.plot, ], errtype = "error"),
+          cbind(test.brier[niter.plot, ], errtype = "brier")
+        ),
+        Type      = "test"
+      )
     )
   }
 
@@ -542,9 +544,9 @@ iplot_par_error <- function(x, niter.plot, type = c("train", "test")) {
       breaks = scales::pretty_breaks(n = min(5, ifelse(x$niter == 2, 1, x$niter)))
     ) +
     scale_y_continuous(
-      name = "Misclassification rate",
+      name = paste0("Misclassification rate (", type, ")"),
       labels = scales::percent,
-      sec.axis = sec_axis(~ ., name = "Brier score")
+      sec.axis = sec_axis(~ ., name = paste0("Brier score (", type, ")"))
     ) +
     scale_color_discrete(name = "") +
     scale_linetype_discrete(name = "") +
