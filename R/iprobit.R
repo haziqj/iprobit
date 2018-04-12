@@ -44,6 +44,7 @@ iprobit.default <- function(y, ..., kernel = "linear", interactions = NULL,
     maxit          = 100,
     stop.crit      = 1e-5,
     silent         = FALSE,
+    int.only       = FALSE,  #intercept only model
     alpha0         = NULL,    # if NULL, parameters
     # lambda0        = NULL,  # are initialised
     w0             = NULL,    # in
@@ -90,7 +91,7 @@ iprobit.default <- function(y, ..., kernel = "linear", interactions = NULL,
         res$est.method <- "Laplace approximation."
       } else if (est.method["em.closed"]) {  # VB CLOSED-FORM
         res <- iprobit_bin(mod, maxit, stop.crit, silent, alpha0, theta0, w0,
-                           w.only = w.only)
+                           w.only = w.only, int.only = int.only)
         res$est.method <- "Closed-form VB-EM algorithm."
       } else {
         res <- iprobit_bin_metr(mod, maxit, stop.crit, silent, alpha0, theta0,
@@ -103,7 +104,8 @@ iprobit.default <- function(y, ..., kernel = "linear", interactions = NULL,
     } else {
       # Multinomial models -----------------------------------------------------
       if (est.method["em.closed"]) {  # VB CLOSED-FORM
-        res <- iprobit_mult(mod, maxit, stop.crit, silent, alpha0, theta0, w0)
+        res <- iprobit_mult(mod, maxit, stop.crit, silent, alpha0, theta0, w0,
+                            int.only = int.only)
         res$est.method <- "Closed-form VB-EM algorithm."
       } else {
         res <- iprobit_mult_metr(mod, maxit, stop.crit, silent, alpha0, theta0,

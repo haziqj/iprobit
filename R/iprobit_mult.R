@@ -19,7 +19,8 @@
 ################################################################################
 
 iprobit_mult <- function(mod, maxit = 10, stop.crit = 1e-5, silent = FALSE,
-                         alpha0 = NULL, theta0 = NULL, w0 = NULL) {
+                         alpha0 = NULL, theta0 = NULL, w0 = NULL, w.only = FALSE,
+                         int.only = FALSE) {
   # Declare all variables and functions to be used into environment ------------
   iprobit.env <- environment()
   list2env(mod, iprobit.env)
@@ -108,8 +109,10 @@ iprobit_mult <- function(mod, maxit = 10, stop.crit = 1e-5, silent = FALSE,
             sum(Sl[[k]] * W[[j]]) / 2
         )
       }
-      lambda[k, ] <- rep(sum(dt[k, ]) / sum(ct[k, ]), m)
-      lambdasq[k, ] <- rep(1 / sum(ct[k, ]) + lambda[k, 1] ^ 2, m)
+      if (!isTRUE(int.only)) {
+        lambda[k, ] <- rep(sum(dt[k, ]) / sum(ct[k, ]), m)
+        lambdasq[k, ] <- rep(1 / sum(ct[k, ]) + lambda[k, 1] ^ 2, m)
+      }
     }
 
     # Update H.lam and H.lam.sq ------------------------------------------------

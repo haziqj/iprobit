@@ -19,7 +19,8 @@
 ################################################################################
 
 iprobit_bin <- function(mod, maxit = 100, stop.crit = 1e-5, silent = FALSE,
-                        alpha0 = NULL, theta0 = NULL, w0 = NULL, w.only = FALSE) {
+                        alpha0 = NULL, theta0 = NULL, w0 = NULL, w.only = FALSE,
+                        int.only = FALSE) {
   # Declare all variables and functions to be used into environment ------------
   iprobit.env <- environment()
   list2env(mod, iprobit.env)
@@ -90,8 +91,10 @@ iprobit_bin <- function(mod, maxit = 100, stop.crit = 1e-5, silent = FALSE,
         dt <- as.numeric(
           crossprod(ystar - alpha, Pl[[k]]) %*% w - sum(Sl[[k]] * W) / 2
         )
-        lambda[k] <- dt / ct[k]
-        lambdasq[k] <- 1 / ct[k] + (dt / ct[k]) ^ 2
+        if (!isTRUE(int.only)) {
+          lambda[k] <- dt / ct[k]
+          lambdasq[k] <- 1 / ct[k] + (dt / ct[k]) ^ 2
+        }
       }
       lambda   <- expand_lambda(lambda[1:p], intr, intr.3plus)
       lambdasq <- expand_lambda(lambdasq[1:p], intr, intr.3plus)
