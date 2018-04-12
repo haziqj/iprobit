@@ -39,8 +39,11 @@ iprobit_parallel <- function(mod, method = "vb",
   } else {
     snow.options.list <- list()
   }
-  par.method <- match.arg(control$par.method, c("lb", "traine", "trainb",
-                                                "teste", "testb"))
+  par.method <- match.arg(control$par.method, c("lower.bound", "train.error",
+                                                "train.brier", "test.error",
+                                                "test.brier"))
+
+  control$par.maxit <- control$maxit  # for now, it just does multiple restarts in parallel
 
   # The multithreading bit -----------------------------------------------------
   start.time <- Sys.time()
@@ -57,16 +60,8 @@ iprobit_parallel <- function(mod, method = "vb",
       new.control$maxit    <- control$par.maxit
       new.control$silent   <- TRUE
       tmp <- iprobit(mod, control = new.control, method = method)
-      list(
-        alpha  = get_alpha(tmp),
-        theta  = get_theta(tmp),
-        niter  = tmp$niter,
-        lb     = tmp$lower.bound,
-        traine = tmp$train.error,
-        trainb = tmp$train.brier,
-        teste  = tmp$test.error,
-        testb  = tmp$test.brier
-      )
+      # tmp$iprioKernel <- NULL
+      tmp
     }
   )
   if (!isTRUE(control$silent)) close(pb)
@@ -74,8 +69,8 @@ iprobit_parallel <- function(mod, method = "vb",
 
   # Find best starting value ---------------------------------------------------
   list2env(find_best_run(res, par.method), envir = environment())
-  best.niter <- res[[best.run]]$niter
-  best.lb    <- res[[best.run]]$lb
+  # best.niter <- res[[best.run]]$niter
+  # best.lb    <- res[[best.run]]$lb
 
   # Continue updating the best model -------------------------------------------
   if (!isTRUE(control$silent)) {
@@ -84,22 +79,22 @@ iprobit_parallel <- function(mod, method = "vb",
     cat("Continuing on Run", best.run, "\n")
   }
 
-  control$restarts <- 0
-  control$alpha0   <- res[[best.run]]$alpha
-  control$theta0   <- res[[best.run]]$theta
-  control$maxit    <- control$maxit - control$par.maxit
-  res <- iprobit(mod, method = method, control = control)
-  end.time <- Sys.time()
-  time.taken <- as.time(end.time - start.time)
+  # control$restarts <- 0
+  # control$alpha0   <- res[[best.run]]$alpha
+  # control$theta0   <- res[[best.run]]$theta
+  # control$maxit    <- control$maxit - control$par.maxit
+  # res <- iprobit(mod, method = method, control = control)
+  # end.time <- Sys.time()
+  # time.taken <- as.time(end.time - start.time)
+  #
+  # # Update time taken ----------------------------------------------------------
+  # res$time <- time.taken
+  # res$start.time <- start.time
+  # res$end.time <- end.time
+  # res$niter <- res$niter + best.niter
+  # res$lower.bound <- c(best.lb, res$lower.bound)
 
-  # Update time taken ----------------------------------------------------------
-  res$time <- time.taken
-  res$start.time <- start.time
-  res$end.time <- end.time
-  res$niter <- res$niter + best.niter
-  res$lower.bound <- c(best.lb, res$lower.bound)
-
-  res
+  res[[best.run]]
 }
 
 # ipar_compare_lb <- function(x) {
@@ -126,9 +121,9 @@ find_best_run <- function(res, par.method) {
     x[length(x)]
   })
   if (is.list(tmp)) {  # if cannot find par.method, tmp is a list not a vector
-    if (par.method == "teste") par.method <- "traine"
-    else if (par.method == "testb") par.method <- "trainb"
-    else par.method <- "lb"
+    if (par.method == "test.error") par.method <- "train.error"
+    else if (par.method == "test.brier") par.method <- "train.brier"
+    else par.method <- "lower.bound"
     message("Using training results as test results not found.")
     par.ind <- grep(par.method, names(res[[1]]))
     tmp <- sapply(res, function(x) {
@@ -138,19 +133,19 @@ find_best_run <- function(res, par.method) {
   }
   names(tmp) <- paste("Run", seq_along(tmp))
 
-  if (par.method == "lb") {
+  if (par.method == "lower.bound") {
     best.run <- which(tmp == max(tmp))
     par.msg <- "Variational lower-bound"
-  } else if (par.method == "traine") {
+  } else if (par.method == "train.error") {
     best.run <- which(tmp == min(tmp))
     par.msg <- "Training misclassification (percent)"
-  } else if (par.method == "trainb") {
+  } else if (par.method == "train.brier") {
     best.run <- which(tmp == min(tmp))
     par.msg <- "Training Brier score"
-  } else if (par.method == "teste") {
+  } else if (par.method == "test.error") {
     best.run <- which(tmp == min(tmp))
     par.msg <- "Test misclassification (percent)"
-  } else if (par.method == "testb") {
+  } else if (par.method == "test.brier") {
     best.run <- which(tmp == min(tmp))
     par.msg <- "Test Brier score"
   }
