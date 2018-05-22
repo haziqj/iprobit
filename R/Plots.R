@@ -553,3 +553,33 @@ iplot_par_error <- function(x, niter.plot, type = c("train", "test")) {
     coord_cartesian(xlim = c(min(niter.plot), max(niter.plot) + 0.5)) +
     theme_bw()
 }
+
+# library(plotly)
+#
+# no.points <- 100
+# m <- 2
+# mu <- rep(0, m)
+# Sigma <- matrix(c(1, 0.6, 0.6, 1), nrow = m)
+#
+# x <- mu[1]
+# x <- seq(x - 3, x + 3, length = no.points)
+# y <- mu[2]
+# y <- seq(y - 3, y + 3, length = no.points)
+# tab <- expand.grid(x = x, y = y)
+# tab$z <- NA
+# for (i in seq_len(nrow(tab))) {
+#   tab$z[i] <- dtnorm_con(as.numeric(tab[i, -3]), 1, mu = mu, Psi = solve(Sigma),
+#                          n.samp = 10000)
+# }
+# z <- matrix(tab$z, nrow = no.points, ncol = no.points)
+# plot_ly(x = x, y = y, z = z) %>%
+#   add_surface() %>%
+#   layout(
+#     title = "Density plot truncated normal",
+#     scene = list(
+#       xaxis = list(title = "X1"),
+#       yaxis = list(title = "X2"),
+#       zaxis = list(title = "Density")
+#     ))
+#
+

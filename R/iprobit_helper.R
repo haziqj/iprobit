@@ -242,6 +242,92 @@ EprodPhiZ <- function(mu, sigma = rep(1, length(mu)), j, log = FALSE) {
   ifelse(isTRUE(log), log(res), res)
 }
 
+#' @export
+moment_tnorm_con <- function(j, mu, Psi = diag(length(mu)), n.samp = 1000,
+                             transform = identity) {
+  X <- rtnorm_con(n = n.samp, j = j, mu = mu, Psi = Psi)
+  X <- transform(X)
+  apply(X, 2, mean)
+}
+
+#' @export
+probj_tnorm_con <- function(j, mu, Psi = diag(length(mu)), n.samp = 10000) {
+  m <- length(mu)
+  u <- zeta <- matrix(NA, nrow = n.samp, ncol = m - 1)
+
+  # Anchor on the j'th variate
+  Q <- cbind(diag(m - 1), -1)
+  col.ind <- c(seq_len(m)[-j], j)
+  Q <- Q[, order(col.ind), drop = FALSE]
+  nuj <- as.numeric(Q %*% mu)  # same as muj <- (mu - mu[j])[-j]
+  Omegaj <- Q %*% Psi %*% t(Q)
+  if (m == 2) Omegaj <- as.numeric(Omegaj)
+
+  # Cholesky decomposition
+  L <- t(chol(Omegaj))
+
+  # Sample per class
+  for (k in seq_len(m - 1)) {
+    u[, k] <- get_u_of_zeta(zeta = zeta, nu = nuj, L = L)
+    zeta[, k] <- truncnorm::rtruncnorm(n.samp, b = u[, k])
+  }
+
+  X <- pnorm(u, log.p = TRUE)
+  mean(exp(apply(X, 1, sum)))
+}
+
+#' @export
+dtnorm_con <- function(x, j, mu,  Psi = diag(length(mu)), n.samp = 1000) {
+  if (all(x[j] - x >= 0)) {
+    norm.const <- 1 / probj_tnorm_con(j = j, mu = mu, Psi = Psi, n.samp = n.samp)  # C^{-1}
+    res <- norm.const * mvtnorm::dmvnorm(x, mean = mu, sigma = solve(Psi))
+    return(res)
+  } else {
+    return(0)
+  }
+}
+
+#' @export
+rtnorm_con <- function(n = 10, j, mu, Psi = diag(length(mu))) {
+  m <- length(mu)
+  res <- matrix(NA, nrow = n, ncol = m)
+  X <- mu  # initial value
+  Sigma <- solve(Psi)  # covariance matrix from precision matrix
+
+  indx <- c(j, sample((1:m)[-j]))  # Sample the j'th component first
+
+  for (i in seq_len(n)) {
+    for (k in indx) {
+      Sigma.inv.minusk <- Psi[-k, -k] - tcrossprod(Psi[-k, k]) / Psi[k, k]
+      sigma2k <- as.numeric(
+        Sigma[k, k] - Sigma[k, -k] %*% Sigma.inv.minusk %*% Sigma[-k, k]
+      )
+      muk <- as.numeric(
+        mu[k] + Sigma[k, -k] %*% Sigma.inv.minusk %*% (X[-k] - mu[-k])
+      )
+
+      if (k == j) X[k] <- rnorm(1, mean = muk, sd = sqrt(sigma2k))
+      else X[k] <- truncnorm::rtruncnorm(1, b = X[j], mean = muk, sd = sqrt(sigma2k))
+    }
+    res[i, ] <- X
+  }
+
+  res
+}
+
+get_u_of_zeta <- function(zeta, nu, L) {
+  check.i <- !apply(zeta, 2, function(x) all(is.na(x)))
+  i <- sum(check.i) + 1
+
+  if (i == 1) {
+    return(rep(-nu[1] / L[1, 1], nrow(zeta)))
+  } else {
+    zeta <- zeta[, 1:(i - 1), drop = FALSE]
+    Lk <- L[i, 1:(i - 1), drop = FALSE]
+    return(-(nu[i] + tcrossprod(zeta, Lk)) / L[i, i])
+  }
+}
+
 # EprodPhiZ <- function(mu, sigma) {
 #   res1 <- EprodPhiZ_1(mu = mu, sigma = sigma)
 #   res2 <- EprodPhiZ_2(mu = mu, sigma = sigma)

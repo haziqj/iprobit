@@ -22,9 +22,10 @@ iprobit_bin_laplace <- function(mod, silent = FALSE, maxit = 100, alpha0 = NULL,
   # Default optim control list -------------------------------------------------
   control <- list(
     fnscale = -1,
-    trace   = ifelse(isTRUE(silent), 0, 1),
+    # trace   = ifelse(isTRUE(silent), 0, 1),
+    trace = 1,
     maxit   = max(0, maxit - 1),
-    REPORT  = 10,
+    REPORT  = 1,
     factr   = stop.crit / .Machine$double.eps
   )
   # control <- iprior::.update_control(control, control_)

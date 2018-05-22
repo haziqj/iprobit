@@ -21,7 +21,8 @@ Imports:
   mvtnorm,
   parallel,
   reshape2,
-  scales
+  scales,
+  truncnorm
 Suggests:
   knitr,
   rmarkdown,

@@ -312,7 +312,7 @@ sample_prob_mult <- function(object, n.samp, xstar = NULL, y = NULL) {
   error.samp <- brier.samp <- rep(NA, n.samp)
 
   for (i in seq_len(n.samp)) {
-    alpha <- alpha.samp[[i]]
+    alpha <- alpha  # alpha.samp[[i]]
     theta <- theta.samp[[i]]
     w <- w.samp[[i]]
     ystar.samp <- calc_ystar(object$ipriorKernel, xstar, alpha, theta, w, til, object$Varw)

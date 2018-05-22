@@ -45,13 +45,11 @@ iprobit_bin <- function(mod, maxit = 100, stop.crit = 1e-5, silent = FALSE,
   lambda <- expand_lambda(lambda[1:p], intr, intr.3plus)
   lambdasq <- expand_lambda(lambdasq[1:p], intr, intr.3plus)
   Hlam   <- get_Hlam(mod, lambda, theta.is.lambda = TRUE)
-  Hlamsq <- get_Hlamsq()
   w <- w0
   Varw <- NA
   f.tmp <- as.numeric(alpha + Hlam %*% w)
   niter <- 0
   lb <- train.error <- train.brier <- test.error <- test.brier <- rep(NA, maxit)
-  lb.const <- (n + 1 + p - log(n) + (p + 1) * log(2 * pi)) / 2
 
   # The variational EM loop ----------------------------------------------------
   if (!silent) pb <- txtProgressBar(min = 0, max = maxit, style = 1)
@@ -71,21 +69,18 @@ iprobit_bin <- function(mod, maxit = 100, stop.crit = 1e-5, silent = FALSE,
     ystar <- f.tmp + thing
 
     # Update w -----------------------------------------------------------------
-    A <- Hlamsq + diag(1, n)
-    a <- as.numeric(crossprod(Hlam, ystar - alpha))
-    eigenA <- iprior::eigenCpp(A)
-    V <- eigenA$vec
-    u <- eigenA$val
-    uinv.Vt <- t(V) / u
-    w <- as.numeric(crossprod(a, V) %*% uinv.Vt)
-    Varw <- iprior::fastVDiag(V, 1 / u)  # V %*% uinv.Vt
-    W <- Varw + tcrossprod(w)
+    iprior::.eigen_Hlam(Hlam, environment())  # assign u and V to environment
+    z <- u ^ 2 + 1  # eigenvalues of Vy
+    zinv.Vt <- t(V) / z
+    Vy.inv.y <- as.numeric(crossprod(ystar - alpha, V) %*% zinv.Vt)
+    w <- Hlam %*% Vy.inv.y
+    W <- V %*% zinv.Vt + tcrossprod(w)
+    Varw <- V %*% zinv.Vt
 
     if (!isTRUE(w.only)) {
       # Update lambda ----------------------------------------------------------
       for (k in 1:p) {
         lambda   <- expand_lambda(lambda[1:p], intr)
-        lambdasq <- expand_lambda(lambdasq[1:p], intr)
         BlockB(k)  # Updates Pl, Psql, and Sl in environment
         ct[k] <- sum(Psql[[k]] * W)
         dt <- as.numeric(
@@ -93,23 +88,21 @@ iprobit_bin <- function(mod, maxit = 100, stop.crit = 1e-5, silent = FALSE,
         )
         if (!isTRUE(int.only)) {
           lambda[k] <- dt / ct[k]
-          lambdasq[k] <- 1 / ct[k] + (dt / ct[k]) ^ 2
         }
       }
       lambda   <- expand_lambda(lambda[1:p], intr, intr.3plus)
-      lambdasq <- expand_lambda(lambdasq[1:p], intr, intr.3plus)
       Hlam     <- get_Hlam(mod, lambda, theta.is.lambda = TRUE)
-      Hlamsq   <- get_Hlamsq()
 
       # Update alpha -----------------------------------------------------------
       alpha <- mean(ystar - Hlam %*% w)
     }
 
     # Calculate lower bound ----------------------------------------------------
-    lb[niter + 1] <- lb.const +
+    lb[niter + 1] <- n / 2  +
       sum(pnorm(f.tmp[y == 2], log.p = TRUE)) +
       sum(pnorm(-f.tmp[y == 1], log.p = TRUE)) -
-      (sum(diag(W)) + determinant(A)$modulus + sum(log(ct))) / 2
+      0.5 * sum(diag(W)) +
+      0.5 * as.numeric(determinant(Varw)$mod)
 
     # theta --------------------------------------------------------------------
     if (p == 1) theta <- log(lambda[1])
@@ -141,9 +134,9 @@ iprobit_bin <- function(mod, maxit = 100, stop.crit = 1e-5, silent = FALSE,
   param.full <- theta_to_param.full(theta, alpha, mod)
   param.summ <- data.frame(
     Mean    = c(alpha, lambda[1:p]),
-    S.D.    = sqrt(c(1 / n, 1 / ct[1:p])),
-    `2.5%`  = c(alpha, lambda[1:p]) - qnorm(0.975) * sqrt(c(1 / n, 1 / ct[1:p])),
-    `97.5%` = c(alpha, lambda[1:p]) + qnorm(0.975) * sqrt(c(1 / n, 1 / ct[1:p]))
+    S.D.    = sqrt(rep(0, p + 1)),
+    `2.5%`  = sqrt(rep(0, p + 1)),
+    `97.5%` = sqrt(rep(0, p + 1))
   )
   colnames(param.summ) <- c("Mean", "S.D.", "2.5%", "97.5%")
   rownames(param.summ) <- get_names(mod, c("intercept", "lambda"), FALSE)
@@ -165,19 +158,3 @@ iprobit_bin <- function(mod, maxit = 100, stop.crit = 1e-5, silent = FALSE,
        test.error = as.numeric(na.omit(test.error)),
        test.brier = as.numeric(na.omit(test.brier)), convergence = convergence)
 }
-
-# if (!isNystrom(mod)) {
-# } else {
-#   # Nystrom approximation
-#   K.mm <- Hlamsq[1:Nystrom$m, 1:Nystrom$m]
-#   eigenK.mm <- iprior::eigenCpp(K.mm)
-#   V <- Hlamsq[, 1:Nystrom$m] %*% eigenK.mm$vec
-#   u <- eigenK.mm$val
-#   u.Vt <- t(V) * u
-#   D <- u.Vt %*% V + diag(1, Nystrom$m)
-#   E <- solve(D, u.Vt, tol = 1e-18)
-#   # see https://stackoverflow.com/questions/22134398/mahalonobis-distance-in-r-error-system-is-computationally-singular
-#   # see https://stackoverflow.com/questions/21451664/system-is-computationally-singular-error
-#   w <- as.numeric(a - V %*% (E %*% a))
-#   W <- (diag(1, n) - V %*% E) + tcrossprod(w)
-# }
